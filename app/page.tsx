@@ -10,14 +10,17 @@ export default function HomePage() {
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
+          href="/pos"
+          className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+        >
+          <ShoppingCart className="h-4 w-4" /> Punto de Venta
+        </Link>
+        <Link
           href="/sincronizacion"
           className="flex items-center gap-2 rounded-2xl border bg-card px-5 py-3 font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           <RefreshCw className="h-4 w-4" /> Sincronizacion
         </Link>
-        <span className="flex items-center gap-2 rounded-2xl border bg-muted px-5 py-3 font-medium text-muted-foreground">
-          <ShoppingCart className="h-4 w-4" /> POS (proximamente)
-        </span>
       </div>
     </main>
   );
