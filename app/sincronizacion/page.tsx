@@ -15,6 +15,7 @@ import { getSyncLogs, getProductosCount } from "@/services/sync-log-service";
 import type { SyncLog, SyncEstado } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils/format";
 import type { SyncResult } from "@/services/sync-service";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
 function estadoBadge(estado: SyncEstado) {
   if (estado === "ok") {
@@ -27,6 +28,14 @@ function estadoBadge(estado: SyncEstado) {
 }
 
 export default function SincronizacionPage() {
+  return (
+    <AuthGuard>
+      <SincronizacionContent />
+    </AuthGuard>
+  );
+}
+
+function SincronizacionContent() {
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);

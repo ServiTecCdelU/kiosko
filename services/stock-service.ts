@@ -1,0 +1,52 @@
+// services/stock-service.ts — movimientos de stock
+import { supabase } from "@/lib/supabase";
+import type { StockMovimiento, StockMovTipo } from "@/lib/types";
+
+export interface AjusteStockInput {
+  productoId: string;
+  tipo: "entrada" | "ajuste" | "rotura";
+  cantidad: number;
+  usuario?: string;
+  referencia?: string;
+}
+
+export interface AjusteStockResult {
+  productoId: string;
+  stockAnterior: number;
+  stockNuevo: number;
+}
+
+export async function ajustarStock(input: AjusteStockInput): Promise<AjusteStockResult> {
+  const res = await fetch("/api/stock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo ajustar el stock");
+  return data as AjusteStockResult;
+}
+
+function mapMov(d: Record<string, any>): StockMovimiento {
+  return {
+    id: d.id,
+    productoId: d.producto_id,
+    tipo: (d.tipo ?? "ajuste") as StockMovTipo,
+    cantidad: Number(d.cantidad) || 0,
+    stockAnterior: d.stock_anterior != null ? Number(d.stock_anterior) : undefined,
+    stockNuevo: d.stock_nuevo != null ? Number(d.stock_nuevo) : undefined,
+    referencia: d.referencia ?? undefined,
+    usuario: d.usuario ?? undefined,
+    fecha: new Date(d.fecha),
+  };
+}
+
+export async function getMovimientos(productoId: string, limit = 30): Promise<StockMovimiento[]> {
+  const { data } = await supabase
+    .from("stock_movimientos")
+    .select("*")
+    .eq("producto_id", productoId)
+    .order("fecha", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map(mapMov);
+}

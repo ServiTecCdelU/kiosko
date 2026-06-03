@@ -10,21 +10,36 @@ import { formatCurrency } from "@/lib/utils/format";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode } from "@/services/products-service";
 import { createSale } from "@/services/sales-service";
+import { getCajaAbierta } from "@/services/caja-service";
+import { getCurrentUser } from "@/hooks/use-auth";
 import { CartPanel, type ConfirmData } from "@/components/pos/cart-panel";
+import { AuthGuard } from "@/components/auth/auth-guard";
 import type { Product } from "@/lib/types";
 
 export default function PosPage() {
+  return (
+    <AuthGuard>
+      <PosScreen />
+    </AuthGuard>
+  );
+}
+
+function PosScreen() {
   const cart = useCart();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [cajaId, setCajaId] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
   useEffect(() => {
     focusInput();
+    getCajaAbierta()
+      .then((c) => setCajaId(c?.id))
+      .catch(() => setCajaId(undefined));
   }, [focusInput]);
 
   // Busqueda por nombre con debounce
@@ -91,6 +106,7 @@ export default function PosPage() {
     async (data: ConfirmData) => {
       setProcessing(true);
       try {
+        const user = getCurrentUser();
         const res = await createSale({
           items: cart.items.map((i) => ({
             productId: i.product.id,
@@ -102,6 +118,9 @@ export default function PosPage() {
           cashAmount: data.cashAmount,
           changeAmount: data.changeAmount,
           transferAmount: data.transferAmount,
+          cajaId,
+          userId: user?.id,
+          userName: user?.nombre,
         });
         const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
         toast.success(`Ticket #${res.saleNumber}${vuelto}`);
@@ -115,7 +134,7 @@ export default function PosPage() {
         setProcessing(false);
       }
     },
-    [cart, focusInput],
+    [cart, focusInput, cajaId],
   );
 
   return (
@@ -125,8 +144,13 @@ export default function PosPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-lg font-bold">Punto de Venta</h1>
-        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          <ScanLine className="h-4 w-4" /> Lector listo
+        <span
+          className={cn(
+            "ml-auto flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
+            cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
+          )}
+        >
+          <ScanLine className="h-4 w-4" /> {cajaId ? "Caja abierta" : "Caja cerrada"}
         </span>
       </header>
 

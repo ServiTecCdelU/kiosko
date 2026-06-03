@@ -41,6 +41,42 @@ export async function searchProducts(query: string, limit = 24): Promise<Product
   return (data ?? []).map(mapRow);
 }
 
+export interface ProductsPageParams {
+  search?: string;
+  soloStockBajo?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ProductsPageResult {
+  products: Product[];
+  total: number;
+}
+
+export async function getProductsPage(params: ProductsPageParams): Promise<ProductsPageResult> {
+  const s = params.search ? sanitize(params.search) : "";
+
+  // Stock bajo: PostgREST no compara dos columnas, se trae un set amplio y se filtra aca.
+  if (params.soloStockBajo) {
+    let q = supabase.from("productos").select("*").eq("disabled", false);
+    if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+    const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
+    if (error) throw new Error(error.message);
+    const products = (data ?? []).map(mapRow).filter((p) => p.stock <= p.stockMinimo);
+    return { products, total: products.length };
+  }
+
+  const page = params.page ?? 0;
+  const size = params.pageSize ?? 30;
+  let q = supabase.from("productos").select("*", { count: "exact" }).eq("disabled", false);
+  if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+  const { data, count, error } = await q
+    .order("name", { ascending: true })
+    .range(page * size, page * size + size - 1);
+  if (error) throw new Error(error.message);
+  return { products: (data ?? []).map(mapRow), total: count ?? 0 };
+}
+
 // Lookup exacto para el lector de codigo de barras: prueba codigo_barras y luego codigo
 export async function findProductByCode(code: string): Promise<Product | null> {
   const c = code.trim();
