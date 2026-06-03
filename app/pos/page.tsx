@@ -12,7 +12,7 @@ import { searchProducts, findProductByCode } from "@/services/products-service";
 import { createSale } from "@/services/sales-service";
 import { getCajaAbierta } from "@/services/caja-service";
 import { getCurrentUser } from "@/hooks/use-auth";
-import { CartPanel, type ConfirmData } from "@/components/pos/cart-panel";
+import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import type { Product } from "@/lib/types";
 
@@ -32,6 +32,7 @@ function PosScreen() {
   const [processing, setProcessing] = useState(false);
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cartRef = useRef<CartPanelHandle>(null);
 
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
@@ -40,6 +41,25 @@ function PosScreen() {
     getCajaAbierta()
       .then((c) => setCajaId(c?.id))
       .catch(() => setCajaId(undefined));
+  }, [focusInput]);
+
+  // Atajos de teclado para mostrador: F2 cobrar · F3 buscar · Esc limpiar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        cartRef.current?.confirm();
+      } else if (e.key === "F3") {
+        e.preventDefault();
+        focusInput();
+      } else if (e.key === "Escape") {
+        setQuery("");
+        setResults([]);
+        focusInput();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [focusInput]);
 
   // Busqueda por nombre con debounce
@@ -148,20 +168,27 @@ function PosScreen() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-lg font-bold tracking-tight">Punto de Venta</h1>
-        <span
-          className={cn(
-            "ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-            cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
-          )}
-        >
+        <div className="ml-auto flex items-center gap-3">
+          <span className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">
+            <Kbd>F2</Kbd> Cobrar
+            <Kbd>F3</Kbd> Buscar
+            <Kbd>Esc</Kbd> Limpiar
+          </span>
           <span
             className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              cajaId ? "bg-success animate-pulse-soft" : "bg-warning",
+              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
+              cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
             )}
-          />
-          <ScanLine className="h-4 w-4" /> {cajaId ? "Caja abierta" : "Caja cerrada"}
-        </span>
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                cajaId ? "bg-success animate-pulse-soft" : "bg-warning",
+              )}
+            />
+            <ScanLine className="h-4 w-4" /> {cajaId ? "Caja abierta" : "Caja cerrada"}
+          </span>
+        </div>
       </header>
 
       <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_380px]">
@@ -235,6 +262,7 @@ function PosScreen() {
         {/* Carrito + cobro */}
         <div className="min-h-0">
           <CartPanel
+            ref={cartRef}
             items={cart.items}
             total={cart.total}
             onSetQuantity={cart.setQuantity}
@@ -246,5 +274,13 @@ function PosScreen() {
         </div>
       </div>
     </main>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+      {children}
+    </kbd>
   );
 }

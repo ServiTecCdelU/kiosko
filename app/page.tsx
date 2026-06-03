@@ -10,10 +10,17 @@ import {
   BarChart3,
   Store,
   ArrowRight,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
+import { getReporte } from "@/services/reportes-service";
+import { getCajaAbierta } from "@/services/caja-service";
+import { getProductsPage } from "@/services/products-service";
+import { formatCurrency, formatTime } from "@/lib/utils/format";
+import type { Caja, UserRol } from "@/lib/types";
 
 const ICONS: Record<string, typeof ShoppingCart> = {
   "/pos": ShoppingCart,
@@ -76,6 +83,8 @@ function HomeContent() {
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8">
         <BrandHeader nombre={user?.nombre} />
+
+        <DashboardStats rol={rol} />
 
         {/* CTA hero — Punto de Venta */}
         {pos && (
@@ -205,4 +214,111 @@ function getSaludo(now: Date | null): string {
   if (h < 13) return "Buen día";
   if (h < 20) return "Buenas tardes";
   return "Buenas noches";
+}
+
+function DashboardStats({ rol }: { rol: UserRol | null }) {
+  const showStock = !rol || rol === "admin";
+  const [loading, setLoading] = useState(true);
+  const [ventasHoy, setVentasHoy] = useState(0);
+  const [cantHoy, setCantHoy] = useState(0);
+  const [caja, setCaja] = useState<Caja | null>(null);
+  const [stockBajo, setStockBajo] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const hasta = new Date();
+      const desde = new Date();
+      desde.setHours(0, 0, 0, 0);
+      const tasks: Promise<unknown>[] = [
+        getReporte(desde, hasta)
+          .then((r) => {
+            if (!alive) return;
+            setVentasHoy(r.resumen.totalVentas);
+            setCantHoy(r.resumen.cantidad);
+          })
+          .catch(() => {}),
+        getCajaAbierta()
+          .then((c) => alive && setCaja(c))
+          .catch(() => {}),
+      ];
+      if (showStock) {
+        tasks.push(
+          getProductsPage({ soloStockBajo: true, pageSize: 1 })
+            .then((r) => alive && setStockBajo(r.total))
+            .catch(() => {}),
+        );
+      }
+      await Promise.allSettled(tasks);
+      if (alive) setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [showStock]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Array.from({ length: showStock ? 3 : 2 }).map((_, i) => (
+          <div key={i} className="h-24 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Ventas de hoy */}
+      <div className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <TrendingUp className="h-4 w-4 text-primary" /> Ventas de hoy
+        </div>
+        <p className="cifra mt-2 text-3xl font-bold text-primary">{formatCurrency(ventasHoy)}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {cantHoy} {cantHoy === 1 ? "venta" : "ventas"}
+        </p>
+      </div>
+
+      {/* Caja */}
+      <Link
+        href="/caja"
+        className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+      >
+        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <Wallet className="h-4 w-4 text-primary" /> Caja
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${caja ? "bg-success animate-pulse-soft" : "bg-muted-foreground/40"}`}
+          />
+          <span className="text-xl font-bold">{caja ? "Abierta" : "Cerrada"}</span>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {caja ? `desde ${formatTime(caja.openedAt)}` : "Tocá para abrir"}
+        </p>
+      </Link>
+
+      {/* Stock bajo (solo admin) */}
+      {showStock && (
+        <Link
+          href="/stock"
+          className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <AlertTriangle className={`h-4 w-4 ${stockBajo && stockBajo > 0 ? "text-warning" : "text-primary"}`} />
+            Stock bajo
+          </div>
+          <p
+            className={`cifra mt-2 text-3xl font-bold ${stockBajo && stockBajo > 0 ? "text-warning" : "text-foreground"}`}
+          >
+            {stockBajo ?? "—"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {stockBajo && stockBajo > 0 ? "productos para reponer" : "todo en orden"}
+          </p>
+        </Link>
+      )}
+    </div>
+  );
 }

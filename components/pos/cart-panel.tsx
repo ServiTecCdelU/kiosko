@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Trash2, Plus, Minus, Banknote, CreditCard, ShoppingCart } from "lucide-react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
+import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -15,6 +20,11 @@ export interface ConfirmData {
   transferAmount: number;
 }
 
+/** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
+export interface CartPanelHandle {
+  confirm: () => void;
+}
+
 interface CartPanelProps {
   items: CartItem[];
   total: number;
@@ -25,30 +35,43 @@ interface CartPanelProps {
   processing: boolean;
 }
 
-export function CartPanel({
-  items, total, onSetQuantity, onRemove, onClear, onConfirm, processing,
-}: CartPanelProps) {
+export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
+  { items, total, onSetQuantity, onRemove, onClear, onConfirm, processing },
+  ref,
+) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
   const [pagaCon, setPagaCon] = useState("");
+  const [efectivoMixto, setEfectivoMixto] = useState("");
 
   useEffect(() => {
-    if (items.length === 0) setPagaCon("");
+    if (items.length === 0) {
+      setPagaCon("");
+      setEfectivoMixto("");
+    }
   }, [items.length]);
 
   const pagaConNum = Number(pagaCon) || 0;
   const vuelto = method === "efectivo" ? Math.max(0, pagaConNum - total) : 0;
   const faltaEfectivo = method === "efectivo" && pagaConNum < total;
+
+  // Mixto: el efectivo ingresado es la porcion en mano; el resto va por transferencia.
+  const cashPortion = method === "mixto" ? Math.min(Math.max(0, Number(efectivoMixto) || 0), total) : 0;
+  const transferPortion = method === "mixto" ? total - cashPortion : 0;
+
   const disabled = items.length === 0 || processing || faltaEfectivo;
 
   const handleConfirm = () => {
     if (disabled) return;
-    onConfirm({
-      paymentMethod: method,
-      cashAmount: method === "efectivo" ? pagaConNum : 0,
-      changeAmount: vuelto,
-      transferAmount: method === "transferencia" ? total : 0,
-    });
+    if (method === "transferencia") {
+      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total });
+    } else if (method === "mixto") {
+      onConfirm({ paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion });
+    } else {
+      onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0 });
+    }
   };
+
+  useImperativeHandle(ref, () => ({ confirm: handleConfirm }));
 
   return (
     <div className="flex h-full flex-col rounded-2xl border bg-card">
@@ -114,25 +137,10 @@ export function CartPanel({
           <span className="cifra text-4xl font-bold text-primary">{formatCurrency(total)}</span>
         </div>
 
-        <div className="mb-3 grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setMethod("efectivo")}
-            className={cn(
-              "flex items-center justify-center gap-2 rounded-xl border py-2 text-sm font-medium transition-colors",
-              method === "efectivo" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
-            )}
-          >
-            <Banknote className="h-4 w-4" /> Efectivo
-          </button>
-          <button
-            onClick={() => setMethod("transferencia")}
-            className={cn(
-              "flex items-center justify-center gap-2 rounded-xl border py-2 text-sm font-medium transition-colors",
-              method === "transferencia" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
-            )}
-          >
-            <CreditCard className="h-4 w-4" /> Transfer.
-          </button>
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
+          <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
+          <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
         </div>
 
         {method === "efectivo" && (
@@ -156,6 +164,33 @@ export function CartPanel({
           </div>
         )}
 
+        {method === "mixto" && (
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number" inputMode="decimal" placeholder="Efectivo en mano"
+                value={efectivoMixto} onChange={(e) => setEfectivoMixto(e.target.value)}
+                className="rounded-xl"
+              />
+              <Button variant="outline" className="rounded-xl" onClick={() => setEfectivoMixto(String(total))}>
+                Todo
+              </Button>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Banknote className="h-3.5 w-3.5" /> Efectivo
+              </span>
+              <span className="font-semibold">{formatCurrency(cashPortion)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <CreditCard className="h-3.5 w-3.5" /> Transferencia
+              </span>
+              <span className="font-semibold">{formatCurrency(transferPortion)}</span>
+            </div>
+          </div>
+        )}
+
         <Button
           className="h-14 w-full rounded-2xl border-0 text-lg font-bold text-white shadow-lg shadow-success/25 transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
           style={
@@ -173,5 +208,27 @@ export function CartPanel({
         </Button>
       </div>
     </div>
+  );
+});
+
+function MethodButton({
+  active, onClick, icon, label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center justify-center gap-1 rounded-xl border py-2 text-xs font-medium transition-colors",
+        active ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

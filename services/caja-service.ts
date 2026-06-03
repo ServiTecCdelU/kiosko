@@ -44,14 +44,21 @@ export async function getCajaAbierta(): Promise<Caja | null> {
 export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
   const { data } = await supabase
     .from("ventas")
-    .select("total,payment_method")
+    .select("total,payment_method,transfer_amount")
     .eq("caja_id", cajaId);
   let efectivo = 0;
   let transferencia = 0;
   for (const v of data ?? []) {
     const t = Number(v.total) || 0;
-    if (v.payment_method === "transferencia") transferencia += t;
-    else efectivo += t;
+    // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
+    const tr =
+      v.payment_method === "transferencia"
+        ? t
+        : v.payment_method === "mixto"
+          ? Math.min(t, Number(v.transfer_amount) || 0)
+          : 0;
+    transferencia += tr;
+    efectivo += t - tr;
   }
   return {
     totalEfectivo: efectivo,

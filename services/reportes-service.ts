@@ -35,7 +35,7 @@ function localDay(iso: string): string {
 export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<Reporte> {
   const { data, error } = await supabase
     .from("ventas")
-    .select("total,payment_method,items,created_at")
+    .select("total,payment_method,transfer_amount,items,created_at")
     .gte("created_at", desde.toISOString())
     .lte("created_at", hasta.toISOString())
     .order("created_at", { ascending: true });
@@ -49,8 +49,15 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
 
   for (const v of ventas) {
     const total = Number(v.total) || 0;
-    if (v.payment_method === "transferencia") transferencia += total;
-    else efectivo += total;
+    // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
+    const tr =
+      v.payment_method === "transferencia"
+        ? total
+        : v.payment_method === "mixto"
+          ? Math.min(total, Number(v.transfer_amount) || 0)
+          : 0;
+    transferencia += tr;
+    efectivo += total - tr;
 
     const dia = localDay(v.created_at);
     dias.set(dia, (dias.get(dia) ?? 0) + total);
