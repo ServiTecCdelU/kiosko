@@ -83,7 +83,7 @@ function SincronizacionContent() {
   const ultima = logs[0];
 
   return (
-    <main className="mx-auto max-w-4xl p-4 sm:p-6">
+    <main className="bg-mesh min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-4xl">
       <div className="mb-6 flex items-center gap-3">
         <Link href="/">
           <Button variant="ghost" size="icon" className="rounded-2xl">
@@ -111,7 +111,7 @@ function SincronizacionContent() {
             {count === null ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <span className="text-3xl font-bold text-primary">{count.toLocaleString("es-AR")}</span>
+              <span className="cifra text-3xl font-bold text-primary">{count.toLocaleString("es-AR")}</span>
             )}
           </CardContent>
         </Card>
@@ -177,6 +177,6 @@ function SincronizacionContent() {
       {ultima?.error && (
         <p className="mt-3 text-sm text-destructive">Ultimo error: {ultima.error}</p>
       )}
-    </main>
+    </div></main>
   );
 }

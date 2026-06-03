@@ -138,18 +138,28 @@ function PosScreen() {
   );
 
   return (
-    <main className="flex h-screen flex-col bg-muted/30">
-      <header className="flex items-center gap-3 border-b bg-card px-4 py-3">
-        <Link href="/" className="text-muted-foreground hover:text-foreground">
+    <main className="bg-mesh flex h-screen flex-col bg-muted/30">
+      <header className="glass flex items-center gap-3 border-b border-border/60 px-4 py-3">
+        <Link
+          href="/"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/70 bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          aria-label="Volver"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-lg font-bold">Punto de Venta</h1>
+        <h1 className="text-lg font-bold tracking-tight">Punto de Venta</h1>
         <span
           className={cn(
-            "ml-auto flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
+            "ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
             cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
           )}
         >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              cajaId ? "bg-success animate-pulse-soft" : "bg-warning",
+            )}
+          />
           <ScanLine className="h-4 w-4" /> {cajaId ? "Caja abierta" : "Caja cerrada"}
         </span>
       </header>

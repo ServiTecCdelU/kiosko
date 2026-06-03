@@ -168,7 +168,7 @@ function StatCard({ label, value, icon, highlight }: { label: string; value: str
     <Card className="rounded-2xl">
       <CardContent className="p-4">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-        <p className={highlight ? "mt-1 text-2xl font-bold text-primary" : "mt-1 text-2xl font-bold"}>{value}</p>
+        <p className={highlight ? "cifra mt-1 text-3xl font-bold text-primary" : "cifra mt-1 text-2xl font-bold"}>{value}</p>
       </CardContent>
     </Card>
   );

@@ -110,8 +110,8 @@ export function CartPanel({
 
       <div className="border-t p-4">
         <div className="mb-3 flex items-end justify-between">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="text-3xl font-bold text-primary">{formatCurrency(total)}</span>
+          <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Total</span>
+          <span className="cifra text-4xl font-bold text-primary">{formatCurrency(total)}</span>
         </div>
 
         <div className="mb-3 grid grid-cols-2 gap-2">
@@ -157,7 +157,15 @@ export function CartPanel({
         )}
 
         <Button
-          className="h-12 w-full rounded-2xl text-base font-semibold"
+          className="h-14 w-full rounded-2xl border-0 text-lg font-bold text-white shadow-lg shadow-success/25 transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
+          style={
+            disabled
+              ? undefined
+              : {
+                  backgroundImage:
+                    "linear-gradient(135deg, oklch(0.78 0.18 150), oklch(0.60 0.14 200))",
+                }
+          }
           disabled={disabled}
           onClick={handleConfirm}
         >
