@@ -18,11 +18,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "El carrito esta vacio" }, { status: 400 });
   }
 
-  // Precio y nombre autoritativos desde la BD (no confiar en el cliente)
+  const comercioId = String(body?.comercioId ?? "comercio_1");
+
+  // Precio y nombre autoritativos desde la BD (no confiar en el cliente),
+  // acotados al comercio para no cruzar catalogos entre tenants.
   const ids: string[] = rawItems.map((i: any) => String(i.productId)).filter(Boolean);
   const { data: prods, error: prodErr } = await supabaseAdmin
     .from("productos")
     .select("id,name,price")
+    .eq("comercio_id", comercioId)
     .in("id", ids);
   if (prodErr) {
     return NextResponse.json({ error: prodErr.message }, { status: 500 });
@@ -52,6 +56,8 @@ export async function POST(req: Request) {
     p_caja_id: body?.cajaId ?? null,
     p_user_id: body?.userId ?? null,
     p_user_name: body?.userName ?? null,
+    p_cliente_id: body?.clienteId ?? null,
+    p_comercio_id: comercioId,
   });
 
   if (error) {

@@ -111,7 +111,7 @@ function SincronizacionContent() {
             {count === null ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <span className="cifra text-3xl font-bold text-primary">{count.toLocaleString("es-AR")}</span>
+              <span className="cifra-hero text-4xl text-primary">{count.toLocaleString("es-AR")}</span>
             )}
           </CardContent>
         </Card>

@@ -1,5 +1,6 @@
 // services/products-service.ts — lectura del catalogo (client, anon)
 import { supabase } from "@/lib/supabase";
+import { getComercioId } from "@/hooks/use-auth";
 import type { Product } from "@/lib/types";
 
 function mapRow(d: Record<string, any>): Product {
@@ -33,6 +34,7 @@ export async function searchProducts(query: string, limit = 24): Promise<Product
   const { data, error } = await supabase
     .from("productos")
     .select("*")
+    .eq("comercio_id", getComercioId())
     .eq("disabled", false)
     .or(`name.ilike.%${q}%,codigo.ilike.%${q}%,codigo_barras.ilike.%${q}%`)
     .order("name", { ascending: true })
@@ -55,10 +57,11 @@ export interface ProductsPageResult {
 
 export async function getProductsPage(params: ProductsPageParams): Promise<ProductsPageResult> {
   const s = params.search ? sanitize(params.search) : "";
+  const comercioId = getComercioId();
 
   // Stock bajo: PostgREST no compara dos columnas, se trae un set amplio y se filtra aca.
   if (params.soloStockBajo) {
-    let q = supabase.from("productos").select("*").eq("disabled", false);
+    let q = supabase.from("productos").select("*").eq("comercio_id", comercioId).eq("disabled", false);
     if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
     const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
     if (error) throw new Error(error.message);
@@ -68,7 +71,7 @@ export async function getProductsPage(params: ProductsPageParams): Promise<Produ
 
   const page = params.page ?? 0;
   const size = params.pageSize ?? 30;
-  let q = supabase.from("productos").select("*", { count: "exact" }).eq("disabled", false);
+  let q = supabase.from("productos").select("*", { count: "exact" }).eq("comercio_id", comercioId).eq("disabled", false);
   if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
   const { data, count, error } = await q
     .order("name", { ascending: true })
@@ -81,10 +84,12 @@ export async function getProductsPage(params: ProductsPageParams): Promise<Produ
 export async function findProductByCode(code: string): Promise<Product | null> {
   const c = code.trim();
   if (!c) return null;
+  const comercioId = getComercioId();
 
   const byBarcode = await supabase
     .from("productos")
     .select("*")
+    .eq("comercio_id", comercioId)
     .eq("codigo_barras", c)
     .eq("disabled", false)
     .limit(1)
@@ -94,6 +99,7 @@ export async function findProductByCode(code: string): Promise<Product | null> {
   const byCodigo = await supabase
     .from("productos")
     .select("*")
+    .eq("comercio_id", comercioId)
     .eq("codigo", c)
     .eq("disabled", false)
     .limit(1)

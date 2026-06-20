@@ -1,5 +1,5 @@
 // services/auth-service.ts — login por PIN (client helper)
-import { setCurrentUser } from "@/hooks/use-auth";
+import { setCurrentUser, DEFAULT_COMERCIO_ID } from "@/hooks/use-auth";
 import type { Usuario } from "@/lib/types";
 
 export async function login(pin: string): Promise<Usuario> {
@@ -14,6 +14,7 @@ export async function login(pin: string): Promise<Usuario> {
     id: data.id,
     nombre: data.nombre,
     rol: data.rol,
+    comercioId: data.comercioId ?? DEFAULT_COMERCIO_ID,
     activo: true,
     createdAt: new Date(),
   };

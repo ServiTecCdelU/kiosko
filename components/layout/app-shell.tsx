@@ -30,13 +30,7 @@ export function AppShell({ title, children }: AppShellProps) {
       {/* Sidebar desktop */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
         <div className="flex items-center gap-3 px-5 py-5">
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30"
-            style={{
-              backgroundImage:
-                "linear-gradient(135deg, oklch(0.62 0.14 225), oklch(0.46 0.11 230))",
-            }}
-          >
+          <span className="grad-brand flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30">
             <Store className="h-5 w-5" />
           </span>
           <span className="text-base font-bold tracking-tight">Kiosko Despensa</span>

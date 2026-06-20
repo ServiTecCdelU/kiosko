@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { formatDateTime } from "@/lib/utils/format";
 import {
@@ -165,10 +166,10 @@ export default function CajaPage() {
 
 function StatCard({ label, value, icon, highlight }: { label: string; value: string; icon: React.ReactNode; highlight?: boolean }) {
   return (
-    <Card className="rounded-2xl">
+    <Card className={cn("rounded-2xl", highlight && "card-premium border-0")}>
       <CardContent className="p-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-        <p className={highlight ? "cifra mt-1 text-3xl font-bold text-primary" : "cifra mt-1 text-2xl font-bold"}>{value}</p>
+        <div className="eyebrow flex items-center gap-1.5">{icon}{label}</div>
+        <p className={highlight ? "cifra-hero text-money mt-1.5 text-4xl" : "cifra mt-1 text-2xl font-bold"}>{value}</p>
       </CardContent>
     </Card>
   );

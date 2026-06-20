@@ -31,7 +31,7 @@ export interface SaleItem {
   subtotal: number;
 }
 
-export type PaymentMethod = "efectivo" | "transferencia" | "mixto";
+export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado";
 
 export interface Sale {
   id: string;
@@ -44,9 +44,38 @@ export interface Sale {
   changeAmount: number;
   transferAmount: number;
   cajaId?: string;
+  clienteId?: string;
   userId?: string;
   userName?: string;
   createdAt: Date;
+}
+
+export interface Cliente {
+  id: string;
+  nombre: string;
+  telefono?: string;
+  documento?: string;
+  limiteCredito: number;
+  saldo: number; // deuda actual (positivo = debe)
+  notas?: string;
+  activo: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CuentaMovTipo = "cargo" | "pago" | "ajuste";
+
+export interface CuentaMov {
+  id: string;
+  clienteId: string;
+  tipo: CuentaMovTipo;
+  monto: number;
+  saldoAnterior?: number;
+  saldoNuevo?: number;
+  ventaId?: string;
+  referencia?: string;
+  usuario?: string;
+  fecha: Date;
 }
 
 export interface Caja {
@@ -100,6 +129,7 @@ export interface Usuario {
   id: string;
   nombre: string;
   rol: UserRol;
+  comercioId: string;
   activo: boolean;
   createdAt: Date;
 }

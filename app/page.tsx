@@ -12,6 +12,7 @@ import {
   ArrowRight,
   TrendingUp,
   AlertTriangle,
+  Users,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,6 +26,7 @@ import type { Caja, UserRol } from "@/lib/types";
 const ICONS: Record<string, typeof ShoppingCart> = {
   "/pos": ShoppingCart,
   "/caja": Wallet,
+  "/clientes": Users,
   "/stock": Package,
   "/reportes": BarChart3,
   "/sincronizacion": RefreshCw,
@@ -33,6 +35,7 @@ const ICONS: Record<string, typeof ShoppingCart> = {
 const SUBTITLES: Record<string, string> = {
   "/pos": "Escaneá, cobrá y listo",
   "/caja": "Apertura, cierre y arqueo",
+  "/clientes": "Fiado y cuenta corriente",
   "/stock": "Inventario y alertas",
   "/reportes": "Ventas, márgenes y más vendidos",
   "/sincronizacion": "Catálogo de la distribuidora",
@@ -90,25 +93,20 @@ function HomeContent() {
         {pos && (
           <Link
             href={pos.href}
-            className="group relative flex items-center gap-5 overflow-hidden rounded-3xl px-6 py-7 text-white shadow-lg shadow-primary/20 transition-transform duration-300 ease-out hover:-translate-y-1 sm:px-8 sm:py-9 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-3"
-            style={{
-              backgroundImage:
-                "linear-gradient(135deg, oklch(0.58 0.14 220), oklch(0.42 0.10 230))",
-            }}
+            className="grad-brand shadow-brand group relative flex items-center gap-5 overflow-hidden rounded-3xl px-6 py-7 text-white transition-transform duration-300 ease-out hover:-translate-y-1 sm:px-8 sm:py-9 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-3"
           >
             <div
               aria-hidden
-              className="absolute -right-10 -top-10 h-44 w-44 rounded-full opacity-30 blur-2xl transition-opacity duration-300 group-hover:opacity-50"
-              style={{ background: "oklch(0.78 0.18 150)" }}
+              className="grad-money absolute -right-12 -top-12 h-48 w-48 rounded-full opacity-40 blur-2xl transition-opacity duration-300 group-hover:opacity-60"
             />
             <span className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm sm:h-20 sm:w-20">
               <ShoppingCart className="h-8 w-8 sm:h-10 sm:w-10" />
             </span>
             <div className="relative min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
                 Vender ahora
               </p>
-              <h2 className="mt-1 text-2xl font-bold leading-tight sm:text-4xl">
+              <h2 className="mt-1 text-3xl font-bold leading-[0.95] tracking-tight sm:text-5xl">
                 Punto de Venta
               </h2>
               <p className="mt-1 text-sm text-white/80 sm:text-base">
@@ -128,7 +126,7 @@ function HomeContent() {
                 key={item.href}
                 href={item.href}
                 style={{ animationDelay: `${80 + i * 70}ms` }}
-                className="group relative flex items-start gap-4 rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-primary/40 hover:shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards"
+                className="card-premium group relative flex items-start gap-4 rounded-2xl p-5 hover:-translate-y-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-backwards"
               >
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
                   <Icon className="h-6 w-6" />
@@ -177,13 +175,7 @@ function BrandHeader({ nombre }: { nombre?: string }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3.5">
-        <span
-          className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md shadow-primary/30"
-          style={{
-            backgroundImage:
-              "linear-gradient(135deg, oklch(0.62 0.14 220), oklch(0.46 0.11 230))",
-          }}
-        >
+        <span className="grad-brand shadow-brand flex h-12 w-12 items-center justify-center rounded-2xl text-white">
           <Store className="h-6 w-6" />
         </span>
         <div>
@@ -197,7 +189,7 @@ function BrandHeader({ nombre }: { nombre?: string }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border/60 bg-card/70 px-4 py-2 text-right backdrop-blur-sm">
+      <div className="card-premium rounded-2xl px-4 py-2 text-right">
         <p className="font-mono text-2xl font-semibold leading-none tracking-tight text-foreground tabular-nums">
           {hora}
         </p>
@@ -261,7 +253,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {Array.from({ length: showStock ? 3 : 2 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
+          <div key={i} className="h-28 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
         ))}
       </div>
     );
@@ -269,13 +261,17 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {/* Ventas de hoy */}
-      <div className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm">
-        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          <TrendingUp className="h-4 w-4 text-primary" /> Ventas de hoy
+      {/* Ventas de hoy — protagonista */}
+      <div className="card-premium relative overflow-hidden rounded-2xl p-5">
+        <div
+          aria-hidden
+          className="grad-money pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full opacity-[0.18] blur-2xl"
+        />
+        <div className="eyebrow flex items-center gap-1.5">
+          <TrendingUp className="h-4 w-4 text-money" /> Ventas de hoy
         </div>
-        <p className="cifra mt-2 text-3xl font-bold text-primary">{formatCurrency(ventasHoy)}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="cifra-hero text-money mt-2 text-4xl sm:text-[2.75rem]">{formatCurrency(ventasHoy)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
           {cantHoy} {cantHoy === 1 ? "venta" : "ventas"}
         </p>
       </div>
@@ -283,9 +279,9 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
       {/* Caja */}
       <Link
         href="/caja"
-        className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+        className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5"
       >
-        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="eyebrow flex items-center gap-1.5">
           <Wallet className="h-4 w-4 text-primary" /> Caja
         </div>
         <div className="mt-2 flex items-center gap-2">
@@ -303,14 +299,14 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
       {showStock && (
         <Link
           href="/stock"
-          className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5"
         >
-          <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="eyebrow flex items-center gap-1.5">
             <AlertTriangle className={`h-4 w-4 ${stockBajo && stockBajo > 0 ? "text-warning" : "text-primary"}`} />
             Stock bajo
           </div>
           <p
-            className={`cifra mt-2 text-3xl font-bold ${stockBajo && stockBajo > 0 ? "text-warning" : "text-foreground"}`}
+            className={`cifra-hero mt-2 text-4xl sm:text-[2.75rem] ${stockBajo && stockBajo > 0 ? "text-warning" : "text-foreground"}`}
           >
             {stockBajo ?? "—"}
           </p>

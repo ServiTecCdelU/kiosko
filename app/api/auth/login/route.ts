@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from("usuarios")
-    .select("id,nombre,rol,activo,pin")
+    .select("id,nombre,rol,activo,pin,comercio_id")
     .eq("pin", pin)
     .eq("activo", true)
     .limit(1)
@@ -27,5 +27,10 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
 
-  return NextResponse.json({ id: data.id, nombre: data.nombre, rol: data.rol });
+  return NextResponse.json({
+    id: data.id,
+    nombre: data.nombre,
+    rol: data.rol,
+    comercioId: data.comercio_id,
+  });
 }

@@ -139,6 +139,7 @@ function PosScreen() {
           changeAmount: data.changeAmount,
           transferAmount: data.transferAmount,
           cajaId,
+          clienteId: data.clienteId,
           userId: user?.id,
           userName: user?.nombre,
         });
@@ -195,7 +196,7 @@ function PosScreen() {
         {/* Busqueda + resultados */}
         <div className="flex min-h-0 flex-col gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
             <Input
               ref={inputRef}
               autoFocus
@@ -207,8 +208,8 @@ function PosScreen() {
                   handleEnter();
                 }
               }}
-              placeholder="Escanea un codigo o busca por nombre..."
-              className="h-12 rounded-2xl pl-11 text-base"
+              placeholder="Escaneá un código o buscá por nombre..."
+              className="card-premium h-14 rounded-2xl border-0 pl-12 text-base font-medium shadow-none focus-visible:ring-2 focus-visible:ring-primary/40"
             />
           </div>
 

@@ -1,11 +1,13 @@
 // services/reportes-service.ts — agregaciones de ventas para reportes
 import { supabase } from "@/lib/supabase";
+import { getComercioId } from "@/hooks/use-auth";
 
 export interface ResumenReporte {
   totalVentas: number;
   cantidad: number;
   efectivo: number;
   transferencia: number;
+  fiado: number;
   ticketPromedio: number;
 }
 
@@ -36,6 +38,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
   const { data, error } = await supabase
     .from("ventas")
     .select("total,payment_method,transfer_amount,items,created_at")
+    .eq("comercio_id", getComercioId())
     .gte("created_at", desde.toISOString())
     .lte("created_at", hasta.toISOString())
     .order("created_at", { ascending: true });
@@ -44,20 +47,25 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
   const ventas = data ?? [];
   let efectivo = 0;
   let transferencia = 0;
+  let fiado = 0;
   const dias = new Map<string, number>();
   const productos = new Map<string, ProductoVendido>();
 
   for (const v of ventas) {
     const total = Number(v.total) || 0;
-    // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
-    const tr =
-      v.payment_method === "transferencia"
-        ? total
-        : v.payment_method === "mixto"
-          ? Math.min(total, Number(v.transfer_amount) || 0)
-          : 0;
-    transferencia += tr;
-    efectivo += total - tr;
+    if (v.payment_method === "fiado") {
+      fiado += total;
+    } else {
+      // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
+      const tr =
+        v.payment_method === "transferencia"
+          ? total
+          : v.payment_method === "mixto"
+            ? Math.min(total, Number(v.transfer_amount) || 0)
+            : 0;
+      transferencia += tr;
+      efectivo += total - tr;
+    }
 
     const dia = localDay(v.created_at);
     dias.set(dia, (dias.get(dia) ?? 0) + total);
@@ -73,7 +81,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
     }
   }
 
-  const totalVentas = efectivo + transferencia;
+  const totalVentas = efectivo + transferencia + fiado;
   const cantidad = ventas.length;
 
   return {
@@ -82,6 +90,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
       cantidad,
       efectivo,
       transferencia,
+      fiado,
       ticketPromedio: cantidad > 0 ? totalVentas / cantidad : 0,
     },
     porDia: Array.from(dias.entries())

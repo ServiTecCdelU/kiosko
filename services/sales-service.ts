@@ -1,4 +1,5 @@
 // services/sales-service.ts — alta de ventas (client helper hacia /api/ventas)
+import { getComercioId } from "@/hooks/use-auth";
 import type { PaymentMethod } from "@/lib/types";
 
 export interface CreateSaleItem {
@@ -16,6 +17,7 @@ export interface CreateSaleInput {
   changeAmount?: number;
   discount?: number;
   cajaId?: string;
+  clienteId?: string;
   userId?: string;
   userName?: string;
 }
@@ -30,7 +32,7 @@ export async function createSale(input: CreateSaleInput): Promise<ProcessSaleRes
   const res = await fetch("/api/ventas", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la venta");

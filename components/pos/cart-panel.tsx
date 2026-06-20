@@ -6,18 +6,20 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, ShoppingCart } from "lucide-react";
+import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import type { CartItem, PaymentMethod } from "@/lib/types";
+import { ClienteSelector } from "@/components/pos/cliente-selector";
+import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
 
 export interface ConfirmData {
   paymentMethod: PaymentMethod;
   cashAmount: number;
   changeAmount: number;
   transferAmount: number;
+  clienteId?: string;
 }
 
 /** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
@@ -42,11 +44,13 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
   const [pagaCon, setPagaCon] = useState("");
   const [efectivoMixto, setEfectivoMixto] = useState("");
+  const [cliente, setCliente] = useState<Cliente | null>(null);
 
   useEffect(() => {
     if (items.length === 0) {
       setPagaCon("");
       setEfectivoMixto("");
+      setCliente(null);
     }
   }, [items.length]);
 
@@ -58,7 +62,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const cashPortion = method === "mixto" ? Math.min(Math.max(0, Number(efectivoMixto) || 0), total) : 0;
   const transferPortion = method === "mixto" ? total - cashPortion : 0;
 
-  const disabled = items.length === 0 || processing || faltaEfectivo;
+  const faltaCliente = method === "fiado" && !cliente;
+  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente;
 
   const handleConfirm = () => {
     if (disabled) return;
@@ -66,6 +71,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total });
     } else if (method === "mixto") {
       onConfirm({ paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion });
+    } else if (method === "fiado") {
+      onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id });
     } else {
       onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0 });
     }
@@ -74,8 +81,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   useImperativeHandle(ref, () => ({ confirm: handleConfirm }));
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
+    <div className="card-premium flex h-full flex-col rounded-2xl">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <span className="flex items-center gap-2 font-semibold">
           <ShoppingCart className="h-4 w-4 text-primary" /> Carrito
         </span>
@@ -131,17 +138,20 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         )}
       </div>
 
-      <div className="border-t p-4">
+      <div className="border-t border-border/60 p-4">
         <div className="mb-3 flex items-end justify-between">
-          <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Total</span>
-          <span className="cifra text-4xl font-bold text-primary">{formatCurrency(total)}</span>
+          <span className="eyebrow">Total</span>
+          <span className="cifra-hero text-money text-5xl">{formatCurrency(total)}</span>
         </div>
 
-        <div className="mb-3 grid grid-cols-3 gap-2">
+        <div className="mb-3 grid grid-cols-4 gap-2">
           <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
           <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
           <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
+          <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
         </div>
+
+        {method === "fiado" && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
 
         {method === "efectivo" && (
           <div className="mb-3 space-y-2">
@@ -192,15 +202,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         )}
 
         <Button
-          className="h-14 w-full rounded-2xl border-0 text-lg font-bold text-white shadow-lg shadow-success/25 transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
-          style={
-            disabled
-              ? undefined
-              : {
-                  backgroundImage:
-                    "linear-gradient(135deg, oklch(0.78 0.18 150), oklch(0.60 0.14 200))",
-                }
-          }
+          className={cn(
+            "h-16 w-full rounded-2xl border-0 text-xl font-bold tracking-tight text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none disabled:opacity-60",
+            !disabled && "grad-money shadow-money",
+          )}
           disabled={disabled}
           onClick={handleConfirm}
         >

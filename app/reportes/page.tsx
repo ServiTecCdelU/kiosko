@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, Receipt, Banknote, CreditCard } from "lucide-react";
+import { TrendingUp, Receipt, Banknote, CreditCard, Coins } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,18 +83,19 @@ export default function ReportesPage() {
 
       {loading ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
           </div>
           <Skeleton className="h-72 w-full rounded-2xl" />
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             <Kpi label="Total vendido" value={formatCurrency(r?.totalVentas ?? 0)} icon={<TrendingUp className="h-4 w-4" />} highlight />
             <Kpi label="Ventas" value={String(r?.cantidad ?? 0)} icon={<Receipt className="h-4 w-4" />} />
             <Kpi label="Efectivo" value={formatCurrency(r?.efectivo ?? 0)} icon={<Banknote className="h-4 w-4" />} />
             <Kpi label="Transferencia" value={formatCurrency(r?.transferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
+            <Kpi label="Fiado" value={formatCurrency(r?.fiado ?? 0)} icon={<Coins className="h-4 w-4" />} />
           </div>
 
           <Card className="rounded-2xl">
@@ -116,7 +117,7 @@ export default function ReportesPage() {
                         formatter={(v: number) => formatCurrency(v)}
                         contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }}
                       />
-                      <Bar dataKey="total" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="total" fill="var(--money)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -163,10 +164,10 @@ export default function ReportesPage() {
 
 function Kpi({ label, value, icon, highlight }: { label: string; value: string; icon: React.ReactNode; highlight?: boolean }) {
   return (
-    <Card className="rounded-2xl">
+    <Card className={cn("rounded-2xl", highlight && "card-premium border-0")}>
       <CardContent className="p-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-        <p className={highlight ? "cifra mt-1 text-3xl font-bold text-primary" : "cifra mt-1 text-2xl font-bold"}>{value}</p>
+        <div className="eyebrow flex items-center gap-1.5">{icon}{label}</div>
+        <p className={highlight ? "cifra-hero text-money mt-1.5 text-4xl" : "cifra mt-1 text-2xl font-bold"}>{value}</p>
       </CardContent>
     </Card>
   );

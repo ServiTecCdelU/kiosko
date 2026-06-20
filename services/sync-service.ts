@@ -8,6 +8,12 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { SyncEstado } from "@/lib/types";
 
+// TODO multi-comercio: hoy la sync apunta al comercio inicial. Cuando haya
+// onboarding de varios comercios, la sync debe correr por comercio y generar
+// ids namespaced (`${comercioId}__${distId}`). El comercio_1 conserva los
+// ids legacy (id == dist_id) para no duplicar el catalogo existente.
+const SYNC_COMERCIO_ID = "comercio_1";
+
 interface DistribuidoraProduct {
   id: string;
   name?: string;
@@ -49,6 +55,7 @@ async function logSync(
   error?: string,
 ): Promise<void> {
   await supabaseAdmin.from("sync_log").insert({
+    comercio_id: SYNC_COMERCIO_ID,
     estado,
     productos_creados: creados,
     productos_actualizados: actualizados,
@@ -86,7 +93,10 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
   // 2. ids existentes (para distinguir creados vs actualizados)
   const existing = new Set<string>();
   {
-    const { data } = await supabaseAdmin.from("productos").select("id");
+    const { data } = await supabaseAdmin
+      .from("productos")
+      .select("id")
+      .eq("comercio_id", SYNC_COMERCIO_ID);
     for (const r of data ?? []) existing.add(r.id);
   }
 
@@ -96,6 +106,8 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
     .filter((p) => p && p.id)
     .map((p) => ({
       id: p.id,
+      comercio_id: SYNC_COMERCIO_ID,
+      dist_id: p.id,
       codigo: deriveCodigo(p.id, p.codigo),
       codigo_barras: p.codigoBarras ?? null,
       name: p.name ?? "",

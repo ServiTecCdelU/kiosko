@@ -41,8 +41,19 @@
   --success-foreground: oklch(1 0 0);
   --warning: oklch(0.75 0.15 85);
   --warning-foreground: oklch(0.25 0.02 240);
-  --money: oklch(0.78 0.18 150);
+  --money: oklch(0.74 0.19 152);
   --money-foreground: oklch(0.22 0.05 160);
+
+  /* ── Identidad de marca "Mostrador" (gradientes + sombras tonalizadas) ── */
+  --brand-1: oklch(0.64 0.16 222);
+  --brand-2: oklch(0.44 0.13 236);
+  --money-1: oklch(0.83 0.20 150);
+  --money-2: oklch(0.62 0.16 192);
+  --grad-brand: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  --grad-money: linear-gradient(135deg, var(--money-1), var(--money-2));
+  --shadow-brand: 0 20px 45px -18px oklch(0.50 0.13 230 / 0.45);
+  --shadow-money: 0 18px 40px -16px oklch(0.74 0.19 152 / 0.45);
+  --shadow-card: 0 1px 2px oklch(0.5 0.05 235 / 0.04), 0 10px 30px -18px oklch(0.5 0.08 235 / 0.18);
 }
 
 .dark {
@@ -82,8 +93,18 @@
   --success-foreground: oklch(0.12 0.02 240);
   --warning: oklch(0.8 0.15 85);
   --warning-foreground: oklch(0.12 0.02 240);
-  --money: oklch(0.80 0.18 150);
+  --money: oklch(0.80 0.19 152);
   --money-foreground: oklch(0.14 0.04 160);
+
+  --brand-1: oklch(0.70 0.14 220);
+  --brand-2: oklch(0.50 0.13 234);
+  --money-1: oklch(0.84 0.20 150);
+  --money-2: oklch(0.66 0.16 190);
+  --grad-brand: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  --grad-money: linear-gradient(135deg, var(--money-1), var(--money-2));
+  --shadow-brand: 0 20px 45px -18px oklch(0.10 0.04 240 / 0.65);
+  --shadow-money: 0 18px 40px -16px oklch(0.80 0.19 152 / 0.30);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.25), 0 12px 32px -20px oklch(0 0 0 / 0.55);
 }
 
 @theme inline {
@@ -158,12 +179,90 @@
   letter-spacing: -0.02em;
 }
 
-/* Fondo atmosférico con mesh de gradientes teal/lima muy sutil */
+/* Fondo atmosférico con mesh de gradientes teal/lima */
 .bg-mesh {
   background-image:
-    radial-gradient(at 15% 0%, oklch(0.62 0.14 225 / 0.10), transparent 50%),
-    radial-gradient(at 85% 5%, oklch(0.78 0.18 150 / 0.07), transparent 45%),
-    radial-gradient(at 50% 100%, oklch(0.62 0.14 225 / 0.05), transparent 55%);
+    radial-gradient(at 14% 2%, oklch(0.62 0.14 225 / 0.14), transparent 48%),
+    radial-gradient(at 86% 4%, oklch(0.80 0.19 152 / 0.11), transparent 44%),
+    radial-gradient(at 50% 104%, oklch(0.55 0.14 230 / 0.08), transparent 55%);
+}
+
+/* ── Identidad premium "Mostrador" ─────────────────────────── */
+
+/* Gradientes de marca centralizados (antes repetidos inline) */
+.grad-brand {
+  background-image: var(--grad-brand);
+}
+.grad-money {
+  background-image: var(--grad-money);
+}
+
+/* Texto de plata: el acento estrella para cifras de ventas */
+.text-money {
+  color: var(--money);
+}
+
+/* Superficie premium: vidrio sutil + sombra tonalizada con profundidad */
+.card-premium {
+  background: color-mix(in oklch, var(--card) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+.card-premium:hover {
+  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+  box-shadow: var(--shadow-brand);
+}
+
+/* Sombras de marca como utilidades */
+.shadow-brand {
+  box-shadow: var(--shadow-brand);
+}
+.shadow-money {
+  box-shadow: var(--shadow-money);
+}
+
+/* Cifra hero: la plata como protagonista visual */
+.cifra-hero {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  font-weight: 700;
+}
+
+/* Etiqueta de sección: minúscula, espaciada, sobria */
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted-foreground);
+}
+
+/* Aparición suave en montaje */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
 }
 
 /* Superficie de vidrio para barras superiores */

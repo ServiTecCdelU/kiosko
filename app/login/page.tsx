@@ -53,13 +53,7 @@ export default function LoginPage() {
   return (
     <main className="bg-mesh flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/30 p-6">
       <div className="flex flex-col items-center gap-3">
-        <div
-          className="flex h-16 w-16 items-center justify-center rounded-3xl text-white shadow-lg shadow-primary/30"
-          style={{
-            backgroundImage:
-              "linear-gradient(135deg, oklch(0.62 0.14 225), oklch(0.46 0.11 230))",
-          }}
-        >
+        <div className="grad-brand shadow-brand flex h-16 w-16 items-center justify-center rounded-3xl text-white">
           <Store className="h-8 w-8" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight">Kiosko Despensa</h1>

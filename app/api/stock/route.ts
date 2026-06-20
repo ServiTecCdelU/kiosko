@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     p_cantidad: cantidad,
     p_usuario: body?.usuario ?? null,
     p_referencia: body?.referencia ?? null,
+    p_comercio_id: String(body?.comercioId ?? "comercio_1"),
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

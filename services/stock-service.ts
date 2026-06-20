@@ -1,5 +1,6 @@
 // services/stock-service.ts — movimientos de stock
 import { supabase } from "@/lib/supabase";
+import { getComercioId } from "@/hooks/use-auth";
 import type { StockMovimiento, StockMovTipo } from "@/lib/types";
 
 export interface AjusteStockInput {
@@ -20,7 +21,7 @@ export async function ajustarStock(input: AjusteStockInput): Promise<AjusteStock
   const res = await fetch("/api/stock", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo ajustar el stock");
@@ -45,6 +46,7 @@ export async function getMovimientos(productoId: string, limit = 30): Promise<St
   const { data } = await supabase
     .from("stock_movimientos")
     .select("*")
+    .eq("comercio_id", getComercioId())
     .eq("producto_id", productoId)
     .order("fecha", { ascending: false })
     .limit(limit);
