@@ -21,6 +21,7 @@ export function mapRow(d: Record<string, any>): Product {
     favorito: d.favorito ?? false,
     fechaVencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento) : undefined,
     unidad: d.unidad === "kg" ? "kg" : "un",
+    stockControlado: d.stock_controlado ?? true,
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
     ofertaTipo: d.oferta_tipo ?? undefined,
@@ -84,7 +85,7 @@ export async function getProductsPage(params: ProductsPageParams): Promise<Produ
     if (params.soloRevisar) q = q.eq("revisar", true);
     const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
     if (error) throw new Error(error.message);
-    let products = (data ?? []).map(mapRow);
+    let products = (data ?? []).map(mapRow).filter((p) => p.stockControlado);
     products = params.soloAgotados
       ? products.filter((p) => p.stock <= 0)
       : products.filter((p) => p.stock <= p.stockMinimo);
@@ -119,16 +120,17 @@ export async function getStockStats(): Promise<StockStats> {
   const comercioId = getComercioId();
   const { data, error } = await supabase
     .from("productos")
-    .select("stock, stock_minimo, revisar")
+    .select("stock, stock_minimo, revisar, stock_controlado")
     .eq("comercio_id", comercioId)
     .eq("disabled", false)
     .limit(5000);
   if (error) throw new Error(error.message);
   const rows = data ?? [];
+  const controlados = rows.filter((r) => r.stock_controlado !== false);
   return {
     total: rows.length,
-    stockBajo: rows.filter((r) => Number(r.stock) > 0 && Number(r.stock) <= Number(r.stock_minimo)).length,
-    agotados: rows.filter((r) => Number(r.stock) <= 0).length,
+    stockBajo: controlados.filter((r) => Number(r.stock) > 0 && Number(r.stock) <= Number(r.stock_minimo)).length,
+    agotados: controlados.filter((r) => Number(r.stock) <= 0).length,
     revisar: rows.filter((r) => r.revisar).length,
   };
 }
@@ -162,6 +164,7 @@ export interface UpdateProductInput {
   favorito: boolean;
   fechaVencimiento?: string; // YYYY-MM-DD
   unidad: "un" | "kg";
+  stockControlado: boolean;
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
@@ -181,6 +184,7 @@ export async function updateProduct(productId: string, input: UpdateProductInput
       favorito: input.favorito,
       fecha_vencimiento: input.fechaVencimiento || null,
       unidad: input.unidad,
+      stock_controlado: input.stockControlado,
     })
     .eq("comercio_id", getComercioId())
     .eq("id", productId);

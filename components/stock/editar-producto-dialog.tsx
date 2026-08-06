@@ -46,6 +46,7 @@ export function EditarProductoDialog({
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [unidad, setUnidad] = useState<"un" | "kg">("un");
+  const [stockControlado, setStockControlado] = useState(true);
   const [historial, setHistorial] = useState<CambioPrecio[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -68,6 +69,7 @@ export function EditarProductoDialog({
       setFavorito(product.favorito);
       setFechaVencimiento(product.fechaVencimiento ? product.fechaVencimiento.toISOString().slice(0, 10) : "");
       setUnidad(product.unidad);
+      setStockControlado(product.stockControlado);
       getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));
       setAjusteTipo("entrada");
       setAjusteCantidad("");
@@ -101,6 +103,7 @@ export function EditarProductoDialog({
         favorito,
         fechaVencimiento: fechaVencimiento || undefined,
         unidad,
+        stockControlado,
       });
       onOpenChange(false);
     } finally {
@@ -215,6 +218,15 @@ export function EditarProductoDialog({
             <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">Producto rápido (grilla del POS)</span>
               <Switch checked={favorito} onCheckedChange={setFavorito} />
+            </label>
+            <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">
+                Es un servicio (sin stock)
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Ej: recarga de celular, fotocopias — se cobra pero no descuenta stock
+                </span>
+              </span>
+              <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />
             </label>
           </div>
 

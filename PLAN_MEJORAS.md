@@ -67,7 +67,7 @@ Esto es lo que determina qué construir, en orden de impacto real:
 | 11 | ✅ **Turnos / múltiples cajeros por caja** | Hecho: tabla "Vendido por cajero" en `/caja` (se muestra automáticamente cuando más de un usuario cobró en la misma caja), sin necesidad de cerrar y reabrir caja por turno. |
 | 12 | ✅ **Suspender venta / ticket en espera** | Hecho: botón "Suspender" en el carrito del POS, guarda el carrito en el dispositivo y lo recupera después desde "En espera" en el header. |
 | 13 | ✅ **Auditoría de cambios de precio** | Hecho: tabla `producto_auditoria`, se registra automáticamente cada cambio manual de precio (quién y cuándo) y se muestra un historial dentro de "Editar producto". |
-| 14 | **Recarga de celular / servicios como "producto especial"** | Muy común en kioskos: se cobra pero no es "stock" tradicional. Requiere tocar la RPC atómica `process_sale_kiosko` para que no descuente stock en productos marcados como "servicio" — pendiente de confirmación antes de tocar esa función crítica. |
+| 14 | ✅ **Recarga de celular / servicios como "producto especial"** | Hecho: columna `stock_controlado` + `process_sale_kiosko` actualizada para saltar la validación y el descuento de stock en productos marcados como "servicio" (toggle en "Editar producto"). POS y stock ya no muestran alertas de stock bajo/agotado para estos productos. |
 
 ### 🔵 Prioridad 4 — Diferenciales que justifican precio frente a la competencia
 

@@ -262,8 +262,8 @@ export default function StockPage() {
               </TableHeader>
               <TableBody>
                 {products.map((p) => {
-                  const sinStock = p.stock <= 0;
-                  const bajo = !sinStock && p.stock <= p.stockMinimo;
+                  const sinStock = p.stockControlado && p.stock <= 0;
+                  const bajo = p.stockControlado && !sinStock && p.stock <= p.stockMinimo;
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="text-xs text-muted-foreground">{p.codigoBarras || "—"}</TableCell>
@@ -315,13 +315,19 @@ export default function StockPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={cn("font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
-                          {p.stock}
-                        </span>
-                        {(sinStock || bajo) && (
-                          <Badge variant="outline" className="ml-2 border-warning text-warning">
-                            <AlertTriangle className="mr-1 h-3 w-3" />{sinStock ? "Agotado" : "Bajo"}
-                          </Badge>
+                        {!p.stockControlado ? (
+                          <span className="text-xs text-muted-foreground">Servicio</span>
+                        ) : (
+                          <>
+                            <span className={cn("font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
+                              {p.stock}
+                            </span>
+                            {(sinStock || bajo) && (
+                              <Badge variant="outline" className="ml-2 border-warning text-warning">
+                                <AlertTriangle className="mr-1 h-3 w-3" />{sinStock ? "Agotado" : "Bajo"}
+                              </Badge>
+                            )}
+                          </>
                         )}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">{p.stockMinimo}</TableCell>

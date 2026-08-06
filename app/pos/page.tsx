@@ -130,7 +130,7 @@ function PosScreen() {
 
   const addToCart = useCallback(
     (p: Product) => {
-      if (p.stock <= 0) {
+      if (p.stockControlado && p.stock <= 0) {
         toast.error(`Sin stock: ${p.name}`);
         return;
       }
@@ -138,10 +138,12 @@ function PosScreen() {
         setPesoProduct(p);
         return;
       }
-      const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
-      if (enCarrito + 1 > p.stock) {
-        toast.error(`Stock maximo (${p.stock}) para ${p.name}`);
-        return;
+      if (p.stockControlado) {
+        const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
+        if (enCarrito + 1 > p.stock) {
+          toast.error(`Stock maximo (${p.stock}) para ${p.name}`);
+          return;
+        }
       }
       cart.addProduct(p, 1);
       if (p.lote && p.lote > 1) {
@@ -321,7 +323,7 @@ function PosScreen() {
                   <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
                   <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {favoritos.map((p) => {
-                      const sinStock = p.stock <= 0;
+                      const sinStock = p.stockControlado && p.stock <= 0;
                       return (
                         <li key={p.id}>
                           <button
@@ -352,8 +354,8 @@ function PosScreen() {
             ) : (
               <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {results.map((p) => {
-                  const sinStock = p.stock <= 0;
-                  const stockBajo = !sinStock && p.stock <= p.stockMinimo;
+                  const sinStock = p.stockControlado && p.stock <= 0;
+                  const stockBajo = p.stockControlado && !sinStock && p.stock <= p.stockMinimo;
                   return (
                     <li key={p.id}>
                       <button
@@ -379,7 +381,7 @@ function PosScreen() {
                               sinStock ? "text-destructive" : stockBajo ? "text-warning" : "text-muted-foreground",
                             )}
                           >
-                            {sinStock ? "Sin stock" : `Stock: ${p.stock}`}
+                            {!p.stockControlado ? "Servicio" : sinStock ? "Sin stock" : `Stock: ${p.stock}`}
                           </span>
                         </div>
                         <span className="shrink-0 text-right">
