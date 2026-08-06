@@ -308,6 +308,7 @@ async function importRow(
     summary.actualizados++;
   } else {
     const { error } = await supabase.from("productos").insert({
+      id: crypto.randomUUID(),
       comercio_id: comercioId,
       codigo: row.codigo || null,
       codigo_barras: row.barra || null,
