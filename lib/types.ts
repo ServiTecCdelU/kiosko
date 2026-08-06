@@ -1,5 +1,7 @@
 // lib/types.ts — tipos del Kiosko Despensa
 
+export type OfertaTipo = "monto" | "porcentaje";
+
 export interface Product {
   id: string;
   codigo?: string;
@@ -12,7 +14,13 @@ export interface Product {
   imageUrl: string;
   stock: number;
   stockMinimo: number;
+  lote?: number;
+  revisar: boolean;
   disabled: boolean;
+  // Oferta de catálogo (descuento propio del kiosko, la sync no lo toca)
+  ofertaActiva: boolean;
+  ofertaTipo?: OfertaTipo;
+  ofertaValor: number;
   syncedAt?: Date;
   createdAt: Date;
   updatedAt: Date;

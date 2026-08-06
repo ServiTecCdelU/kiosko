@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { precioFinal } from "@/lib/pricing";
 import type { Product, CartItem } from "@/lib/types";
 
 export function useCart() {
@@ -33,7 +34,7 @@ export function useCart() {
   const clear = useCallback(() => setItems([]), []);
 
   const total = useMemo(
-    () => items.reduce((s, i) => s + i.product.price * i.quantity, 0),
+    () => items.reduce((s, i) => s + precioFinal(i.product) * i.quantity, 0),
     [items],
   );
 

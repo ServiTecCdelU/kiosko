@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Search, AlertTriangle, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, AlertTriangle, SlidersHorizontal, ChevronLeft, ChevronRight, Tag, Upload } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getProductsPage } from "@/services/products-service";
+import { getProductsPage, setOferta, type SetOfertaInput } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
 import { AjusteDialog } from "@/components/stock/ajuste-dialog";
+import { OfertaDialog } from "@/components/stock/oferta-dialog";
+import { ImportDialog } from "@/components/stock/import-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
+import { precioFinal, tieneOferta } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -32,6 +35,9 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Product | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [ofertaProduct, setOfertaProduct] = useState<Product | null>(null);
+  const [ofertaOpen, setOfertaOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -64,6 +70,22 @@ export default function StockPage() {
     setDialogOpen(true);
   };
 
+  const openOferta = (p: Product) => {
+    setOfertaProduct(p);
+    setOfertaOpen(true);
+  };
+
+  const handleOferta = async (oferta: SetOfertaInput) => {
+    if (!ofertaProduct) return;
+    try {
+      await setOferta(ofertaProduct.id, oferta);
+      toast.success(oferta.activa ? "Oferta aplicada" : "Oferta quitada");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar la oferta");
+    }
+  };
+
   const handleAjuste = async (tipo: "entrada" | "ajuste" | "rotura", cantidad: number) => {
     if (!selected) return;
     try {
@@ -94,6 +116,9 @@ export default function StockPage() {
           Solo stock bajo
           <Switch checked={soloStockBajo} onCheckedChange={setSoloStockBajo} />
         </label>
+        <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" /> Importar productos
+        </Button>
       </div>
 
       <div className="rounded-2xl border bg-card">
@@ -124,8 +149,27 @@ export default function StockPage() {
                       <TableCell>
                         <p className="line-clamp-1 font-medium">{p.name}</p>
                         {p.codigo && <span className="text-xs text-muted-foreground">{p.codigo}</span>}
+                        {p.revisar && (
+                          <Badge variant="outline" className="ml-2 border-warning text-warning">
+                            <AlertTriangle className="mr-1 h-3 w-3" />A revisar
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(p.price)}</TableCell>
+                      <TableCell className="text-right">
+                        {tieneOferta(p) ? (
+                          <span className="flex flex-col items-end leading-tight">
+                            <span className="text-xs text-muted-foreground line-through">
+                              {formatCurrency(p.price)}
+                            </span>
+                            <span className="inline-flex items-center gap-1 font-semibold text-money">
+                              <Tag className="h-3 w-3" />
+                              {formatCurrency(precioFinal(p))}
+                            </span>
+                          </span>
+                        ) : (
+                          formatCurrency(p.price)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <span className={cn("font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
                           {p.stock}
@@ -138,9 +182,19 @@ export default function StockPage() {
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">{p.stockMinimo}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openAjuste(p)}>
-                          Ajustar
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={cn("rounded-xl", tieneOferta(p) && "border-money/50 text-money")}
+                            onClick={() => openOferta(p)}
+                          >
+                            <Tag className="mr-1 h-3.5 w-3.5" /> Oferta
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openAjuste(p)}>
+                            Ajustar
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -164,6 +218,8 @@ export default function StockPage() {
       )}
 
       <AjusteDialog product={selected} open={dialogOpen} onOpenChange={setDialogOpen} onSubmit={handleAjuste} />
+      <OfertaDialog product={ofertaProduct} open={ofertaOpen} onOpenChange={setOfertaOpen} onSubmit={handleOferta} />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
     </AppShell>
   );
 }

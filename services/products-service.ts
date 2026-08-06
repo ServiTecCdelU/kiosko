@@ -1,9 +1,9 @@
 // services/products-service.ts — lectura del catalogo (client, anon)
 import { supabase } from "@/lib/supabase";
 import { getComercioId } from "@/hooks/use-auth";
-import type { Product } from "@/lib/types";
+import type { OfertaTipo, Product } from "@/lib/types";
 
-function mapRow(d: Record<string, any>): Product {
+export function mapRow(d: Record<string, any>): Product {
   return {
     id: d.id,
     codigo: d.codigo ?? undefined,
@@ -16,7 +16,12 @@ function mapRow(d: Record<string, any>): Product {
     imageUrl: d.image_url ?? "",
     stock: Number(d.stock) || 0,
     stockMinimo: Number(d.stock_minimo) || 0,
+    lote: d.lote != null ? Number(d.lote) : undefined,
+    revisar: d.revisar ?? false,
     disabled: d.disabled ?? false,
+    ofertaActiva: d.oferta_activa ?? false,
+    ofertaTipo: d.oferta_tipo ?? undefined,
+    ofertaValor: Number(d.oferta_valor) || 0,
     syncedAt: d.synced_at ? new Date(d.synced_at) : undefined,
     createdAt: d.created_at ? new Date(d.created_at) : new Date(),
     updatedAt: d.updated_at ? new Date(d.updated_at) : new Date(),
@@ -78,6 +83,26 @@ export async function getProductsPage(params: ProductsPageParams): Promise<Produ
     .range(page * size, page * size + size - 1);
   if (error) throw new Error(error.message);
   return { products: (data ?? []).map(mapRow), total: count ?? 0 };
+}
+
+export interface SetOfertaInput {
+  activa: boolean;
+  tipo?: OfertaTipo;
+  valor?: number;
+}
+
+/** Marca/actualiza la oferta de catálogo de un producto (descuento propio). */
+export async function setOferta(productId: string, oferta: SetOfertaInput): Promise<void> {
+  const { error } = await supabase
+    .from("productos")
+    .update({
+      oferta_activa: oferta.activa,
+      oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
+      oferta_valor: oferta.activa ? oferta.valor ?? 0 : 0,
+    })
+    .eq("comercio_id", getComercioId())
+    .eq("id", productId);
+  if (error) throw new Error(error.message);
 }
 
 // Lookup exacto para el lector de codigo de barras: prueba codigo_barras y luego codigo

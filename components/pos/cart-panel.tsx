@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { precioFinal, tieneOferta } from "@/lib/pricing";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
 
@@ -128,9 +129,16 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
-                  <span className="text-sm font-semibold">
-                    {formatCurrency(i.product.price * i.quantity)}
-                  </span>
+                  <div className="text-right">
+                    {tieneOferta(i.product) && (
+                      <span className="mr-1.5 text-xs text-muted-foreground line-through">
+                        {formatCurrency(i.product.price * i.quantity)}
+                      </span>
+                    )}
+                    <span className={cn("text-sm font-semibold", tieneOferta(i.product) && "text-money")}>
+                      {formatCurrency(precioFinal(i.product) * i.quantity)}
+                    </span>
+                  </div>
                 </div>
               </li>
             ))}

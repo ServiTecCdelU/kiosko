@@ -7,6 +7,7 @@ import { Search, ArrowLeft, ScanLine } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { precioFinal, tieneOferta } from "@/lib/pricing";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode } from "@/services/products-service";
 import { createSale } from "@/services/sales-service";
@@ -94,6 +95,9 @@ function PosScreen() {
         return;
       }
       cart.addProduct(p, 1);
+      if (p.lote && p.lote > 1) {
+        toast.info(`${p.name} viene en paquete de ${p.lote} unidades`);
+      }
     },
     [cart],
   );
@@ -248,8 +252,15 @@ function PosScreen() {
                             {sinStock ? "Sin stock" : `Stock: ${p.stock}`}
                           </span>
                         </div>
-                        <span className="shrink-0 text-sm font-semibold text-primary">
-                          {formatCurrency(p.price)}
+                        <span className="shrink-0 text-right">
+                          {tieneOferta(p) && (
+                            <span className="mr-1.5 text-xs text-muted-foreground line-through">
+                              {formatCurrency(p.price)}
+                            </span>
+                          )}
+                          <span className={cn("text-sm font-semibold", tieneOferta(p) ? "text-money" : "text-primary")}>
+                            {formatCurrency(precioFinal(p))}
+                          </span>
                         </span>
                       </button>
                     </li>
