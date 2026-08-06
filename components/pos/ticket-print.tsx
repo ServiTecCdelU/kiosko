@@ -20,6 +20,7 @@ const METODO_LABEL: Record<PaymentMethod, string> = {
   fiado: "Fiado",
   mercadopago: "Mercado Pago (QR)",
   tarjeta: "Tarjeta (posnet)",
+  mercadopago_point: "Mercado Pago (Point)",
 };
 
 export function TicketPrint({ ticket }: { ticket: TicketData | null }) {

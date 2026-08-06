@@ -24,10 +24,13 @@ import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
 } from "@/lib/utils/tickets-espera";
 import { AuthGuard } from "@/components/auth/auth-guard";
-import { crearCobroQR } from "@/services/mercadopago-service";
+import {
+  crearCobroQR, cobrarConPoint, listarDispositivosMP, getDispositivoGuardado, guardarDispositivo,
+  type CobroQR, type CobroPoint,
+} from "@/services/mercadopago-service";
 import { getVentaById } from "@/services/sales-service";
 import { MercadoPagoQrDialog } from "@/components/pos/mercadopago-qr-dialog";
-import type { CobroQR } from "@/services/mercadopago-service";
+import { MercadoPagoPointDialog } from "@/components/pos/mercadopago-point-dialog";
 import type { Product } from "@/lib/types";
 
 export default function PosPage() {
@@ -51,6 +54,7 @@ function PosScreen() {
   const [ticketsEspera, setTicketsEspera] = useState<TicketEnEspera[]>([]);
   const [esperaOpen, setEsperaOpen] = useState(false);
   const [cobroQR, setCobroQR] = useState<CobroQR | null>(null);
+  const [cobroPoint, setCobroPoint] = useState<CobroPoint | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
   const { isOnline, pendingCount, syncVentasPendientes } = useOfflineSync();
@@ -248,8 +252,62 @@ function PosScreen() {
     [cart.total, finalizarTicket],
   );
 
+  const handleAprobadoPoint = useCallback(
+    async (ventaId: string) => {
+      try {
+        const venta = await getVentaById(ventaId);
+        const saleNumber = venta?.saleNumber ?? ventaId;
+        const total = venta?.total ?? cart.total;
+        setCobroPoint(null);
+        finalizarTicket(saleNumber, total, { paymentMethod: "mercadopago_point", cashAmount: 0, changeAmount: 0, transferAmount: total }, getCurrentUser()?.nombre);
+      } catch {
+        toast.error("El pago se acreditó pero no se pudo cerrar el ticket automáticamente");
+      }
+    },
+    [cart.total, finalizarTicket],
+  );
+
+  const resolverDispositivoPoint = useCallback(async (): Promise<string> => {
+    const guardado = getDispositivoGuardado();
+    if (guardado) return guardado;
+    const dispositivos = await listarDispositivosMP();
+    if (dispositivos.length === 0) throw new Error("No hay lectores Point vinculados a esta cuenta de Mercado Pago");
+    guardarDispositivo(dispositivos[0].id);
+    return dispositivos[0].id;
+  }, []);
+
   const handleConfirm = useCallback(
     async (data: ConfirmData) => {
+      if (data.paymentMethod === "mercadopago_point") {
+        setProcessing(true);
+        try {
+          const user = getCurrentUser();
+          const deviceId = await resolverDispositivoPoint();
+          const saleInput: CreateSaleInput = {
+            items: cart.items.map((i) => ({
+              productId: i.product.id,
+              name: i.product.name,
+              quantity: i.quantity,
+              price: i.product.price,
+            })),
+            paymentMethod: "mercadopago_point",
+            cashAmount: 0,
+            changeAmount: 0,
+            transferAmount: cart.total,
+            cajaId,
+            userId: user?.id,
+            userName: user?.nombre,
+          };
+          const cobro = await cobrarConPoint(saleInput, cart.total, deviceId);
+          setCobroPoint(cobro);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "No se pudo enviar el cobro al lector");
+        } finally {
+          setProcessing(false);
+        }
+        return;
+      }
+
       if (data.paymentMethod === "mercadopago") {
         setProcessing(true);
         try {
@@ -329,7 +387,7 @@ function PosScreen() {
         setProcessing(false);
       }
     },
-    [cart, cajaId, finalizarTicket],
+    [cart, cajaId, finalizarTicket, resolverDispositivoPoint],
   );
 
   return (
@@ -533,6 +591,12 @@ function PosScreen() {
         total={cart.total}
         onOpenChange={(o) => !o && setCobroQR(null)}
         onAprobado={handleAprobadoQR}
+      />
+      <MercadoPagoPointDialog
+        cobro={cobroPoint}
+        total={cart.total}
+        onOpenChange={(o) => !o && setCobroPoint(null)}
+        onAprobado={handleAprobadoPoint}
       />
     </main>
   );

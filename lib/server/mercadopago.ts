@@ -76,3 +76,69 @@ export async function getPagoMP(paymentId: string): Promise<PagoMP> {
   if (!res.ok) throw new Error(data?.message ?? "No se pudo consultar el pago en Mercado Pago");
   return { id: String(data.id), status: data.status, externalReference: data.external_reference ?? null };
 }
+
+// ============================================================
+// Point Integration API (lector fisico) — NOTA: verificado contra la
+// documentacion oficial de MP al momento de escribir esto, pero no probado
+// contra un lector real. Probar con una venta chica antes de confiar en
+// el mostrador. Doc: https://www.mercadopago.com.ar/developers/es/docs/mp-point/integrate-point
+// ============================================================
+
+export interface DispositivoMP {
+  id: string;
+  posId?: string;
+  operatingMode: string;
+}
+
+export async function listarDispositivosMP(): Promise<DispositivoMP[]> {
+  const token = getAccessToken();
+  const res = await fetch(`${MP_API}/point/integration-api/devices`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message ?? "No se pudieron listar los lectores Point");
+  return (data.devices ?? []).map((d: any) => ({
+    id: d.id,
+    posId: d.pos_id ?? undefined,
+    operatingMode: d.operating_mode ?? "PDV",
+  }));
+}
+
+export interface IntentoPagoPoint {
+  id: string;
+}
+
+/** Manda el cobro al lector fisico. El cliente paga apoyando/insertando la tarjeta ahi. */
+export async function crearIntentoPagoPoint(
+  deviceId: string,
+  total: number,
+  externalReference: string,
+): Promise<IntentoPagoPoint> {
+  const token = getAccessToken();
+  const res = await fetch(`${MP_API}/point/integration-api/devices/${deviceId}/payment-intents`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      amount: Math.round(total * 100), // Point API espera el monto en centavos
+      additional_info: { external_reference: externalReference, print_on_terminal: true },
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message ?? "No se pudo enviar el cobro al lector");
+  return { id: data.id };
+}
+
+export async function cancelarIntentoPagoPoint(deviceId: string, intentId: string): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`${MP_API}/point/integration-api/devices/${deviceId}/payment-intents/${intentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 404) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message ?? "No se pudo cancelar el cobro en el lector");
+  }
+}
