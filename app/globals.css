@@ -286,3 +286,31 @@
     animation: none;
   }
 }
+
+/* Ticket termico: se renderiza siempre en el DOM (fuera de pantalla) y solo se
+   muestra al imprimir, para que window.print() lo encuentre sin parpadeos de layout. */
+#ticket-print {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 80mm;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #ticket-print,
+  #ticket-print * {
+    visibility: visible;
+  }
+  #ticket-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -15,6 +15,7 @@ import { getCajaAbierta } from "@/services/caja-service";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
+import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import type { Product } from "@/lib/types";
 
@@ -35,6 +36,7 @@ function PosScreen() {
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
+  const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
 
@@ -171,10 +173,27 @@ function PosScreen() {
         });
         const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
         toast.success(`Ticket #${res.saleNumber}${vuelto}`);
+        setLastTicket({
+          saleNumber: res.saleNumber,
+          createdAt: new Date(),
+          items: cart.items.map((i) => ({
+            name: i.product.name,
+            quantity: i.quantity,
+            price: precioFinal(i.product),
+            subtotal: precioFinal(i.product) * i.quantity,
+            unidad: i.product.unidad,
+          })),
+          total: res.total,
+          paymentMethod: data.paymentMethod,
+          cashAmount: data.cashAmount,
+          changeAmount: data.changeAmount,
+          userName: user?.nombre,
+        });
         cart.clear();
         setQuery("");
         setResults([]);
         focusInput();
+        setTimeout(() => window.print(), 150);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "No se pudo cobrar");
       } finally {
@@ -201,6 +220,14 @@ function PosScreen() {
             <Kbd>F3</Kbd> Buscar
             <Kbd>Esc</Kbd> Limpiar
           </span>
+          {lastTicket && (
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Printer className="h-3.5 w-3.5" /> Reimprimir
+            </button>
+          )}
           <span
             className={cn(
               "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
@@ -335,6 +362,7 @@ function PosScreen() {
       </div>
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
+      <TicketPrint ticket={lastTicket} />
     </main>
   );
 }
