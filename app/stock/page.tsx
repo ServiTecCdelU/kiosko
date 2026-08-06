@@ -24,7 +24,7 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal, tieneOferta } from "@/lib/pricing";
+import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -273,7 +273,15 @@ export default function StockPage() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.category || "—"}</TableCell>
                       <TableCell className="text-right">
-                        {tieneOferta(p) ? (
+                        {comboLabel(p) ? (
+                          <span className="flex flex-col items-end leading-tight">
+                            <span className="text-xs text-muted-foreground">{formatCurrency(p.price)} c/u</span>
+                            <span className="inline-flex items-center gap-1 font-semibold text-money">
+                              <Tag className="h-3 w-3" />
+                              {comboLabel(p)}
+                            </span>
+                          </span>
+                        ) : tieneOferta(p) ? (
                           <span className="flex flex-col items-end leading-tight">
                             <span className="text-xs text-muted-foreground line-through">
                               {formatCurrency(p.price)}

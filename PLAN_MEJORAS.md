@@ -56,7 +56,7 @@ Esto es lo que determina qué construir, en orden de impacto real:
 | 5 | ✅ **Grilla de productos rápidos / favoritos** | Hecho: toggle "Producto rápido" en "Editar producto" + grilla en el POS que aparece cuando no hay búsqueda activa. Cubre el 30-40% del catálogo sin código de barras (cigarrillos, golosinas sueltas, fotocopias). |
 | 6 | ✅ **Venta por peso/kg** | Hecho: campo `unidad` ("un"/"kg") por producto, diálogo de peso al agregar al carrito un producto por kg, cantidades decimales en el carrito (stock y cantidad ya eran `numeric` en la BD, no hizo falta tocar la RPC de venta). |
 | 7 | ✅ **Control de vencimientos** | Hecho: campo `fecha_vencimiento` editable en "Editar producto" + banner de aviso en `/stock` ("N productos vencen en los próximos 7 días"). |
-| 8 | **Combos y precio por cantidad** | `lib/pricing.ts` ya resuelve oferta por producto individual; falta "3x2", "2do al 70%", "llevando 6 unidades, $X c/u". Muy pedido en bebidas y golosinas. |
+| 8 | ✅ **Combos y precio por cantidad** | Hecho: `oferta_tipo = 'combo'` en `lib/pricing.ts` (`precioLinea`), UI en el diálogo de Oferta ("cada cuántas unidades" + "precio del combo"), badge Nx$ / 2x1 en POS y stock, y `/api/ventas` recalcula el subtotal autoritativo con combos incluidos (no confía en el cliente). |
 | 9 | ✅ **Impresión de ticket** | Hecho: layout térmico 80mm imprimible desde el navegador (`window.print()`), se dispara automáticamente al confirmar el cobro + botón "Reimprimir" en el header del POS. ESC/POS por WebUSB queda como mejora posterior si un comercio pide impresión silenciosa sin diálogo del navegador. |
 
 ### 🟡 Prioridad 3 — Operación diaria más prolija (no bloquea vender, pero se nota rápido)

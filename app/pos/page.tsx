@@ -7,7 +7,7 @@ import { Search, ArrowLeft, ScanLine, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal, tieneOferta } from "@/lib/pricing";
+import { precioFinal, precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
 import { createSale } from "@/services/sales-service";
@@ -176,13 +176,16 @@ function PosScreen() {
         setLastTicket({
           saleNumber: res.saleNumber,
           createdAt: new Date(),
-          items: cart.items.map((i) => ({
-            name: i.product.name,
-            quantity: i.quantity,
-            price: precioFinal(i.product),
-            subtotal: precioFinal(i.product) * i.quantity,
-            unidad: i.product.unidad,
-          })),
+          items: cart.items.map((i) => {
+            const subtotal = precioLinea(i.product, i.quantity);
+            return {
+              name: i.product.name,
+              quantity: i.quantity,
+              price: i.quantity > 0 ? subtotal / i.quantity : 0,
+              subtotal,
+              unidad: i.product.unidad,
+            };
+          }),
           total: res.total,
           paymentMethod: data.paymentMethod,
           cashAmount: data.cashAmount,
@@ -317,7 +320,14 @@ function PosScreen() {
                         )}
                       >
                         <div className="min-w-0">
-                          <p className="line-clamp-1 text-sm font-medium">{p.name}</p>
+                          <p className="line-clamp-1 text-sm font-medium">
+                            {p.name}
+                            {comboLabel(p) && (
+                              <span className="ml-1.5 rounded-md bg-money/15 px-1.5 py-0.5 text-[10px] font-semibold text-money">
+                                {comboLabel(p)}
+                              </span>
+                            )}
+                          </p>
                           <span
                             className={cn(
                               "text-xs",

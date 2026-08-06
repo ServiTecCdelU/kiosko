@@ -1,7 +1,7 @@
 // app/api/ventas/route.ts — alta de venta atomica via RPC process_sale_kiosko
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { precioFinal } from "@/lib/pricing";
+import { precioLinea } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const ids: string[] = rawItems.map((i: any) => String(i.productId)).filter(Boolean);
   const { data: prods, error: prodErr } = await supabaseAdmin
     .from("productos")
-    .select("id,name,price,oferta_activa,oferta_tipo,oferta_valor")
+    .select("id,name,price,oferta_activa,oferta_tipo,oferta_valor,oferta_cantidad")
     .eq("comercio_id", comercioId)
     .in("id", ids);
   if (prodErr) {
@@ -37,18 +37,23 @@ export async function POST(req: Request) {
   const items = rawItems.map((i: any) => {
     const id = String(i.productId);
     const db = byId.get(id);
-    // Precio autoritativo desde la BD, ya con la oferta de catálogo aplicada.
-    const price = db
-      ? precioFinal({
-          price: Number(db.price),
-          ofertaActiva: db.oferta_activa,
-          ofertaTipo: db.oferta_tipo,
-          ofertaValor: db.oferta_valor,
-        })
-      : Number(i.price) || 0;
-    const name = db ? db.name : String(i.name ?? "");
     const quantity = Number(i.quantity) || 0;
-    return { productId: id, name, quantity, price, subtotal: price * quantity };
+    // Subtotal autoritativo desde la BD (oferta y combos incluidos, no confiar en el cliente).
+    const subtotal = db
+      ? precioLinea(
+          {
+            price: Number(db.price),
+            ofertaActiva: db.oferta_activa,
+            ofertaTipo: db.oferta_tipo,
+            ofertaValor: db.oferta_valor,
+            ofertaCantidad: db.oferta_cantidad,
+          },
+          quantity,
+        )
+      : (Number(i.price) || 0) * quantity;
+    const name = db ? db.name : String(i.name ?? "");
+    const price = quantity > 0 ? subtotal / quantity : 0;
+    return { productId: id, name, quantity, price, subtotal };
   });
 
   const discount = Number(body?.discount) || 0;

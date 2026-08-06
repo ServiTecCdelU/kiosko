@@ -25,6 +25,7 @@ export function mapRow(d: Record<string, any>): Product {
     ofertaActiva: d.oferta_activa ?? false,
     ofertaTipo: d.oferta_tipo ?? undefined,
     ofertaValor: Number(d.oferta_valor) || 0,
+    ofertaCantidad: d.oferta_cantidad != null ? Number(d.oferta_cantidad) : undefined,
     syncedAt: d.synced_at ? new Date(d.synced_at) : undefined,
     createdAt: d.created_at ? new Date(d.created_at) : new Date(),
     updatedAt: d.updated_at ? new Date(d.updated_at) : new Date(),
@@ -219,9 +220,10 @@ export interface SetOfertaInput {
   activa: boolean;
   tipo?: OfertaTipo;
   valor?: number;
+  cantidad?: number;
 }
 
-/** Marca/actualiza la oferta de catálogo de un producto (descuento propio). */
+/** Marca/actualiza la oferta de catálogo de un producto (descuento propio, incluye combos). */
 export async function setOferta(productId: string, oferta: SetOfertaInput): Promise<void> {
   const { error } = await supabase
     .from("productos")
@@ -229,6 +231,7 @@ export async function setOferta(productId: string, oferta: SetOfertaInput): Prom
       oferta_activa: oferta.activa,
       oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
       oferta_valor: oferta.activa ? oferta.valor ?? 0 : 0,
+      oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? oferta.cantidad ?? null : null,
     })
     .eq("comercio_id", getComercioId())
     .eq("id", productId);

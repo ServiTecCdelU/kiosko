@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal, tieneOferta } from "@/lib/pricing";
+import { precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
 
@@ -104,7 +104,14 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
             {items.map((i) => (
               <li key={i.product.id} className="rounded-xl px-2 py-2 hover:bg-muted/50">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="line-clamp-2 text-sm font-medium">{i.product.name}</span>
+                  <span className="line-clamp-2 text-sm font-medium">
+                    {i.product.name}
+                    {comboLabel(i.product) && (
+                      <span className="ml-1.5 rounded-md bg-money/15 px-1.5 py-0.5 text-[10px] font-semibold text-money">
+                        {comboLabel(i.product)}
+                      </span>
+                    )}
+                  </span>
                   <button
                     onClick={() => onRemove(i.product.id)}
                     className="text-muted-foreground hover:text-destructive"
@@ -145,7 +152,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                       </span>
                     )}
                     <span className={cn("text-sm font-semibold", tieneOferta(i.product) && "text-money")}>
-                      {formatCurrency(precioFinal(i.product) * i.quantity)}
+                      {formatCurrency(precioLinea(i.product, i.quantity))}
                     </span>
                   </div>
                 </div>

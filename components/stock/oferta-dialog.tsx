@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal } from "@/lib/pricing";
+import { precioFinal, precioLinea } from "@/lib/pricing";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { SetOfertaInput } from "@/services/products-service";
 
@@ -24,12 +24,14 @@ interface OfertaDialogProps {
 const TIPOS: { value: OfertaTipo; label: string }[] = [
   { value: "monto", label: "Monto ($)" },
   { value: "porcentaje", label: "Porcentaje (%)" },
+  { value: "combo", label: "Combo (Nx$)" },
 ];
 
 export function OfertaDialog({ product, open, onOpenChange, onSubmit }: OfertaDialogProps) {
   const [activa, setActiva] = useState(false);
   const [tipo, setTipo] = useState<OfertaTipo>("monto");
   const [valor, setValor] = useState("");
+  const [cantidad, setCantidad] = useState("");
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
@@ -37,26 +39,31 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit }: OfertaDi
       setActiva(product.ofertaActiva);
       setTipo(product.ofertaTipo ?? "monto");
       setValor(product.ofertaValor ? String(product.ofertaValor) : "");
+      setCantidad(product.ofertaCantidad ? String(product.ofertaCantidad) : "");
     }
   }, [open, product]);
 
   if (!product) return null;
 
   const valorNum = Number(valor) || 0;
-  const preview = precioFinal({
-    price: product.price,
-    ofertaActiva: activa,
-    ofertaTipo: tipo,
-    ofertaValor: valorNum,
-  });
+  const cantidadNum = Number(cantidad) || 0;
+  const esCombo = tipo === "combo";
+
+  const preview = esCombo
+    ? precioLinea({ price: product.price, ofertaActiva: true, ofertaTipo: tipo, ofertaValor: valorNum, ofertaCantidad: cantidadNum }, cantidadNum || 1)
+    : precioFinal({ price: product.price, ofertaActiva: activa, ofertaTipo: tipo, ofertaValor: valorNum });
+
   const valorInvalido =
-    activa && (valorNum <= 0 || (tipo === "porcentaje" && valorNum >= 100));
+    activa &&
+    (esCombo
+      ? valorNum <= 0 || cantidadNum <= 1
+      : valorNum <= 0 || (tipo === "porcentaje" && valorNum >= 100));
 
   const handle = async () => {
     if (valorInvalido) return;
     setWorking(true);
     try {
-      await onSubmit({ activa, tipo, valor: valorNum });
+      await onSubmit({ activa, tipo, valor: valorNum, cantidad: esCombo ? cantidadNum : undefined });
       onOpenChange(false);
     } finally {
       setWorking(false);
@@ -80,13 +87,13 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit }: OfertaDi
 
           {activa && (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {TIPOS.map((t) => (
                   <button
                     key={t.value}
                     onClick={() => setTipo(t.value)}
                     className={cn(
-                      "rounded-xl border py-2 text-sm font-medium transition-colors",
+                      "rounded-xl border py-2 text-xs font-medium transition-colors",
                       tipo === t.value ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
                     )}
                   >
@@ -95,29 +102,57 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit }: OfertaDi
                 ))}
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  {tipo === "monto" ? "Descuento en pesos" : "Descuento en %"}
-                </label>
-                <Input
-                  type="number" inputMode="decimal" autoFocus
-                  value={valor} onChange={(e) => setValor(e.target.value)}
-                  placeholder={tipo === "monto" ? "Ej: 200" : "Ej: 15"}
-                  className="rounded-xl"
-                />
-                {valorInvalido && (
-                  <p className="mt-1 text-xs text-destructive">
-                    {tipo === "porcentaje" ? "Debe ser entre 0 y 100" : "Debe ser mayor a 0"}
-                  </p>
-                )}
-              </div>
+              {esCombo ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Cada cuántas unidades</label>
+                    <Input
+                      type="number" inputMode="numeric" autoFocus
+                      value={cantidad} onChange={(e) => setCantidad(e.target.value)}
+                      placeholder="Ej: 3" className="rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Precio del combo</label>
+                    <Input
+                      type="number" inputMode="decimal"
+                      value={valor} onChange={(e) => setValor(e.target.value)}
+                      placeholder="Ej: 1000" className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    {tipo === "monto" ? "Descuento en pesos" : "Descuento en %"}
+                  </label>
+                  <Input
+                    type="number" inputMode="decimal" autoFocus
+                    value={valor} onChange={(e) => setValor(e.target.value)}
+                    placeholder={tipo === "monto" ? "Ej: 200" : "Ej: 15"}
+                    className="rounded-xl"
+                  />
+                </div>
+              )}
+
+              {valorInvalido && (
+                <p className="text-xs text-destructive">
+                  {esCombo
+                    ? "Ingresá una cantidad mayor a 1 y un precio de combo válido"
+                    : tipo === "porcentaje" ? "Debe ser entre 0 y 100" : "Debe ser mayor a 0"}
+                </p>
+              )}
 
               <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2.5">
-                <span className="text-sm text-muted-foreground">Precio final</span>
+                <span className="text-sm text-muted-foreground">
+                  {esCombo ? `Precio llevando ${cantidadNum || "N"}` : "Precio final"}
+                </span>
                 <span className="flex items-baseline gap-2">
-                  <span className="text-xs text-muted-foreground line-through">
-                    {formatCurrency(product.price)}
-                  </span>
+                  {!esCombo && (
+                    <span className="text-xs text-muted-foreground line-through">
+                      {formatCurrency(product.price)}
+                    </span>
+                  )}
                   <span className="cifra text-lg font-bold text-money">{formatCurrency(preview)}</span>
                 </span>
               </div>
