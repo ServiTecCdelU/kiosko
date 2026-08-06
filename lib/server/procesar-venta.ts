@@ -1,0 +1,85 @@
+// lib/server/procesar-venta.ts — logica compartida de alta de venta (server-only, usa service role)
+// La usan /api/ventas (cobro directo) y /api/mercadopago/webhook (cobro con QR confirmado).
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { precioLinea } from "@/lib/pricing";
+
+export interface ProcesarVentaInput {
+  items: { productId: string; name?: string; quantity: number; price?: number }[];
+  paymentMethod: string;
+  cashAmount?: number;
+  changeAmount?: number;
+  transferAmount?: number;
+  discount?: number;
+  cajaId?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  clienteId?: string | null;
+  comercioId: string;
+}
+
+export interface ProcesarVentaResult {
+  id: string;
+  saleNumber: string;
+  total: number;
+}
+
+/** Recalcula precios/subtotales autoritativos desde la BD e inserta la venta via RPC atomica. */
+export async function procesarVenta(input: ProcesarVentaInput): Promise<ProcesarVentaResult> {
+  const rawItems = input.items;
+  if (rawItems.length === 0) {
+    throw new Error("El carrito esta vacio");
+  }
+
+  const comercioId = input.comercioId;
+  const ids = rawItems.map((i) => String(i.productId)).filter(Boolean);
+  const { data: prods, error: prodErr } = await supabaseAdmin
+    .from("productos")
+    .select("id,name,price,oferta_activa,oferta_tipo,oferta_valor,oferta_cantidad")
+    .eq("comercio_id", comercioId)
+    .in("id", ids);
+  if (prodErr) throw new Error(prodErr.message);
+  const byId = new Map((prods ?? []).map((p: any) => [p.id, p]));
+
+  const items = rawItems.map((i) => {
+    const id = String(i.productId);
+    const db = byId.get(id);
+    const quantity = Number(i.quantity) || 0;
+    const subtotal = db
+      ? precioLinea(
+          {
+            price: Number(db.price),
+            ofertaActiva: db.oferta_activa,
+            ofertaTipo: db.oferta_tipo,
+            ofertaValor: db.oferta_valor,
+            ofertaCantidad: db.oferta_cantidad,
+          },
+          quantity,
+        )
+      : (Number(i.price) || 0) * quantity;
+    const name = db ? db.name : String(i.name ?? "");
+    const price = quantity > 0 ? subtotal / quantity : 0;
+    return { productId: id, name, quantity, price, subtotal };
+  });
+
+  const discount = Number(input.discount) || 0;
+  const total = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
+
+  const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", {
+    p_items: items,
+    p_total: total,
+    p_payment_method: input.paymentMethod ?? "efectivo",
+    p_cash_amount: Number(input.cashAmount) || 0,
+    p_change_amount: Number(input.changeAmount) || 0,
+    p_transfer_amount: Number(input.transferAmount) || 0,
+    p_discount: discount,
+    p_caja_id: input.cajaId ?? null,
+    p_user_id: input.userId ?? null,
+    p_user_name: input.userName ?? null,
+    p_cliente_id: input.clienteId ?? null,
+    p_comercio_id: comercioId,
+  });
+
+  if (error) throw new Error(error.message);
+
+  return { id: data.id, saleNumber: data.sale_number, total: data.total };
+}

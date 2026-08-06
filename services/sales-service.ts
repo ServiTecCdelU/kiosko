@@ -76,6 +76,17 @@ function mapSale(d: Record<string, any>): Sale {
   };
 }
 
+export async function getVentaById(ventaId: string): Promise<Sale | null> {
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("*")
+    .eq("comercio_id", getComercioId())
+    .eq("id", ventaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapSale(data) : null;
+}
+
 export async function getVentasDeCaja(cajaId: string): Promise<Sale[]> {
   const { data, error } = await supabase
     .from("ventas")

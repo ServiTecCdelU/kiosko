@@ -44,7 +44,7 @@ export interface SaleItem {
   subtotal: number;
 }
 
-export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado";
+export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado" | "mercadopago";
 export type VentaEstado = "completada" | "anulada";
 
 export interface Sale {

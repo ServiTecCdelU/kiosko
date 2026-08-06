@@ -74,7 +74,7 @@ Esto es lo que determina qué construir, en orden de impacto real:
 | # | Ítem | Detalle |
 |---|---|---|
 | 15 | ✅ **Modo offline (PWA)** | Hecho: service worker manual (`public/sw.js`, sin tocar `next.config.mjs`) que cachea la app shell; catálogo completo cacheado en IndexedDB (`lib/offline/db.ts`) para buscar y cobrar sin señal; las ventas offline se guardan en una cola local y se sincronizan solas al volver la conexión (`hooks/use-offline-sync.ts`). El fiado no se puede cobrar offline (necesita validar saldo en el momento). |
-| 16 | **Cobro con QR de Mercado Pago** | La estructura de `comercios` ya lo contempla (ver `PLAN.md`); falta el flujo de generación de QR + webhook. |
+| 16 | ✅ **Cobro con QR de Mercado Pago** | Hecho: nuevo método de pago "MP" en el POS, genera un QR (Checkout Pro) que el cliente escanea; la venta real recién se registra cuando el webhook de Mercado Pago confirma el pago aprobado (`process_sale_kiosko` no se dispara antes). Requiere completar `MP_ACCESS_TOKEN` y `NEXT_PUBLIC_APP_URL` en `.env.local` y correr `supabase/16_mercadopago_qr.sql`. El fiado y el modo offline no aplican a este método (necesita conexión y confirmación en el momento). |
 | 17 | **Historial de precios por producto** | Ver cómo evolucionó el precio de un producto en el tiempo — útil para decidir cuándo actualizar la lista y detectar productos que un proveedor aumentó de más. |
 
 ---

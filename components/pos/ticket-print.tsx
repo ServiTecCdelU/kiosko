@@ -18,6 +18,7 @@ const METODO_LABEL: Record<PaymentMethod, string> = {
   transferencia: "Transferencia",
   mixto: "Mixto (efectivo + transferencia)",
   fiado: "Fiado",
+  mercadopago: "Mercado Pago (QR)",
 };
 
 export function TicketPrint({ ticket }: { ticket: TicketData | null }) {

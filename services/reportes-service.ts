@@ -88,7 +88,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
     } else {
       // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
       const tr =
-        v.payment_method === "transferencia"
+        v.payment_method === "transferencia" || v.payment_method === "mercadopago"
           ? total
           : v.payment_method === "mixto"
             ? Math.min(total, Number(v.transfer_amount) || 0)

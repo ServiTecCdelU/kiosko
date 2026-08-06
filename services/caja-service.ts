@@ -115,7 +115,7 @@ export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
     const t = Number(v.total) || 0;
     // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
     const tr =
-      v.payment_method === "transferencia"
+      v.payment_method === "transferencia" || v.payment_method === "mercadopago"
         ? t
         : v.payment_method === "mixto"
           ? Math.min(t, Number(v.transfer_amount) || 0)

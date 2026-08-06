@@ -24,6 +24,10 @@ import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
 } from "@/lib/utils/tickets-espera";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { crearCobroQR } from "@/services/mercadopago-service";
+import { getVentaById } from "@/services/sales-service";
+import { MercadoPagoQrDialog } from "@/components/pos/mercadopago-qr-dialog";
+import type { CobroQR } from "@/services/mercadopago-service";
 import type { Product } from "@/lib/types";
 
 export default function PosPage() {
@@ -46,6 +50,7 @@ function PosScreen() {
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
   const [ticketsEspera, setTicketsEspera] = useState<TicketEnEspera[]>([]);
   const [esperaOpen, setEsperaOpen] = useState(false);
+  const [cobroQR, setCobroQR] = useState<CobroQR | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
   const { isOnline, pendingCount, syncVentasPendientes } = useOfflineSync();
@@ -196,8 +201,84 @@ function PosScreen() {
     }
   }, [query, results, addToCart, focusInput, isOnline]);
 
+  const finalizarTicket = useCallback(
+    (saleNumber: string, total: number, data: ConfirmData, userName?: string) => {
+      const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
+      if (saleNumber !== "PENDIENTE") toast.success(`Ticket #${saleNumber}${vuelto}`);
+      setLastTicket({
+        saleNumber,
+        createdAt: new Date(),
+        items: cart.items.map((i) => {
+          const subtotal = precioLinea(i.product, i.quantity);
+          return {
+            name: i.product.name,
+            quantity: i.quantity,
+            price: i.quantity > 0 ? subtotal / i.quantity : 0,
+            subtotal,
+            unidad: i.product.unidad,
+          };
+        }),
+        total,
+        paymentMethod: data.paymentMethod,
+        cashAmount: data.cashAmount,
+        changeAmount: data.changeAmount,
+        userName,
+      });
+      cart.clear();
+      setQuery("");
+      setResults([]);
+      focusInput();
+      setTimeout(() => window.print(), 150);
+    },
+    [cart, focusInput],
+  );
+
+  const handleAprobadoQR = useCallback(
+    async (ventaId: string) => {
+      try {
+        const venta = await getVentaById(ventaId);
+        const saleNumber = venta?.saleNumber ?? ventaId;
+        const total = venta?.total ?? cart.total;
+        setCobroQR(null);
+        finalizarTicket(saleNumber, total, { paymentMethod: "mercadopago", cashAmount: 0, changeAmount: 0, transferAmount: total }, getCurrentUser()?.nombre);
+      } catch {
+        toast.error("El pago se acreditó pero no se pudo cerrar el ticket automáticamente");
+      }
+    },
+    [cart.total, finalizarTicket],
+  );
+
   const handleConfirm = useCallback(
     async (data: ConfirmData) => {
+      if (data.paymentMethod === "mercadopago") {
+        setProcessing(true);
+        try {
+          const user = getCurrentUser();
+          const saleInput: CreateSaleInput = {
+            items: cart.items.map((i) => ({
+              productId: i.product.id,
+              name: i.product.name,
+              quantity: i.quantity,
+              price: i.product.price,
+            })),
+            paymentMethod: "mercadopago",
+            cashAmount: 0,
+            changeAmount: 0,
+            transferAmount: cart.total,
+            cajaId,
+            userId: user?.id,
+            userName: user?.nombre,
+          };
+          const cobro = await crearCobroQR(saleInput, cart.total);
+          setCobroQR(cobro);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "No se pudo generar el cobro con QR");
+        } finally {
+          setProcessing(false);
+        }
+        return;
+      }
+
       setProcessing(true);
       const user = getCurrentUser();
       const saleInput: CreateSaleInput = {
@@ -241,40 +322,14 @@ function PosScreen() {
           }
         }
 
-        const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
-        if (saleNumber !== "PENDIENTE") toast.success(`Ticket #${saleNumber}${vuelto}`);
-        const res = { saleNumber, total };
-        setLastTicket({
-          saleNumber: res.saleNumber,
-          createdAt: new Date(),
-          items: cart.items.map((i) => {
-            const subtotal = precioLinea(i.product, i.quantity);
-            return {
-              name: i.product.name,
-              quantity: i.quantity,
-              price: i.quantity > 0 ? subtotal / i.quantity : 0,
-              subtotal,
-              unidad: i.product.unidad,
-            };
-          }),
-          total: res.total,
-          paymentMethod: data.paymentMethod,
-          cashAmount: data.cashAmount,
-          changeAmount: data.changeAmount,
-          userName: user?.nombre,
-        });
-        cart.clear();
-        setQuery("");
-        setResults([]);
-        focusInput();
-        setTimeout(() => window.print(), 150);
+        finalizarTicket(saleNumber, total, data, user?.nombre);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "No se pudo cobrar");
       } finally {
         setProcessing(false);
       }
     },
-    [cart, focusInput, cajaId],
+    [cart, cajaId, finalizarTicket],
   );
 
   return (
@@ -472,6 +527,12 @@ function PosScreen() {
         tickets={ticketsEspera}
         onRecuperar={handleRecuperar}
         onDescartar={handleDescartarEspera}
+      />
+      <MercadoPagoQrDialog
+        cobro={cobroQR}
+        total={cart.total}
+        onOpenChange={(o) => !o && setCobroQR(null)}
+        onAprobado={handleAprobadoQR}
       />
     </main>
   );
