@@ -150,6 +150,7 @@ export interface UpdateProductInput {
   name: string;
   category: string;
   price: number;
+  costo?: number;
   stockMinimo: number;
   lote?: number;
   disabled: boolean;
@@ -165,6 +166,7 @@ export async function updateProduct(productId: string, input: UpdateProductInput
       name: input.name,
       category: input.category,
       price: input.price,
+      precio_base: input.costo ?? null,
       stock_minimo: input.stockMinimo,
       lote: input.lote ?? null,
       disabled: input.disabled,

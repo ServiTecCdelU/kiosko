@@ -227,6 +227,7 @@ export default function StockPage() {
                   <TableHead>Producto</TableHead>
                   <TableHead>Rubro</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
+                  <TableHead className="text-right">Margen</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Mín.</TableHead>
                   <TableHead className="text-right">Lote</TableHead>
@@ -263,6 +264,20 @@ export default function StockPage() {
                           </span>
                         ) : (
                           formatCurrency(p.price)
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {p.precioBase && p.price > 0 ? (
+                          (() => {
+                            const margen = ((p.price - p.precioBase) / p.price) * 100;
+                            return (
+                              <span className={margen < 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
+                                {margen.toFixed(0)}%
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

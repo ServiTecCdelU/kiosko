@@ -10,6 +10,7 @@ export type ImportField =
   | "codigo"
   | "descripcion"
   | "precio"
+  | "costo"
   | "rubro"
   | "subrubro"
   | "stock"
@@ -20,6 +21,7 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   codigo: "Código",
   descripcion: "Descripción",
   precio: "Precio (Cons. Final)",
+  costo: "Costo (opcional, para margen)",
   rubro: "Rubro",
   subrubro: "Subrubro",
   stock: "Stock",
@@ -76,6 +78,7 @@ const AUTO_MATCH: Record<ImportField, RegExp> = {
   codigo: /^c[oó]digo$|cod\.?$|sku/i,
   descripcion: /descrip|nombre|producto/i,
   precio: /precio|cons\.?\s*final|pvp/i,
+  costo: /costo|compra|neto/i,
   rubro: /rubro|categor/i,
   subrubro: /subrubro|sub.?categor/i,
   stock: /stock|cantidad|existencia/i,
@@ -124,6 +127,7 @@ export interface ParsedRow {
   codigo: string;
   descripcion: string;
   precio: number;
+  costo: number | undefined;
   rubro: string;
   subrubro: string;
   stock: number;
@@ -152,6 +156,7 @@ export function parseRows(
     codigo: letterToIndex(mapping.codigo),
     descripcion: letterToIndex(mapping.descripcion),
     precio: letterToIndex(mapping.precio),
+    costo: letterToIndex(mapping.costo),
     rubro: letterToIndex(mapping.rubro),
     subrubro: letterToIndex(mapping.subrubro),
     stock: letterToIndex(mapping.stock),
@@ -170,6 +175,8 @@ export function parseRows(
     const descripcion = get(idx.descripcion);
     const precioRaw = get(idx.precio).replace(/[^\d,.-]/g, "").replace(",", ".");
     const precio = Number(precioRaw) || 0;
+    const costoRaw = get(idx.costo).replace(/[^\d,.-]/g, "").replace(",", ".");
+    const costo = costoRaw ? Number(costoRaw) || undefined : undefined;
     const rubro = get(idx.rubro);
     const subrubro = get(idx.subrubro);
     const stockRaw = get(idx.stock).replace(/[^\d.-]/g, "");
@@ -191,6 +198,7 @@ export function parseRows(
       codigo,
       descripcion,
       precio,
+      costo,
       rubro,
       subrubro,
       stock,
@@ -295,6 +303,7 @@ async function importRow(
       .update({
         name: row.descripcion || existing.name,
         price: row.precio || existing.price,
+        precio_base: row.costo ?? existing.precioBase ?? null,
         category: category || existing.category,
         codigo: row.codigo || existing.codigo,
         codigo_barras: row.barra || existing.codigoBarras,
@@ -315,6 +324,7 @@ async function importRow(
       name: row.descripcion,
       description: "",
       price: row.precio,
+      precio_base: row.costo ?? null,
       category,
       image_url: "",
       stock: row.stock,

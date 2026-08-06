@@ -26,7 +26,7 @@ interface ImportDialogProps {
 
 type Step = "archivo" | "preview" | "progreso" | "resultado";
 
-const FIELDS: ImportField[] = ["barra", "codigo", "descripcion", "precio", "rubro", "subrubro", "stock", "lote"];
+const FIELDS: ImportField[] = ["barra", "codigo", "descripcion", "precio", "costo", "rubro", "subrubro", "stock", "lote"];
 
 const STRATEGIES: { value: StockStrategy; label: string; hint: string }[] = [
   { value: "no_tocar", label: "No tocar stock", hint: "Solo actualiza precio, nombre y rubro" },

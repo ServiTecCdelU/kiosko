@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, Receipt, Banknote, CreditCard, Coins } from "lucide-react";
+import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +96,17 @@ export default function ReportesPage() {
             <Kpi label="Efectivo" value={formatCurrency(r?.efectivo ?? 0)} icon={<Banknote className="h-4 w-4" />} />
             <Kpi label="Transferencia" value={formatCurrency(r?.transferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
             <Kpi label="Fiado" value={formatCurrency(r?.fiado ?? 0)} icon={<Coins className="h-4 w-4" />} />
+            <Kpi
+              label="Margen bruto"
+              value={r ? `${formatCurrency(r.margenBruto)} (${r.margenPct.toFixed(0)}%)` : "—"}
+              icon={<PiggyBank className="h-4 w-4" />}
+            />
           </div>
+          {r && r.sinCosto > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {r.sinCosto} unidades vendidas sin costo cargado — el margen real es mayor a lo mostrado. Cargá el costo en "Editar producto" o en la importación de Excel.
+            </p>
+          )}
 
           <Card className="rounded-2xl">
             <CardHeader>
@@ -140,6 +150,7 @@ export default function ReportesPage() {
                         <TableHead>Producto</TableHead>
                         <TableHead className="text-right">Unidades</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Margen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -148,6 +159,55 @@ export default function ReportesPage() {
                           <TableCell className="line-clamp-1 font-medium">{p.name}</TableCell>
                           <TableCell className="text-right font-semibold">{p.cantidad}</TableCell>
                           <TableCell className="text-right">{formatCurrency(p.total)}</TableCell>
+                          <TableCell className="text-right text-xs">
+                            {p.margenPct !== undefined ? (
+                              <span className={p.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
+                                {formatCurrency(p.margen)} ({p.margenPct.toFixed(0)}%)
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">sin costo</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-base">Rentabilidad por rubro</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(reporte?.rentabilidadPorRubro.length ?? 0) === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin datos</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rubro</TableHead>
+                        <TableHead className="text-right">Vendido</TableHead>
+                        <TableHead className="text-right">Margen</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reporte?.rentabilidadPorRubro.map((r) => (
+                        <TableRow key={r.rubro}>
+                          <TableCell className="line-clamp-1 font-medium">{r.rubro}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
+                          <TableCell className="text-right text-xs">
+                            {r.margenPct !== undefined ? (
+                              <span className={r.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
+                                {formatCurrency(r.margen)} ({r.margenPct.toFixed(0)}%)
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

@@ -37,6 +37,7 @@ export function EditarProductoDialog({
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [costo, setCosto] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
   const [lote, setLote] = useState("");
   const [disabled, setDisabled] = useState(false);
@@ -54,6 +55,7 @@ export function EditarProductoDialog({
       setName(product.name);
       setCategory(product.category ?? "");
       setPrice(String(product.price));
+      setCosto(product.precioBase ? String(product.precioBase) : "");
       setStockMinimo(String(product.stockMinimo));
       setLote(product.lote ? String(product.lote) : "");
       setDisabled(product.disabled);
@@ -66,6 +68,8 @@ export function EditarProductoDialog({
   if (!product) return null;
 
   const priceNum = Number(price) || 0;
+  const costoNum = costo ? Number(costo) || 0 : undefined;
+  const margenPct = costoNum && priceNum > 0 ? ((priceNum - costoNum) / priceNum) * 100 : undefined;
   const stockMinimoNum = Number(stockMinimo) || 0;
   const loteNum = lote ? Number(lote) : undefined;
   const nombreInvalido = !name.trim();
@@ -80,6 +84,7 @@ export function EditarProductoDialog({
         name: name.trim(),
         category: category.trim(),
         price: priceNum,
+        costo: costoNum,
         stockMinimo: stockMinimoNum,
         lote: loteNum,
         disabled,
@@ -138,11 +143,28 @@ export function EditarProductoDialog({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">Precio</Label>
+              <Label className="mb-1 block text-xs">Precio de venta</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
             </div>
+            <div>
+              <Label className="mb-1 block text-xs">Costo</Label>
+              <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
+            </div>
+          </div>
+
+          {margenPct !== undefined && (
+            <div className={cn(
+              "rounded-xl px-3 py-2 text-sm",
+              margenPct < 0 ? "bg-destructive/10 text-destructive" : "bg-money/10 text-money",
+            )}>
+              Margen: <strong>{margenPct.toFixed(1)}%</strong>
+              {margenPct < 0 && " — estás vendiendo por debajo del costo"}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Stock mínimo</Label>
               <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
