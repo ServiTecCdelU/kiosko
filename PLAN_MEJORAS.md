@@ -54,7 +54,7 @@ Esto es lo que determina qué construir, en orden de impacto real:
 | # | Ítem | Detalle |
 |---|---|---|
 | 5 | ✅ **Grilla de productos rápidos / favoritos** | Hecho: toggle "Producto rápido" en "Editar producto" + grilla en el POS que aparece cuando no hay búsqueda activa. Cubre el 30-40% del catálogo sin código de barras (cigarrillos, golosinas sueltas, fotocopias). |
-| 6 | **Venta por peso/kg** | Hoy `CartItem.quantity` es entero implícito de unidades. Agregar `unidad: "un" \| "kg"` al producto; en el carrito, cantidad admite decimales cuando `unidad = "kg"`. Habilita fiambrería/verdulería en despensas. |
+| 6 | ✅ **Venta por peso/kg** | Hecho: campo `unidad` ("un"/"kg") por producto, diálogo de peso al agregar al carrito un producto por kg, cantidades decimales en el carrito (stock y cantidad ya eran `numeric` en la BD, no hizo falta tocar la RPC de venta). |
 | 7 | ✅ **Control de vencimientos** | Hecho: campo `fecha_vencimiento` editable en "Editar producto" + banner de aviso en `/stock` ("N productos vencen en los próximos 7 días"). |
 | 8 | **Combos y precio por cantidad** | `lib/pricing.ts` ya resuelve oferta por producto individual; falta "3x2", "2do al 70%", "llevando 6 unidades, $X c/u". Muy pedido en bebidas y golosinas. |
 | 9 | **Impresión de ticket** | No hay ni térmica ni PDF. Layout imprimible 58/80mm desde el navegador como primer paso (sin hardware especial); ESC/POS por WebUSB como mejora posterior. |

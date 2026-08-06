@@ -14,6 +14,7 @@ import { createSale } from "@/services/sales-service";
 import { getCajaAbierta } from "@/services/caja-service";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
+import { PesoDialog } from "@/components/pos/peso-dialog";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import type { Product } from "@/lib/types";
 
@@ -33,6 +34,7 @@ function PosScreen() {
   const [processing, setProcessing] = useState(false);
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
   const [favoritos, setFavoritos] = useState<Product[]>([]);
+  const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
 
@@ -93,6 +95,10 @@ function PosScreen() {
         toast.error(`Sin stock: ${p.name}`);
         return;
       }
+      if (p.unidad === "kg") {
+        setPesoProduct(p);
+        return;
+      }
       const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
       if (enCarrito + 1 > p.stock) {
         toast.error(`Stock maximo (${p.stock}) para ${p.name}`);
@@ -104,6 +110,18 @@ function PosScreen() {
       }
     },
     [cart],
+  );
+
+  const confirmarPeso = useCallback(
+    (kg: number) => {
+      if (!pesoProduct) return;
+      if (kg > pesoProduct.stock) {
+        toast.error(`Stock maximo (${pesoProduct.stock}kg) para ${pesoProduct.name}`);
+        return;
+      }
+      cart.addProduct(pesoProduct, kg);
+    },
+    [cart, pesoProduct],
   );
 
   // Enter: el lector de codigo de barras "tipea" + Enter. Match exacto -> agrega directo.
@@ -289,7 +307,7 @@ function PosScreen() {
                             </span>
                           )}
                           <span className={cn("text-sm font-semibold", tieneOferta(p) ? "text-money" : "text-primary")}>
-                            {formatCurrency(precioFinal(p))}
+                            {formatCurrency(precioFinal(p))}{p.unidad === "kg" && "/kg"}
                           </span>
                         </span>
                       </button>
@@ -315,6 +333,8 @@ function PosScreen() {
           />
         </div>
       </div>
+
+      <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
     </main>
   );
 }

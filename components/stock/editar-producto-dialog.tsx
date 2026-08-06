@@ -44,6 +44,7 @@ export function EditarProductoDialog({
   const [revisar, setRevisar] = useState(false);
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [unidad, setUnidad] = useState<"un" | "kg">("un");
   const [saving, setSaving] = useState(false);
 
   const [ajusteTipo, setAjusteTipo] = useState<AjusteTipo>("entrada");
@@ -64,6 +65,7 @@ export function EditarProductoDialog({
       setRevisar(product.revisar);
       setFavorito(product.favorito);
       setFechaVencimiento(product.fechaVencimiento ? product.fechaVencimiento.toISOString().slice(0, 10) : "");
+      setUnidad(product.unidad);
       setAjusteTipo("entrada");
       setAjusteCantidad("");
     }
@@ -95,6 +97,7 @@ export function EditarProductoDialog({
         revisar,
         favorito,
         fechaVencimiento: fechaVencimiento || undefined,
+        unidad,
       });
       onOpenChange(false);
     } finally {
@@ -170,7 +173,7 @@ export function EditarProductoDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Stock mínimo</Label>
               <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
@@ -178,6 +181,17 @@ export function EditarProductoDialog({
             <div>
               <Label className="mb-1 block text-xs">Lote</Label>
               <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} className="rounded-xl" />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">Se vende por</Label>
+              <select
+                value={unidad}
+                onChange={(e) => setUnidad(e.target.value as "un" | "kg")}
+                className="h-9 w-full rounded-xl border bg-background px-3 text-sm"
+              >
+                <option value="un">Unidad</option>
+                <option value="kg">Peso (kg)</option>
+              </select>
             </div>
           </div>
 

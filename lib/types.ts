@@ -18,6 +18,7 @@ export interface Product {
   revisar: boolean;
   favorito: boolean;
   fechaVencimiento?: Date;
+  unidad: "un" | "kg";
   disabled: boolean;
   // Oferta de catálogo (descuento propio del kiosko, la sync no lo toca)
   ofertaActiva: boolean;

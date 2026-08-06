@@ -21,9 +21,11 @@ export function useCart() {
 
   const setQuantity = useCallback((productId: string, qty: number) => {
     setItems((prev) =>
-      prev.map((i) =>
-        i.product.id === productId ? { ...i, quantity: Math.max(1, qty) } : i,
-      ),
+      prev.map((i) => {
+        if (i.product.id !== productId) return i;
+        const min = i.product.unidad === "kg" ? 0.01 : 1;
+        return { ...i, quantity: Math.max(min, qty) };
+      }),
     );
   }, []);
 

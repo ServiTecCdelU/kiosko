@@ -115,19 +115,28 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                 </div>
                 <div className="mt-1 flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline" size="icon" className="h-7 w-7 rounded-lg"
-                      onClick={() => onSetQuantity(i.product.id, i.quantity - 1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-8 text-center text-sm font-semibold">{i.quantity}</span>
-                    <Button
-                      variant="outline" size="icon" className="h-7 w-7 rounded-lg"
-                      onClick={() => onSetQuantity(i.product.id, i.quantity + 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                    {(() => {
+                      const step = i.product.unidad === "kg" ? 0.1 : 1;
+                      return (
+                        <>
+                          <Button
+                            variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                            onClick={() => onSetQuantity(i.product.id, i.quantity - step)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-12 text-center text-sm font-semibold">
+                            {i.product.unidad === "kg" ? `${i.quantity.toFixed(2)}kg` : i.quantity}
+                          </span>
+                          <Button
+                            variant="outline" size="icon" className="h-7 w-7 rounded-lg"
+                            onClick={() => onSetQuantity(i.product.id, i.quantity + step)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="text-right">
                     {tieneOferta(i.product) && (

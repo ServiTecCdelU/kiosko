@@ -20,6 +20,7 @@ export function mapRow(d: Record<string, any>): Product {
     revisar: d.revisar ?? false,
     favorito: d.favorito ?? false,
     fechaVencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento) : undefined,
+    unidad: d.unidad === "kg" ? "kg" : "un",
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
     ofertaTipo: d.oferta_tipo ?? undefined,
@@ -159,6 +160,7 @@ export interface UpdateProductInput {
   revisar: boolean;
   favorito: boolean;
   fechaVencimiento?: string; // YYYY-MM-DD
+  unidad: "un" | "kg";
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
@@ -177,6 +179,7 @@ export async function updateProduct(productId: string, input: UpdateProductInput
       revisar: input.revisar,
       favorito: input.favorito,
       fecha_vencimiento: input.fechaVencimiento || null,
+      unidad: input.unidad,
     })
     .eq("comercio_id", getComercioId())
     .eq("id", productId);
