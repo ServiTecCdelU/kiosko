@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import {
   getCajaAbierta, getResumenCaja, abrirCaja, cerrarCaja, getCajaHistorial,
-  getMovimientosCaja, registrarMovimientoCaja,
-  type ResumenCaja,
+  getMovimientosCaja, registrarMovimientoCaja, getVentasPorCajero,
+  type ResumenCaja, type VentasPorCajero,
 } from "@/services/caja-service";
 import { getVentasDeCaja, anularVenta } from "@/services/sales-service";
 import { MovimientoDialog } from "@/components/caja/movimiento-dialog";
@@ -33,6 +33,7 @@ export default function CajaPage() {
   const [resumen, setResumen] = useState<ResumenCaja | null>(null);
   const [movimientos, setMovimientos] = useState<CajaMovimiento[]>([]);
   const [ventas, setVentas] = useState<Sale[]>([]);
+  const [ventasPorCajero, setVentasPorCajero] = useState<VentasPorCajero[]>([]);
   const [historial, setHistorial] = useState<Caja[]>([]);
   const [loading, setLoading] = useState(true);
   const [montoApertura, setMontoApertura] = useState("");
@@ -50,18 +51,21 @@ export default function CajaPage() {
       const abierta = await getCajaAbierta();
       setCaja(abierta);
       if (abierta) {
-        const [res, movs, vts] = await Promise.all([
+        const [res, movs, vts, porCajero] = await Promise.all([
           getResumenCaja(abierta.id),
           getMovimientosCaja(abierta.id),
           getVentasDeCaja(abierta.id),
+          getVentasPorCajero(abierta.id),
         ]);
         setResumen(res);
         setMovimientos(movs);
         setVentas(vts);
+        setVentasPorCajero(porCajero);
       } else {
         setResumen(null);
         setMovimientos([]);
         setVentas([]);
+        setVentasPorCajero([]);
       }
       setHistorial(await getCajaHistorial());
     } catch {
@@ -223,6 +227,36 @@ export default function CajaPage() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{m.concepto || "—"}</TableCell>
                           <TableCell className="text-right font-medium">{formatCurrency(m.monto)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {ventasPorCajero.length > 1 && (
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="text-base">Vendido por cajero</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cajero</TableHead>
+                        <TableHead className="text-right">Ventas</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ventasPorCajero.map((c) => (
+                        <TableRow key={c.usuarioNombre}>
+                          <TableCell className="font-medium">{c.usuarioNombre}</TableCell>
+                          <TableCell className="text-right">{c.cantidad}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(c.total)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

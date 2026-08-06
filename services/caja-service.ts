@@ -145,6 +145,33 @@ export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
   };
 }
 
+export interface VentasPorCajero {
+  usuarioNombre: string;
+  cantidad: number;
+  total: number;
+}
+
+/** Desglose de ventas dentro de la misma caja por quien cobro (util con varios turnos/cajeros). */
+export async function getVentasPorCajero(cajaId: string): Promise<VentasPorCajero[]> {
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("total,user_name")
+    .eq("comercio_id", getComercioId())
+    .eq("caja_id", cajaId)
+    .eq("estado", "completada");
+  if (error) throw new Error(error.message);
+
+  const porCajero = new Map<string, VentasPorCajero>();
+  for (const v of data ?? []) {
+    const nombre = v.user_name || "Sin identificar";
+    const prev = porCajero.get(nombre) ?? { usuarioNombre: nombre, cantidad: 0, total: 0 };
+    prev.cantidad += 1;
+    prev.total += Number(v.total) || 0;
+    porCajero.set(nombre, prev);
+  }
+  return Array.from(porCajero.values()).sort((a, b) => b.total - a.total);
+}
+
 export async function abrirCaja(
   montoApertura: number,
   usuarioId?: string,

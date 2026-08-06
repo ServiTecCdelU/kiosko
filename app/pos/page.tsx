@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -16,6 +16,10 @@ import { getCurrentUser } from "@/hooks/use-auth";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
+import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
+import {
+  listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
+} from "@/lib/utils/tickets-espera";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import type { Product } from "@/lib/types";
 
@@ -37,6 +41,8 @@ function PosScreen() {
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
+  const [ticketsEspera, setTicketsEspera] = useState<TicketEnEspera[]>([]);
+  const [esperaOpen, setEsperaOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
 
@@ -50,7 +56,38 @@ function PosScreen() {
     getFavoritos()
       .then(setFavoritos)
       .catch(() => setFavoritos([]));
+    setTicketsEspera(listarTicketsEnEspera());
   }, [focusInput]);
+
+  const handleSuspender = useCallback(() => {
+    if (cart.items.length === 0) return;
+    const nota = window.prompt("Nota para identificar este carrito (opcional):", "") ?? "";
+    suspenderTicket(cart.items, nota.trim());
+    setTicketsEspera(listarTicketsEnEspera());
+    cart.clear();
+    toast.success("Venta suspendida");
+    focusInput();
+  }, [cart, focusInput]);
+
+  const handleRecuperar = useCallback(
+    (ticket: TicketEnEspera) => {
+      if (cart.items.length > 0) {
+        toast.error("Vaciá o cobrá el carrito actual antes de recuperar otro");
+        return;
+      }
+      cart.replaceAll(ticket.items);
+      quitarTicketEnEspera(ticket.id);
+      setTicketsEspera(listarTicketsEnEspera());
+      setEsperaOpen(false);
+      focusInput();
+    },
+    [cart, focusInput],
+  );
+
+  const handleDescartarEspera = useCallback((id: string) => {
+    quitarTicketEnEspera(id);
+    setTicketsEspera(listarTicketsEnEspera());
+  }, []);
 
   // Atajos de teclado para mostrador: F2 cobrar · F3 buscar · Esc limpiar
   useEffect(() => {
@@ -223,6 +260,14 @@ function PosScreen() {
             <Kbd>F3</Kbd> Buscar
             <Kbd>Esc</Kbd> Limpiar
           </span>
+          {ticketsEspera.length > 0 && (
+            <button
+              onClick={() => setEsperaOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/20"
+            >
+              <PauseCircle className="h-3.5 w-3.5" /> En espera ({ticketsEspera.length})
+            </button>
+          )}
           {lastTicket && (
             <button
               onClick={() => window.print()}
@@ -366,6 +411,7 @@ function PosScreen() {
             onRemove={cart.removeProduct}
             onClear={cart.clear}
             onConfirm={handleConfirm}
+            onSuspend={handleSuspender}
             processing={processing}
           />
         </div>
@@ -373,6 +419,13 @@ function PosScreen() {
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
       <TicketPrint ticket={lastTicket} />
+      <TicketsEsperaDialog
+        open={esperaOpen}
+        onOpenChange={setEsperaOpen}
+        tickets={ticketsEspera}
+        onRecuperar={handleRecuperar}
+        onDescartar={handleDescartarEspera}
+      />
     </main>
   );
 }

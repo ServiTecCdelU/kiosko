@@ -35,6 +35,8 @@ export function useCart() {
 
   const clear = useCallback(() => setItems([]), []);
 
+  const replaceAll = useCallback((next: CartItem[]) => setItems(next), []);
+
   const total = useMemo(
     () => items.reduce((s, i) => s + precioLinea(i.product, i.quantity), 0),
     [items],
@@ -45,5 +47,5 @@ export function useCart() {
     [items],
   );
 
-  return { items, addProduct, setQuantity, removeProduct, clear, total, count };
+  return { items, addProduct, setQuantity, removeProduct, clear, replaceAll, total, count };
 }

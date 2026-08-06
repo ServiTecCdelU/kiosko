@@ -187,6 +187,53 @@ export async function updateProduct(productId: string, input: UpdateProductInput
   if (error) throw new Error(error.message);
 }
 
+export interface CambioPrecio {
+  id: string;
+  campo: string;
+  valorAnterior: string;
+  valorNuevo: string;
+  usuarioNombre?: string;
+  fecha: Date;
+}
+
+export async function logCambioPrecio(
+  productId: string,
+  campo: string,
+  valorAnterior: number,
+  valorNuevo: number,
+  usuarioNombre?: string,
+): Promise<void> {
+  const { error } = await supabase.from("producto_auditoria").insert({
+    id: crypto.randomUUID(),
+    comercio_id: getComercioId(),
+    producto_id: productId,
+    campo,
+    valor_anterior: String(valorAnterior),
+    valor_nuevo: String(valorNuevo),
+    usuario_nombre: usuarioNombre ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function getHistorialPrecio(productId: string, limit = 10): Promise<CambioPrecio[]> {
+  const { data, error } = await supabase
+    .from("producto_auditoria")
+    .select("*")
+    .eq("comercio_id", getComercioId())
+    .eq("producto_id", productId)
+    .order("fecha", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((d) => ({
+    id: d.id,
+    campo: d.campo,
+    valorAnterior: d.valor_anterior ?? "",
+    valorNuevo: d.valor_nuevo ?? "",
+    usuarioNombre: d.usuario_nombre ?? undefined,
+    fecha: new Date(d.fecha),
+  }));
+}
+
 export async function getFavoritos(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("productos")

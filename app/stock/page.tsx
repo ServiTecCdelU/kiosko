@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct, getVencimientosProximos,
+  logCambioPrecio,
   type SetOfertaInput, type StockStats, type UpdateProductInput,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -143,6 +144,10 @@ export default function StockPage() {
     if (!selected) return;
     try {
       await updateProduct(selected.id, input);
+      if (input.price !== selected.price) {
+        const user = getCurrentUser();
+        await logCambioPrecio(selected.id, "price", selected.price, input.price, user?.nombre);
+      }
       toast.success("Producto actualizado");
       await refreshAll();
     } catch (e) {

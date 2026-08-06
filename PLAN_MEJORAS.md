@@ -63,11 +63,11 @@ Esto es lo que determina qué construir, en orden de impacto real:
 
 | # | Ítem | Detalle |
 |---|---|---|
-| 10 | **Gastos/proveedores como categoría propia** | Separado de "retiro de caja": registrar compras a proveedores con su monto, para que el reporte de rentabilidad sea real (no solo margen teórico por lista de precios, sino gasto real). |
-| 11 | **Turnos / múltiples cajeros por caja** | Hoy la caja es una sola por día. Un kiosko familiar suele tener 2 turnos (mamá a la mañana, hijo a la tarde) — sería útil poder ver "vendido por cajero" dentro del mismo día sin cerrar y volver a abrir caja. |
-| 12 | **Suspender venta / ticket en espera** | Cliente que "ya vuelvo, dejame esto" mientras se atiende a otro. Guardar el carrito actual y recuperarlo después, sin perderlo. |
-| 13 | **Auditoría de cambios de precio y ajustes de stock** | Quién cambió qué y cuándo — ya hay `stock_movimientos` con `usuario`, falta lo mismo para cambios de precio manual (no solo por sync/import). Protege al dueño frente a errores o abuso de un empleado. |
-| 14 | **Recarga de celular / servicios como "producto especial"** | Muy común en kioskos: se cobra pero no es "stock" tradicional. Se puede modelar como producto con `stock` infinito/no controlado, marcándolo explícitamente en vez de forzarlo con truco de stock alto. |
+| 10 | ✅ **Gastos como categoría propia en reportes** | Hecho: KPI "Gastos" y "Ganancia neta" (margen bruto − gastos) en `/reportes`, usando los movimientos de caja tipo `gasto` ya existentes del ítem 3. |
+| 11 | ✅ **Turnos / múltiples cajeros por caja** | Hecho: tabla "Vendido por cajero" en `/caja` (se muestra automáticamente cuando más de un usuario cobró en la misma caja), sin necesidad de cerrar y reabrir caja por turno. |
+| 12 | ✅ **Suspender venta / ticket en espera** | Hecho: botón "Suspender" en el carrito del POS, guarda el carrito en el dispositivo y lo recupera después desde "En espera" en el header. |
+| 13 | ✅ **Auditoría de cambios de precio** | Hecho: tabla `producto_auditoria`, se registra automáticamente cada cambio manual de precio (quién y cuándo) y se muestra un historial dentro de "Editar producto". |
+| 14 | **Recarga de celular / servicios como "producto especial"** | Muy común en kioskos: se cobra pero no es "stock" tradicional. Requiere tocar la RPC atómica `process_sale_kiosko` para que no descuente stock en productos marcados como "servicio" — pendiente de confirmación antes de tocar esa función crítica. |
 
 ### 🔵 Prioridad 4 — Diferenciales que justifican precio frente a la competencia
 

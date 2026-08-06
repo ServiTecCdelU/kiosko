@@ -101,6 +101,13 @@ export default function ReportesPage() {
               value={r ? `${formatCurrency(r.margenBruto)} (${r.margenPct.toFixed(0)}%)` : "—"}
               icon={<PiggyBank className="h-4 w-4" />}
             />
+            <Kpi label="Gastos" value={formatCurrency(r?.gastosTotal ?? 0)} icon={<Receipt className="h-4 w-4" />} />
+            <Kpi
+              label="Ganancia neta"
+              value={formatCurrency(r?.gananciaNeta ?? 0)}
+              icon={<TrendingUp className="h-4 w-4" />}
+              highlight
+            />
           </div>
           {r && r.sinCosto > 0 && (
             <p className="text-xs text-muted-foreground">

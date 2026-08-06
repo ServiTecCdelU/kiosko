@@ -35,11 +35,12 @@ interface CartPanelProps {
   onRemove: (id: string) => void;
   onClear: () => void;
   onConfirm: (data: ConfirmData) => void;
+  onSuspend?: () => void;
   processing: boolean;
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
-  { items, total, onSetQuantity, onRemove, onClear, onConfirm, processing },
+  { items, total, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing },
   ref,
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
@@ -88,9 +89,16 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           <ShoppingCart className="h-4 w-4 text-primary" /> Carrito
         </span>
         {items.length > 0 && (
-          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onClear}>
-            Vaciar
-          </Button>
+          <div className="flex items-center gap-1">
+            {onSuspend && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onSuspend}>
+                Suspender
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onClear}>
+              Vaciar
+            </Button>
+          </div>
         )}
       </div>
 

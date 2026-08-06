@@ -14,6 +14,8 @@ export interface ResumenReporte {
   margenPct: number;
   /** Cantidad de items vendidos sin costo cargado (margen no confiable para esa parte). */
   sinCosto: number;
+  gastosTotal: number;
+  gananciaNeta: number;
 }
 
 export interface VentaDia {
@@ -150,6 +152,15 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
   const cantidad = ventas.length;
   const margenBruto = totalVentas - costoTotal;
 
+  const { data: gastosData } = await supabase
+    .from("caja_movimientos")
+    .select("monto")
+    .eq("comercio_id", comercioId)
+    .eq("tipo", "gasto")
+    .gte("fecha", desde.toISOString())
+    .lte("fecha", hasta.toISOString());
+  const gastosTotal = (gastosData ?? []).reduce((s, m) => s + (Number(m.monto) || 0), 0);
+
   return {
     resumen: {
       totalVentas,
@@ -162,6 +173,8 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
       margenBruto,
       margenPct: totalVentas > 0 ? (margenBruto / totalVentas) * 100 : 0,
       sinCosto: sinCostoCount,
+      gastosTotal,
+      gananciaNeta: margenBruto - gastosTotal,
     },
     porDia: Array.from(dias.entries())
       .map(([fecha, total]) => ({ fecha, total }))

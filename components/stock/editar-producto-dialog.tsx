@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import type { Product } from "@/lib/types";
-import type { UpdateProductInput } from "@/services/products-service";
+import { getHistorialPrecio, type UpdateProductInput, type CambioPrecio } from "@/services/products-service";
 
 type AjusteTipo = "entrada" | "ajuste" | "rotura";
 
@@ -45,6 +46,7 @@ export function EditarProductoDialog({
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [unidad, setUnidad] = useState<"un" | "kg">("un");
+  const [historial, setHistorial] = useState<CambioPrecio[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [ajusteTipo, setAjusteTipo] = useState<AjusteTipo>("entrada");
@@ -66,6 +68,7 @@ export function EditarProductoDialog({
       setFavorito(product.favorito);
       setFechaVencimiento(product.fechaVencimiento ? product.fechaVencimiento.toISOString().slice(0, 10) : "");
       setUnidad(product.unidad);
+      getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));
       setAjusteTipo("entrada");
       setAjusteCantidad("");
     }
@@ -248,6 +251,23 @@ export function EditarProductoDialog({
               </Button>
             </div>
           </div>
+
+          {historial.length > 0 && (
+            <div className="rounded-xl border p-3">
+              <p className="mb-2 text-sm font-medium">Historial de cambios de precio</p>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                {historial.map((h) => (
+                  <li key={h.id} className="flex items-center justify-between">
+                    <span>
+                      {formatCurrency(Number(h.valorAnterior))} → <strong className="text-foreground">{formatCurrency(Number(h.valorNuevo))}</strong>
+                      {h.usuarioNombre && ` · ${h.usuarioNombre}`}
+                    </span>
+                    <span>{formatDateTime(h.fecha)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
