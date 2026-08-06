@@ -177,7 +177,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                       <select
                         value={mapping[field] ?? ""}
                         onChange={(e) => setMapping((m) => ({ ...m, [field]: e.target.value || undefined }))}
-                        className="w-full rounded-xl border bg-background px-3 py-2 text-sm"
+                        className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
                       >
                         <option value="">— sin usar —</option>
                         {columnLetters.map((letter) => {

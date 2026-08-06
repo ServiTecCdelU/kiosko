@@ -226,7 +226,7 @@ export default function CajaPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{m.concepto || "—"}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(m.monto)}</TableCell>
+                          <TableCell className="cifra text-right font-medium">{formatCurrency(m.monto)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -256,7 +256,7 @@ export default function CajaPage() {
                         <TableRow key={c.usuarioNombre}>
                           <TableCell className="font-medium">{c.usuarioNombre}</TableCell>
                           <TableCell className="text-right">{c.cantidad}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(c.total)}</TableCell>
+                          <TableCell className="cifra text-right font-medium">{formatCurrency(c.total)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -289,7 +289,7 @@ export default function CajaPage() {
                           <TableCell className="whitespace-nowrap text-sm">{formatDateTime(v.createdAt)}</TableCell>
                           <TableCell className="text-sm">{v.saleNumber ?? v.id}</TableCell>
                           <TableCell className="text-sm capitalize">{v.paymentMethod}</TableCell>
-                          <TableCell className="text-right font-medium">
+                          <TableCell className="cifra text-right font-medium">
                             {v.estado === "anulada" ? (
                               <span className="line-through">{formatCurrency(v.total)}</span>
                             ) : (
@@ -325,7 +325,7 @@ export default function CajaPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-1 text-sm">
+              <div className="cifra space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Apertura + ventas efectivo</span>
                   <span>{formatCurrency(caja.montoApertura + (resumen?.totalEfectivo ?? 0))}</span>
@@ -413,10 +413,10 @@ function Historial({ historial }: { historial: Caja[] }) {
               {historial.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="whitespace-nowrap text-sm">{c.closedAt ? formatDateTime(c.closedAt) : "-"}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(c.montoApertura)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(c.totalEfectivo)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(c.totalTransferencia)}</TableCell>
-                  <TableCell className={`text-right font-medium ${(c.diferencia ?? 0) < 0 ? "text-destructive" : (c.diferencia ?? 0) > 0 ? "text-warning" : ""}`}>
+                  <TableCell className="cifra text-right">{formatCurrency(c.montoApertura)}</TableCell>
+                  <TableCell className="cifra text-right">{formatCurrency(c.totalEfectivo)}</TableCell>
+                  <TableCell className="cifra text-right">{formatCurrency(c.totalTransferencia)}</TableCell>
+                  <TableCell className={cn("cifra text-right font-medium", (c.diferencia ?? 0) < 0 ? "text-destructive" : (c.diferencia ?? 0) > 0 ? "text-warning" : "")}>
                     {formatCurrency(c.diferencia ?? 0)}
                   </TableCell>
                 </TableRow>

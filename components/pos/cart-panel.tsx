@@ -165,7 +165,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                         {formatCurrency(i.product.price * i.quantity)}
                       </span>
                     )}
-                    <span className={cn("text-sm font-semibold", tieneOferta(i.product) && "text-money")}>
+                    <span className={cn("cifra text-sm font-semibold", tieneOferta(i.product) && "text-money")}>
                       {formatCurrency(precioLinea(i.product, i.quantity))}
                     </span>
                   </div>
@@ -231,13 +231,13 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Banknote className="h-3.5 w-3.5" /> Efectivo
               </span>
-              <span className="font-semibold">{formatCurrency(cashPortion)}</span>
+              <span className="cifra font-semibold">{formatCurrency(cashPortion)}</span>
             </div>
             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <CreditCard className="h-3.5 w-3.5" /> Transferencia
               </span>
-              <span className="font-semibold">{formatCurrency(transferPortion)}</span>
+              <span className="cifra font-semibold">{formatCurrency(transferPortion)}</span>
             </div>
           </div>
         )}

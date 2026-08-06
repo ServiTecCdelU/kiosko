@@ -168,9 +168,9 @@ export default function ReportesPage() {
                       {reporte?.masVendidos.map((p) => (
                         <TableRow key={p.productId}>
                           <TableCell className="line-clamp-1 font-medium">{p.name}</TableCell>
-                          <TableCell className="text-right font-semibold">{p.cantidad}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(p.total)}</TableCell>
-                          <TableCell className="text-right text-xs">
+                          <TableCell className="cifra text-right font-semibold">{p.cantidad}</TableCell>
+                          <TableCell className="cifra text-right">{formatCurrency(p.total)}</TableCell>
+                          <TableCell className="cifra text-right text-xs">
                             {p.margenPct !== undefined ? (
                               <span className={p.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
                                 {formatCurrency(p.margen)} ({p.margenPct.toFixed(0)}%)
@@ -209,8 +209,8 @@ export default function ReportesPage() {
                       {reporte?.rentabilidadPorRubro.map((r) => (
                         <TableRow key={r.rubro}>
                           <TableCell className="line-clamp-1 font-medium">{r.rubro}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
-                          <TableCell className="text-right text-xs">
+                          <TableCell className="cifra text-right">{formatCurrency(r.total)}</TableCell>
+                          <TableCell className="cifra text-right text-xs">
                             {r.margenPct !== undefined ? (
                               <span className={r.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
                                 {formatCurrency(r.margen)} ({r.margenPct.toFixed(0)}%)
@@ -254,9 +254,9 @@ export default function ReportesPage() {
                       {aumentos.map((a, i) => (
                         <TableRow key={`${a.productoId}-${i}`}>
                           <TableCell className="line-clamp-1 font-medium">{a.nombre}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{formatCurrency(a.precioAnterior)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(a.precioNuevo)}</TableCell>
-                          <TableCell className="text-right font-semibold text-warning">+{a.variacionPct.toFixed(0)}%</TableCell>
+                          <TableCell className="cifra text-right text-muted-foreground">{formatCurrency(a.precioAnterior)}</TableCell>
+                          <TableCell className="cifra text-right">{formatCurrency(a.precioNuevo)}</TableCell>
+                          <TableCell className="cifra text-right font-semibold text-warning">+{a.variacionPct.toFixed(0)}%</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{a.usuarioNombre ?? "—"}</TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(a.fecha)}</TableCell>
                         </TableRow>

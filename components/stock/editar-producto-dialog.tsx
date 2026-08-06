@@ -193,7 +193,7 @@ export function EditarProductoDialog({
               <select
                 value={unidad}
                 onChange={(e) => setUnidad(e.target.value as "un" | "kg")}
-                className="h-9 w-full rounded-xl border bg-background px-3 text-sm"
+                className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
               >
                 <option value="un">Unidad</option>
                 <option value="kg">Peso (kg)</option>

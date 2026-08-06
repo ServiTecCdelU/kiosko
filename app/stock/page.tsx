@@ -223,7 +223,7 @@ export default function StockPage() {
           <select
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
-            className="rounded-2xl border bg-card px-4 py-2 text-sm"
+            className="rounded-2xl border bg-card px-4 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <option value="">Todos los rubros</option>
             {categorias.map((c) => (
@@ -277,7 +277,7 @@ export default function StockPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.category || "—"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right cifra">
                         {comboLabel(p) ? (
                           <span className="flex flex-col items-end leading-tight">
                             <span className="text-xs text-muted-foreground">{formatCurrency(p.price)} c/u</span>
@@ -300,7 +300,7 @@ export default function StockPage() {
                           formatCurrency(p.price)
                         )}
                       </TableCell>
-                      <TableCell className="text-right text-xs">
+                      <TableCell className="cifra text-right text-xs">
                         {p.precioBase && p.price > 0 ? (
                           (() => {
                             const margen = ((p.price - p.precioBase) / p.price) * 100;
@@ -319,7 +319,7 @@ export default function StockPage() {
                           <span className="text-xs text-muted-foreground">Servicio</span>
                         ) : (
                           <>
-                            <span className={cn("font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
+                            <span className={cn("cifra font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
                               {p.stock}
                             </span>
                             {(sinStock || bajo) && (
