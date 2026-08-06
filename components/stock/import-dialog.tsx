@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
-  readSheet, guessMapping, parseRows, importProducts,
+  readSheet, guessMappingFromHeaders, parseRows, importProducts,
+  loadSavedMapping, saveMapping,
   IMPORT_FIELD_LABELS,
   type ColumnMapping, type ImportField, type ParsedRow, type StockStrategy, type ImportSummary,
 } from "@/services/import-service";
@@ -37,7 +38,8 @@ const STRATEGIES: { value: StockStrategy; label: string; hint: string }[] = [
 export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogProps) {
   const [step, setStep] = useState<Step>("archivo");
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
+  const [columnLetters, setColumnLetters] = useState<string[]>([]);
+  const [sampleRows, setSampleRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [startRow, setStartRow] = useState(2);
   const [rows, setRows] = useState<ParsedRow[]>([]);
@@ -51,7 +53,8 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
   const reset = () => {
     setStep("archivo");
     setWorkbook(null);
-    setHeaders([]);
+    setColumnLetters([]);
+    setSampleRows([]);
     setMapping({});
     setStartRow(2);
     setRows([]);
@@ -67,14 +70,29 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
     onOpenChange(o);
   };
 
+  const sampleFor = (letter: string): string => {
+    const idx = columnLetters.indexOf(letter);
+    if (idx < 0) return "";
+    const firstDataRow = sampleRows[startRow - 1] ?? sampleRows.find((r) => r[idx]);
+    return firstDataRow?.[idx]?.trim() ?? "";
+  };
+
   const handleFile = async (file: File) => {
     setError("");
     setLoading(true);
     try {
       const { workbook: wb, preview } = await readSheet(file);
       setWorkbook(wb);
-      setHeaders(preview.headers);
-      setMapping(guessMapping(preview.headers));
+      setColumnLetters(preview.columnLetters);
+      setSampleRows(preview.sampleRows);
+
+      const saved = loadSavedMapping();
+      if (saved) {
+        setMapping(saved.mapping);
+        setStartRow(saved.startRow);
+      } else {
+        setMapping(guessMappingFromHeaders(preview.sampleRows[0] ?? []));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo leer el archivo");
     } finally {
@@ -86,6 +104,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
 
   const goToPreview = () => {
     if (!workbook) return;
+    saveMapping({ mapping, startRow });
     const parsed = parseRows(workbook, mapping, startRow);
     setRows(parsed);
     setStep("preview");
@@ -116,7 +135,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="rounded-2xl sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4" /> Importar productos
@@ -138,16 +157,19 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
             {loading && <p className="text-center text-sm text-muted-foreground">Leyendo archivo...</p>}
             {error && <p className="text-center text-sm text-destructive">{error}</p>}
 
-            {headers.length > 0 && (
+            {columnLetters.length > 0 && (
               <div className="space-y-3">
                 <div>
                   <Label className="mb-1 block">Fila donde empiezan los datos</Label>
                   <Input
-                    type="number" min={2} value={startRow}
-                    onChange={(e) => setStartRow(Math.max(2, Number(e.target.value) || 2))}
+                    type="number" min={1} value={startRow}
+                    onChange={(e) => setStartRow(Math.max(1, Number(e.target.value) || 1))}
                     className="rounded-xl"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Elegí la columna de Excel (A, B, C...) para cada dato. Se recuerda para la próxima vez.
+                </p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {FIELDS.map((field) => (
                     <div key={field}>
@@ -158,9 +180,14 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                         className="w-full rounded-xl border bg-background px-3 py-2 text-sm"
                       >
                         <option value="">— sin usar —</option>
-                        {headers.map((h) => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
+                        {columnLetters.map((letter) => {
+                          const sample = sampleFor(letter);
+                          return (
+                            <option key={letter} value={letter}>
+                              {letter}{sample ? ` — ${sample.slice(0, 24)}` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   ))}

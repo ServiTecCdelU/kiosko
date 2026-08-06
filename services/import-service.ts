@@ -26,11 +26,28 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   lote: "Lote (unidades por paquete)",
 };
 
+// El mapeo usa la letra de columna de Excel (A, B, C...), no el texto del encabezado
+// (muchas listas de precios no traen encabezados reales, o los repiten/dejan vacíos).
 export type ColumnMapping = Partial<Record<ImportField, string>>;
 
 export interface SheetPreview {
-  headers: string[];
+  columnLetters: string[];
   sampleRows: string[][];
+}
+
+function indexToLetter(i: number): string {
+  let n = i;
+  let s = "";
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
+
+function readRawRows(workbook: XLSX.WorkBook): string[][] {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" }) as string[][];
 }
 
 export function readSheet(file: File): Promise<{ workbook: XLSX.WorkBook; preview: SheetPreview }> {
@@ -41,11 +58,11 @@ export function readSheet(file: File): Promise<{ workbook: XLSX.WorkBook; previe
       try {
         const data = new Uint8Array(reader.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-        const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
-        const sampleRows = rows.slice(1, 6).map((r) => r.map((c) => String(c ?? "")));
-        resolve({ workbook, preview: { headers, sampleRows } });
+        const rows = readRawRows(workbook);
+        const columnCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
+        const columnLetters = Array.from({ length: columnCount }, (_, i) => indexToLetter(i));
+        const sampleRows = rows.slice(0, 5).map((r) => r.map((c) => String(c ?? "")));
+        resolve({ workbook, preview: { columnLetters, sampleRows } });
       } catch {
         reject(new Error("El archivo no parece ser un Excel válido"));
       }
@@ -65,13 +82,40 @@ const AUTO_MATCH: Record<ImportField, RegExp> = {
   lote: /lote|paquete|bulto/i,
 };
 
-export function guessMapping(headers: string[]): ColumnMapping {
+/** Intenta adivinar el mapeo mirando la primera fila (por si trae encabezados reales). */
+export function guessMappingFromHeaders(headerRow: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   (Object.keys(AUTO_MATCH) as ImportField[]).forEach((field) => {
-    const match = headers.find((h) => AUTO_MATCH[field].test(h));
-    if (match) mapping[field] = match;
+    const idx = headerRow.findIndex((h) => AUTO_MATCH[field].test(String(h ?? "")));
+    if (idx >= 0) mapping[field] = indexToLetter(idx);
   });
   return mapping;
+}
+
+const STORAGE_KEY = "kiosko:import-mapping-v1";
+
+export interface SavedImportConfig {
+  mapping: ColumnMapping;
+  startRow: number;
+}
+
+export function loadSavedMapping(): SavedImportConfig | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as SavedImportConfig) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveMapping(config: SavedImportConfig): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // almacenamiento no disponible, no es crítico
+  }
 }
 
 export interface ParsedRow {
@@ -87,9 +131,13 @@ export interface ParsedRow {
   warnings: string[];
 }
 
-function colIndex(headers: string[], name?: string): number {
-  if (!name) return -1;
-  return headers.indexOf(name);
+function letterToIndex(letter?: string): number {
+  if (!letter) return -1;
+  let n = 0;
+  for (const ch of letter.toUpperCase()) {
+    n = n * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return n - 1;
 }
 
 export function parseRows(
@@ -97,19 +145,17 @@ export function parseRows(
   mapping: ColumnMapping,
   startRow: number,
 ): ParsedRow[] {
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-  const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
+  const rows = readRawRows(workbook);
 
   const idx = {
-    barra: colIndex(headers, mapping.barra),
-    codigo: colIndex(headers, mapping.codigo),
-    descripcion: colIndex(headers, mapping.descripcion),
-    precio: colIndex(headers, mapping.precio),
-    rubro: colIndex(headers, mapping.rubro),
-    subrubro: colIndex(headers, mapping.subrubro),
-    stock: colIndex(headers, mapping.stock),
-    lote: colIndex(headers, mapping.lote),
+    barra: letterToIndex(mapping.barra),
+    codigo: letterToIndex(mapping.codigo),
+    descripcion: letterToIndex(mapping.descripcion),
+    precio: letterToIndex(mapping.precio),
+    rubro: letterToIndex(mapping.rubro),
+    subrubro: letterToIndex(mapping.subrubro),
+    stock: letterToIndex(mapping.stock),
+    lote: letterToIndex(mapping.lote),
   };
 
   const dataRows = rows.slice(startRow - 1);
@@ -131,13 +177,13 @@ export function parseRows(
     const loteRaw = get(idx.lote).replace(/[^\d]/g, "");
     const lote = loteRaw ? Number(loteRaw) : undefined;
 
+    if (!descripcion && !barra && !codigo) return;
+
     const warnings: string[] = [];
     if (precio <= 0) warnings.push("precio en cero");
     if (!barra && !codigo) warnings.push("sin código");
     if (!rubro) warnings.push("sin rubro");
     if (!descripcion) warnings.push("sin descripción");
-
-    if (!descripcion && !barra && !codigo) return;
 
     parsed.push({
       rowNumber: startRow + i,
