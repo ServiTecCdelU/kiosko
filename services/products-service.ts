@@ -250,6 +250,60 @@ export async function getCatalogoCompleto(): Promise<Product[]> {
   return (data ?? []).map(mapRow);
 }
 
+export interface AumentoPrecio {
+  productoId: string;
+  nombre: string;
+  precioAnterior: number;
+  precioNuevo: number;
+  variacionPct: number;
+  usuarioNombre?: string;
+  fecha: Date;
+}
+
+/** Mayores subas de precio en los ultimos N dias, cruzando todo el catalogo. */
+export async function getMayoresAumentos(dias = 30, limit = 15): Promise<AumentoPrecio[]> {
+  const comercioId = getComercioId();
+  const desde = new Date();
+  desde.setDate(desde.getDate() - dias);
+
+  const { data: cambios, error } = await supabase
+    .from("producto_auditoria")
+    .select("producto_id, valor_anterior, valor_nuevo, usuario_nombre, fecha")
+    .eq("comercio_id", comercioId)
+    .eq("campo", "price")
+    .gte("fecha", desde.toISOString())
+    .order("fecha", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(error.message);
+  if (!cambios || cambios.length === 0) return [];
+
+  const ids = Array.from(new Set(cambios.map((c) => c.producto_id)));
+  const { data: productos } = await supabase
+    .from("productos")
+    .select("id, name")
+    .eq("comercio_id", comercioId)
+    .in("id", ids);
+  const nombrePorId = new Map((productos ?? []).map((p) => [p.id, p.name]));
+
+  return cambios
+    .map((c) => {
+      const anterior = Number(c.valor_anterior) || 0;
+      const nuevo = Number(c.valor_nuevo) || 0;
+      return {
+        productoId: c.producto_id,
+        nombre: nombrePorId.get(c.producto_id) ?? c.producto_id,
+        precioAnterior: anterior,
+        precioNuevo: nuevo,
+        variacionPct: anterior > 0 ? ((nuevo - anterior) / anterior) * 100 : 0,
+        usuarioNombre: c.usuario_nombre ?? undefined,
+        fecha: new Date(c.fecha),
+      };
+    })
+    .filter((c) => c.variacionPct > 0)
+    .sort((a, b) => b.variacionPct - a.variacionPct)
+    .slice(0, limit);
+}
+
 export async function getFavoritos(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("productos")

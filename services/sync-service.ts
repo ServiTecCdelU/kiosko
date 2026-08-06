@@ -90,14 +90,18 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
     return { estado: "error", productosCreados: 0, productosActualizados: 0, productosTotal: 0, error };
   }
 
-  // 2. ids existentes (para distinguir creados vs actualizados)
+  // 2. ids y precios existentes (para distinguir creados vs actualizados y auditar cambios de precio)
   const existing = new Set<string>();
+  const precioAnterior = new Map<string, number>();
   {
     const { data } = await supabaseAdmin
       .from("productos")
-      .select("id")
+      .select("id, price")
       .eq("comercio_id", SYNC_COMERCIO_ID);
-    for (const r of data ?? []) existing.add(r.id);
+    for (const r of data ?? []) {
+      existing.add(r.id);
+      precioAnterior.set(r.id, Number(r.price) || 0);
+    }
   }
 
   // 3. Mapear SOLO campos del catalogo. Nunca stock / stock_minimo / precio_base.
@@ -138,6 +142,22 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
     const error = `Error guardando productos: ${e instanceof Error ? e.message : String(e)}`;
     await logSync("parcial", creados, actualizados, rows.length, startedAt, error);
     return { estado: "parcial", productosCreados: creados, productosActualizados: actualizados, productosTotal: rows.length, error };
+  }
+
+  // 5. Auditar cambios de precio en productos que ya existian (no en altas nuevas)
+  const cambiosPrecio = rows
+    .filter((r) => existing.has(r.id) && precioAnterior.has(r.id) && precioAnterior.get(r.id) !== r.price)
+    .map((r) => ({
+      id: crypto.randomUUID(),
+      comercio_id: SYNC_COMERCIO_ID,
+      producto_id: r.id,
+      campo: "price",
+      valor_anterior: String(precioAnterior.get(r.id)),
+      valor_nuevo: String(r.price),
+      usuario_nombre: "Sincronización distribuidora",
+    }));
+  if (cambiosPrecio.length > 0) {
+    await supabaseAdmin.from("producto_auditoria").insert(cambiosPrecio);
   }
 
   await logSync("ok", creados, actualizados, rows.length, startedAt);

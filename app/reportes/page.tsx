@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank } from "lucide-react";
+import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank, ArrowUpRight } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { getReporte, type Reporte } from "@/services/reportes-service";
+import { getMayoresAumentos, type AumentoPrecio } from "@/services/products-service";
+import { formatDateTime } from "@/lib/utils/format";
 
 type Rango = "hoy" | "semana" | "mes";
 
@@ -36,6 +38,7 @@ const TABS: { value: Rango; label: string }[] = [
 export default function ReportesPage() {
   const [rango, setRango] = useState<Rango>("hoy");
   const [reporte, setReporte] = useState<Reporte | null>(null);
+  const [aumentos, setAumentos] = useState<AumentoPrecio[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (r: Rango) => {
@@ -43,6 +46,7 @@ export default function ReportesPage() {
     try {
       const { desde, hasta } = rangoFechas(r);
       setReporte(await getReporte(desde, hasta));
+      getMayoresAumentos(30).then(setAumentos).catch(() => setAumentos([]));
     } catch {
       toast.error("No se pudo cargar el reporte");
     } finally {
@@ -215,6 +219,46 @@ export default function ReportesPage() {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ArrowUpRight className="h-4 w-4 text-warning" /> Mayores aumentos de precio (últimos 30 días)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {aumentos.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin cambios de precio registrados</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead className="text-right">Antes</TableHead>
+                        <TableHead className="text-right">Ahora</TableHead>
+                        <TableHead className="text-right">Aumento</TableHead>
+                        <TableHead>Origen</TableHead>
+                        <TableHead>Fecha</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {aumentos.map((a, i) => (
+                        <TableRow key={`${a.productoId}-${i}`}>
+                          <TableCell className="line-clamp-1 font-medium">{a.nombre}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{formatCurrency(a.precioAnterior)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(a.precioNuevo)}</TableCell>
+                          <TableCell className="text-right font-semibold text-warning">+{a.variacionPct.toFixed(0)}%</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{a.usuarioNombre ?? "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(a.fecha)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

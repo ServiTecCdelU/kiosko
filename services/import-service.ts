@@ -298,11 +298,12 @@ async function importRow(
           ? existing.stock + row.stock
           : existing.stock;
 
+    const nuevoPrecio = row.precio || existing.price;
     const { error } = await supabase
       .from("productos")
       .update({
         name: row.descripcion || existing.name,
-        price: row.precio || existing.price,
+        price: nuevoPrecio,
         precio_base: row.costo ?? existing.precioBase ?? null,
         category: category || existing.category,
         codigo: row.codigo || existing.codigo,
@@ -314,6 +315,17 @@ async function importRow(
       .eq("comercio_id", comercioId)
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
+    if (nuevoPrecio !== existing.price) {
+      await supabase.from("producto_auditoria").insert({
+        id: crypto.randomUUID(),
+        comercio_id: comercioId,
+        producto_id: existing.id,
+        campo: "price",
+        valor_anterior: String(existing.price),
+        valor_nuevo: String(nuevoPrecio),
+        usuario_nombre: "Importación Excel",
+      });
+    }
     summary.actualizados++;
   } else {
     const { error } = await supabase.from("productos").insert({
