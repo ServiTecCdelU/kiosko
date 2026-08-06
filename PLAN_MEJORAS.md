@@ -46,8 +46,8 @@ Esto es lo que determina qué construir, en orden de impacto real:
 |---|---|---|---|
 | 1 | ✅ **Costo de producto usable de punta a punta** | Es el dato que ya existe y se tira a la basura. Sin esto no hay reporte de rentabilidad posible. | Hecho: columna "Costo" en el importador de Excel (opcional), campo editable en "Editar producto" con margen % en vivo, y columna "Margen" en la tabla de stock. |
 | 2 | ✅ **Reporte de rentabilidad** | "¿Qué rubro me deja plata y cuál no?" es la pregunta que un dueño de despensa hace todas las semanas. | Hecho: KPI de margen bruto, margen por producto en "Más vendidos" y nueva tabla "Rentabilidad por rubro" en `/reportes`, usando `precio_base` actual (no histórico) contra lo vendido. |
-| 3 | **Retiros, aportes y gastos de caja** | Sin esto el arqueo de cierre da diferencia todos los días y el sistema pierde credibilidad en la primera semana de uso real. | Ya diseñado en `PLAN.md` (`supabase/09_anulacion_caja_mov.sql`) — falta aplicar el SQL y programar el código. Es el ítem con mayor relación impacto/esfuerzo de todo este plan. |
-| 4 | **Anulación de venta** | El error de cobro es diario, no una excepción. | Mismo SQL que el ítem anterior — van juntos, un solo commit (ver `PLAN.md`, sección "Riesgo a tener en cuenta"). |
+| 3 | ✅ **Retiros, aportes y gastos de caja** | Sin esto el arqueo de cierre da diferencia todos los días y el sistema pierde credibilidad en la primera semana de uso real. | Hecho: `supabase/09_anulacion_caja_mov.sql` (ejecutar si no se hizo aún) + `/api/caja/movimiento` + botones Aporte/Retiro/Gasto en `/caja` con historial. El cierre de caja ahora calcula `apertura + ventas_efectivo + aportes − retiros − gastos`. |
+| 4 | ✅ **Anulación de venta** | El error de cobro es diario, no una excepción. | Hecho: `/api/ventas/anular` (RPC `anular_venta_kiosko`), listado "Ventas de esta caja" en `/caja` con botón Anular (solo rol admin), devuelve stock automáticamente y revierte saldo de fiado si corresponde. Reportes y resumen de caja excluyen ventas anuladas. |
 
 ### 🟠 Prioridad 2 — Amplía qué tipo de comercio puede usar el sistema sin quejarse
 

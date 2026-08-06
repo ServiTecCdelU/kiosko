@@ -66,6 +66,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
     .from("ventas")
     .select("total,payment_method,transfer_amount,items,created_at")
     .eq("comercio_id", comercioId)
+    .eq("estado", "completada")
     .gte("created_at", desde.toISOString())
     .lte("created_at", hasta.toISOString())
     .order("created_at", { ascending: true });

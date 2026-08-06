@@ -1,7 +1,7 @@
 // services/caja-service.ts — caja diaria (client, anon)
 import { supabase } from "@/lib/supabase";
 import { getComercioId } from "@/hooks/use-auth";
-import type { Caja } from "@/lib/types";
+import type { Caja, CajaMovimiento, CajaMovTipo } from "@/lib/types";
 import { generateReadableId } from "@/services/supabase-helpers";
 
 function mapCaja(d: Record<string, any>): Caja {
@@ -14,6 +14,9 @@ function mapCaja(d: Record<string, any>): Caja {
     totalTransferencia: Number(d.total_transferencia) || 0,
     totalVentas: Number(d.total_ventas) || 0,
     cantidadVentas: Number(d.cantidad_ventas) || 0,
+    totalRetiros: Number(d.total_retiros) || 0,
+    totalAportes: Number(d.total_aportes) || 0,
+    totalGastos: Number(d.total_gastos) || 0,
     diferencia: d.diferencia != null ? Number(d.diferencia) : undefined,
     abiertaPor: d.abierta_por ?? undefined,
     abiertaPorNombre: d.abierta_por_nombre ?? undefined,
@@ -24,11 +27,26 @@ function mapCaja(d: Record<string, any>): Caja {
   };
 }
 
+function mapCajaMov(d: Record<string, any>): CajaMovimiento {
+  return {
+    id: d.id,
+    cajaId: d.caja_id,
+    tipo: d.tipo,
+    monto: Number(d.monto) || 0,
+    concepto: d.concepto ?? "",
+    usuarioNombre: d.usuario_nombre ?? undefined,
+    fecha: new Date(d.fecha),
+  };
+}
+
 export interface ResumenCaja {
   totalEfectivo: number;
   totalTransferencia: number;
   totalVentas: number;
   cantidadVentas: number;
+  totalRetiros: number;
+  totalAportes: number;
+  totalGastos: number;
 }
 
 export async function getCajaAbierta(): Promise<Caja | null> {
@@ -43,15 +61,55 @@ export async function getCajaAbierta(): Promise<Caja | null> {
   return data ? mapCaja(data) : null;
 }
 
-export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
-  const { data } = await supabase
-    .from("ventas")
-    .select("total,payment_method,transfer_amount")
+export async function getMovimientosCaja(cajaId: string): Promise<CajaMovimiento[]> {
+  const { data, error } = await supabase
+    .from("caja_movimientos")
+    .select("*")
     .eq("comercio_id", getComercioId())
-    .eq("caja_id", cajaId);
+    .eq("caja_id", cajaId)
+    .order("fecha", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapCajaMov);
+}
+
+export interface RegistrarMovimientoInput {
+  cajaId: string;
+  tipo: CajaMovTipo;
+  monto: number;
+  concepto?: string;
+  usuarioId?: string;
+  usuarioNombre?: string;
+}
+
+export async function registrarMovimientoCaja(input: RegistrarMovimientoInput): Promise<void> {
+  const res = await fetch("/api/caja/movimiento", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el movimiento");
+}
+
+export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
+  const comercioId = getComercioId();
+  const [{ data: ventas }, { data: movs }] = await Promise.all([
+    supabase
+      .from("ventas")
+      .select("total,payment_method,transfer_amount")
+      .eq("comercio_id", comercioId)
+      .eq("caja_id", cajaId)
+      .eq("estado", "completada"),
+    supabase
+      .from("caja_movimientos")
+      .select("tipo,monto")
+      .eq("comercio_id", comercioId)
+      .eq("caja_id", cajaId),
+  ]);
+
   let efectivo = 0;
   let transferencia = 0;
-  for (const v of data ?? []) {
+  for (const v of ventas ?? []) {
     // El fiado no mueve la caja: no es efectivo ni transferencia al momento de la venta.
     if (v.payment_method === "fiado") continue;
     const t = Number(v.total) || 0;
@@ -65,11 +123,25 @@ export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
     transferencia += tr;
     efectivo += t - tr;
   }
+
+  let totalRetiros = 0;
+  let totalAportes = 0;
+  let totalGastos = 0;
+  for (const m of movs ?? []) {
+    const monto = Number(m.monto) || 0;
+    if (m.tipo === "retiro") totalRetiros += monto;
+    else if (m.tipo === "aporte") totalAportes += monto;
+    else if (m.tipo === "gasto") totalGastos += monto;
+  }
+
   return {
     totalEfectivo: efectivo,
     totalTransferencia: transferencia,
     totalVentas: efectivo + transferencia,
-    cantidadVentas: (data ?? []).length,
+    cantidadVentas: (ventas ?? []).length,
+    totalRetiros,
+    totalAportes,
+    totalGastos,
   };
 }
 
@@ -107,7 +179,9 @@ export async function cerrarCaja(
   notas?: string,
 ): Promise<Caja> {
   const resumen = await getResumenCaja(cajaId);
-  const esperadoEfectivo = montoApertura + resumen.totalEfectivo;
+  // Arqueo real: lo que abrió + lo vendido en efectivo + aportes − retiros − gastos.
+  const esperadoEfectivo =
+    montoApertura + resumen.totalEfectivo + resumen.totalAportes - resumen.totalRetiros - resumen.totalGastos;
   const diferencia = montoCierreContado - esperadoEfectivo;
 
   const { data, error } = await supabase
@@ -119,6 +193,9 @@ export async function cerrarCaja(
       total_transferencia: resumen.totalTransferencia,
       total_ventas: resumen.totalVentas,
       cantidad_ventas: resumen.cantidadVentas,
+      total_retiros: resumen.totalRetiros,
+      total_aportes: resumen.totalAportes,
+      total_gastos: resumen.totalGastos,
       diferencia,
       cerrada_por: usuarioId ?? null,
       notas: notas ?? null,

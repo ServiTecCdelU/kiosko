@@ -40,6 +40,7 @@ export interface SaleItem {
 }
 
 export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado";
+export type VentaEstado = "completada" | "anulada";
 
 export interface Sale {
   id: string;
@@ -55,7 +56,23 @@ export interface Sale {
   clienteId?: string;
   userId?: string;
   userName?: string;
+  estado: VentaEstado;
+  anuladaAt?: Date;
+  anuladaPorNombre?: string;
+  motivoAnulacion?: string;
   createdAt: Date;
+}
+
+export type CajaMovTipo = "retiro" | "aporte" | "gasto";
+
+export interface CajaMovimiento {
+  id: string;
+  cajaId: string;
+  tipo: CajaMovTipo;
+  monto: number;
+  concepto: string;
+  usuarioNombre?: string;
+  fecha: Date;
 }
 
 export interface Cliente {
@@ -95,6 +112,9 @@ export interface Caja {
   totalTransferencia: number;
   totalVentas: number;
   cantidadVentas: number;
+  totalRetiros: number;
+  totalAportes: number;
+  totalGastos: number;
   diferencia?: number;
   abiertaPor?: string;
   abiertaPorNombre?: string;
