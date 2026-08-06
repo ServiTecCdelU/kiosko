@@ -6,7 +6,7 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode } from "lucide-react";
+import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id });
     } else if (method === "mercadopago") {
       onConfirm({ paymentMethod: "mercadopago", cashAmount: 0, changeAmount: 0, transferAmount: total });
+    } else if (method === "tarjeta") {
+      onConfirm({ paymentMethod: "tarjeta", cashAmount: 0, changeAmount: 0, transferAmount: total });
     } else {
       onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0 });
     }
@@ -178,11 +180,12 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           <span className="cifra-hero text-money text-5xl">{formatCurrency(total)}</span>
         </div>
 
-        <div className="mb-3 grid grid-cols-5 gap-1.5">
+        <div className="mb-3 grid grid-cols-3 gap-1.5">
           <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
           <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
+          <MethodButton active={method === "tarjeta"} onClick={() => setMethod("tarjeta")} icon={<Wallet className="h-4 w-4" />} label="Tarjeta" />
           <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
-          <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP" />
+          <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP QR" />
           <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
         </div>
 
