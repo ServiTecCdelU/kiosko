@@ -51,6 +51,9 @@ export async function searchProducts(query: string, limit = 24): Promise<Product
 export interface ProductsPageParams {
   search?: string;
   soloStockBajo?: boolean;
+  soloAgotados?: boolean;
+  soloRevisar?: boolean;
+  categoria?: string;
   page?: number;
   pageSize?: number;
 }
@@ -60,29 +63,116 @@ export interface ProductsPageResult {
   total: number;
 }
 
+function applyCommonFilters(q: any, comercioId: string, s: string, categoria?: string) {
+  let query = q.eq("comercio_id", comercioId).eq("disabled", false);
+  if (s) query = query.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+  if (categoria) query = query.eq("category", categoria);
+  return query;
+}
+
 export async function getProductsPage(params: ProductsPageParams): Promise<ProductsPageResult> {
   const s = params.search ? sanitize(params.search) : "";
   const comercioId = getComercioId();
 
-  // Stock bajo: PostgREST no compara dos columnas, se trae un set amplio y se filtra aca.
-  if (params.soloStockBajo) {
-    let q = supabase.from("productos").select("*").eq("comercio_id", comercioId).eq("disabled", false);
-    if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+  // Stock bajo / agotados: PostgREST no compara dos columnas, se trae un set amplio y se filtra aca.
+  if (params.soloStockBajo || params.soloAgotados) {
+    let q = applyCommonFilters(supabase.from("productos").select("*"), comercioId, s, params.categoria);
+    if (params.soloRevisar) q = q.eq("revisar", true);
     const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
     if (error) throw new Error(error.message);
-    const products = (data ?? []).map(mapRow).filter((p) => p.stock <= p.stockMinimo);
+    let products = (data ?? []).map(mapRow);
+    products = params.soloAgotados
+      ? products.filter((p) => p.stock <= 0)
+      : products.filter((p) => p.stock <= p.stockMinimo);
     return { products, total: products.length };
   }
 
   const page = params.page ?? 0;
   const size = params.pageSize ?? 30;
-  let q = supabase.from("productos").select("*", { count: "exact" }).eq("comercio_id", comercioId).eq("disabled", false);
-  if (s) q = q.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+  let q = applyCommonFilters(
+    supabase.from("productos").select("*", { count: "exact" }),
+    comercioId,
+    s,
+    params.categoria,
+  );
+  if (params.soloRevisar) q = q.eq("revisar", true);
   const { data, count, error } = await q
     .order("name", { ascending: true })
     .range(page * size, page * size + size - 1);
   if (error) throw new Error(error.message);
   return { products: (data ?? []).map(mapRow), total: count ?? 0 };
+}
+
+export interface StockStats {
+  total: number;
+  stockBajo: number;
+  agotados: number;
+  revisar: number;
+}
+
+/** Trae id/stock/stock_minimo/revisar de todo el catalogo activo para calcular las tarjetas del dashboard. */
+export async function getStockStats(): Promise<StockStats> {
+  const comercioId = getComercioId();
+  const { data, error } = await supabase
+    .from("productos")
+    .select("stock, stock_minimo, revisar")
+    .eq("comercio_id", comercioId)
+    .eq("disabled", false)
+    .limit(5000);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  return {
+    total: rows.length,
+    stockBajo: rows.filter((r) => Number(r.stock) > 0 && Number(r.stock) <= Number(r.stock_minimo)).length,
+    agotados: rows.filter((r) => Number(r.stock) <= 0).length,
+    revisar: rows.filter((r) => r.revisar).length,
+  };
+}
+
+export async function getCategorias(): Promise<string[]> {
+  const comercioId = getComercioId();
+  const { data, error } = await supabase
+    .from("productos")
+    .select("category")
+    .eq("comercio_id", comercioId)
+    .eq("disabled", false)
+    .not("category", "is", null)
+    .neq("category", "")
+    .limit(5000);
+  if (error) throw new Error(error.message);
+  const set = new Set((data ?? []).map((r) => String(r.category)).filter(Boolean));
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+export interface UpdateProductInput {
+  codigo?: string;
+  codigoBarras?: string;
+  name: string;
+  category: string;
+  price: number;
+  stockMinimo: number;
+  lote?: number;
+  disabled: boolean;
+  revisar: boolean;
+}
+
+export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
+  const { error } = await supabase
+    .from("productos")
+    .update({
+      codigo: input.codigo || null,
+      codigo_barras: input.codigoBarras || null,
+      name: input.name,
+      category: input.category,
+      price: input.price,
+      stock_minimo: input.stockMinimo,
+      lote: input.lote ?? null,
+      disabled: input.disabled,
+      revisar: input.revisar,
+    })
+    .eq("comercio_id", getComercioId())
+    .eq("id", productId);
+  if (error) throw new Error(error.message);
 }
 
 export interface SetOfertaInput {

@@ -1,22 +1,27 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Search, AlertTriangle, SlidersHorizontal, ChevronLeft, ChevronRight, Tag, Upload } from "lucide-react";
+import {
+  Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
+  Package, PackageX, ClipboardList, Layers,
+} from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getProductsPage, setOferta, type SetOfertaInput } from "@/services/products-service";
+import {
+  getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
+  type SetOfertaInput, type StockStats, type UpdateProductInput,
+} from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
-import { AjusteDialog } from "@/components/stock/ajuste-dialog";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
 import { ImportDialog } from "@/components/stock/import-dialog";
+import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta } from "@/lib/pricing";
@@ -25,16 +30,21 @@ import type { Product } from "@/lib/types";
 
 const PAGE_SIZE = 30;
 
+type QuickFilter = "todos" | "stockBajo" | "agotados" | "revisar";
+
 export default function StockPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [soloStockBajo, setSoloStockBajo] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
+  const [categoria, setCategoria] = useState("");
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [stats, setStats] = useState<StockStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Product | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [ofertaProduct, setOfertaProduct] = useState<Product | null>(null);
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -46,12 +56,36 @@ export default function StockPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debounced, soloStockBajo]);
+  }, [debounced, quickFilter, categoria]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      setStats(await getStockStats());
+    } catch {
+      // no crítico, no bloquea la pantalla
+    }
+  }, []);
+
+  const loadCategorias = useCallback(async () => {
+    try {
+      setCategorias(await getCategorias());
+    } catch {
+      // no crítico
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getProductsPage({ search: debounced, soloStockBajo, page, pageSize: PAGE_SIZE });
+      const res = await getProductsPage({
+        search: debounced,
+        soloStockBajo: quickFilter === "stockBajo",
+        soloAgotados: quickFilter === "agotados",
+        soloRevisar: quickFilter === "revisar",
+        categoria: categoria || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      });
       setProducts(res.products);
       setTotal(res.total);
     } catch {
@@ -59,15 +93,24 @@ export default function StockPage() {
     } finally {
       setLoading(false);
     }
-  }, [debounced, soloStockBajo, page]);
+  }, [debounced, quickFilter, categoria, page]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const openAjuste = (p: Product) => {
+  useEffect(() => {
+    loadStats();
+    loadCategorias();
+  }, [loadStats, loadCategorias]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([load(), loadStats(), loadCategorias()]);
+  }, [load, loadStats, loadCategorias]);
+
+  const openEdit = (p: Product) => {
     setSelected(p);
-    setDialogOpen(true);
+    setEditOpen(true);
   };
 
   const openOferta = (p: Product) => {
@@ -86,13 +129,25 @@ export default function StockPage() {
     }
   };
 
+  const handleSaveProduct = async (input: UpdateProductInput) => {
+    if (!selected) return;
+    try {
+      await updateProduct(selected.id, input);
+      toast.success("Producto actualizado");
+      await refreshAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar el producto");
+    }
+  };
+
   const handleAjuste = async (tipo: "entrada" | "ajuste" | "rotura", cantidad: number) => {
     if (!selected) return;
     try {
       const user = getCurrentUser();
       const res = await ajustarStock({ productoId: selected.id, tipo, cantidad, usuario: user?.nombre });
       toast.success(`Stock actualizado: ${res.stockNuevo}`);
-      await load();
+      setSelected((s) => (s ? { ...s, stock: res.stockNuevo } : s));
+      await refreshAll();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al ajustar");
     }
@@ -100,8 +155,35 @@ export default function StockPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const cards = useMemo(
+    () => [
+      { key: "todos" as QuickFilter, label: "Total productos", value: stats?.total ?? "—", icon: Layers, color: "text-foreground" },
+      { key: "stockBajo" as QuickFilter, label: "Stock bajo", value: stats?.stockBajo ?? "—", icon: Package, color: "text-warning" },
+      { key: "agotados" as QuickFilter, label: "Agotados", value: stats?.agotados ?? "—", icon: PackageX, color: "text-destructive" },
+      { key: "revisar" as QuickFilter, label: "A revisar", value: stats?.revisar ?? "—", icon: ClipboardList, color: "text-warning" },
+    ],
+    [stats],
+  );
+
   return (
     <AppShell title="Stock">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {cards.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setQuickFilter((f) => (f === c.key ? "todos" : c.key))}
+            className={cn(
+              "rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-muted/50",
+              quickFilter === c.key && "border-primary bg-primary/10",
+            )}
+          >
+            <c.icon className={cn("mb-2 h-4 w-4", c.color)} />
+            <p className={cn("cifra text-2xl font-bold", c.color)}>{c.value}</p>
+            <p className="text-xs text-muted-foreground">{c.label}</p>
+          </button>
+        ))}
+      </div>
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -111,11 +193,18 @@ export default function StockPage() {
             className="rounded-2xl pl-10"
           />
         </div>
-        <label className="flex items-center gap-2 rounded-2xl border bg-card px-4 py-2 text-sm">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          Solo stock bajo
-          <Switch checked={soloStockBajo} onCheckedChange={setSoloStockBajo} />
-        </label>
+        {categorias.length > 0 && (
+          <select
+            value={categoria}
+            onChange={(e) => setCategoria(e.target.value)}
+            className="rounded-2xl border bg-card px-4 py-2 text-sm"
+          >
+            <option value="">Todos los rubros</option>
+            {categorias.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        )}
         <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
           <Upload className="mr-2 h-4 w-4" /> Importar productos
         </Button>
@@ -133,11 +222,15 @@ export default function StockPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Cód. barra</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Producto</TableHead>
+                  <TableHead>Rubro</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Min.</TableHead>
-                  <TableHead className="text-right">Accion</TableHead>
+                  <TableHead className="text-right">Mín.</TableHead>
+                  <TableHead className="text-right">Lote</TableHead>
+                  <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -146,15 +239,17 @@ export default function StockPage() {
                   const bajo = !sinStock && p.stock <= p.stockMinimo;
                   return (
                     <TableRow key={p.id}>
+                      <TableCell className="text-xs text-muted-foreground">{p.codigoBarras || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{p.codigo || "—"}</TableCell>
                       <TableCell>
                         <p className="line-clamp-1 font-medium">{p.name}</p>
-                        {p.codigo && <span className="text-xs text-muted-foreground">{p.codigo}</span>}
                         {p.revisar && (
-                          <Badge variant="outline" className="ml-2 border-warning text-warning">
+                          <Badge variant="outline" className="mt-1 border-warning text-warning">
                             <AlertTriangle className="mr-1 h-3 w-3" />A revisar
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{p.category || "—"}</TableCell>
                       <TableCell className="text-right">
                         {tieneOferta(p) ? (
                           <span className="flex flex-col items-end leading-tight">
@@ -181,6 +276,7 @@ export default function StockPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">{p.stockMinimo}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{p.lote ?? "—"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -191,8 +287,8 @@ export default function StockPage() {
                           >
                             <Tag className="mr-1 h-3.5 w-3.5" /> Oferta
                           </Button>
-                          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openAjuste(p)}>
-                            Ajustar
+                          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openEdit(p)}>
+                            <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
                           </Button>
                         </div>
                       </TableCell>
@@ -205,7 +301,7 @@ export default function StockPage() {
         )}
       </div>
 
-      {!soloStockBajo && total > PAGE_SIZE && (
+      {quickFilter === "todos" && total > PAGE_SIZE && (
         <div className="mt-4 flex items-center justify-center gap-3">
           <Button variant="outline" size="icon" className="rounded-xl" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeft className="h-4 w-4" />
@@ -217,9 +313,15 @@ export default function StockPage() {
         </div>
       )}
 
-      <AjusteDialog product={selected} open={dialogOpen} onOpenChange={setDialogOpen} onSubmit={handleAjuste} />
+      <EditarProductoDialog
+        product={selected}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSave={handleSaveProduct}
+        onAjustarStock={handleAjuste}
+      />
       <OfertaDialog product={ofertaProduct} open={ofertaOpen} onOpenChange={setOfertaOpen} onSubmit={handleOferta} />
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
     </AppShell>
   );
 }
