@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   });
 
   const discount = Number(body?.discount) || 0;
-  const total = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
+  const total = Math.max(0, items.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0) - discount);
 
   const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", {
     p_items: items,

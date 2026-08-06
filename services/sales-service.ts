@@ -29,12 +29,25 @@ export interface ProcessSaleResult {
   total: number;
 }
 
+/** Se lanza cuando la venta no pudo ni siquiera llegar al servidor (sin internet). */
+export class NetworkUnavailableError extends Error {
+  constructor() {
+    super("Sin conexión");
+    this.name = "NetworkUnavailableError";
+  }
+}
+
 export async function createSale(input: CreateSaleInput): Promise<ProcessSaleResult> {
-  const res = await fetch("/api/ventas", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("/api/ventas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    });
+  } catch {
+    throw new NetworkUnavailableError();
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la venta");
   return data as ProcessSaleResult;

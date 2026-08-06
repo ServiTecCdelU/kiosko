@@ -85,7 +85,7 @@ export async function getProductsPage(params: ProductsPageParams): Promise<Produ
     if (params.soloRevisar) q = q.eq("revisar", true);
     const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
     if (error) throw new Error(error.message);
-    let products = (data ?? []).map(mapRow).filter((p) => p.stockControlado);
+    let products: Product[] = (data ?? []).map(mapRow).filter((p: Product) => p.stockControlado);
     products = params.soloAgotados
       ? products.filter((p) => p.stock <= 0)
       : products.filter((p) => p.stock <= p.stockMinimo);
@@ -236,6 +236,18 @@ export async function getHistorialPrecio(productId: string, limit = 10): Promise
     usuarioNombre: d.usuario_nombre ?? undefined,
     fecha: new Date(d.fecha),
   }));
+}
+
+/** Catalogo completo activo, para cachear en IndexedDB y poder vender sin conexion. */
+export async function getCatalogoCompleto(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("comercio_id", getComercioId())
+    .eq("disabled", false)
+    .limit(5000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapRow);
 }
 
 export async function getFavoritos(): Promise<Product[]> {

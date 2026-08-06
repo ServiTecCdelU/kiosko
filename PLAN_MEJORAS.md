@@ -73,7 +73,7 @@ Esto es lo que determina qué construir, en orden de impacto real:
 
 | # | Ítem | Detalle |
 |---|---|---|
-| 15 | **Modo offline (PWA)** | Ya está en `PLAN.md` como bloqueante de venta — se mantiene acá porque es el diferencial más fuerte: un local que no puede dejar de cobrar cuando se corta el wifi. |
+| 15 | ✅ **Modo offline (PWA)** | Hecho: service worker manual (`public/sw.js`, sin tocar `next.config.mjs`) que cachea la app shell; catálogo completo cacheado en IndexedDB (`lib/offline/db.ts`) para buscar y cobrar sin señal; las ventas offline se guardan en una cola local y se sincronizan solas al volver la conexión (`hooks/use-offline-sync.ts`). El fiado no se puede cobrar offline (necesita validar saldo en el momento). |
 | 16 | **Cobro con QR de Mercado Pago** | La estructura de `comercios` ya lo contempla (ver `PLAN.md`); falta el flujo de generación de QR + webhook. |
 | 17 | **Historial de precios por producto** | Ver cómo evolucionó el precio de un producto en el tiempo — útil para decidir cuándo actualizar la lista y detectar productos que un proveedor aumentó de más. |
 

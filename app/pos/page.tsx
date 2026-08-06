@@ -3,15 +3,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer, PauseCircle } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
-import { createSale } from "@/services/sales-service";
+import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajaAbierta } from "@/services/caja-service";
+import { useOfflineSync } from "@/hooks/use-offline-sync";
+import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
+import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
@@ -45,6 +48,7 @@ function PosScreen() {
   const [esperaOpen, setEsperaOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
+  const { isOnline, pendingCount, syncVentasPendientes } = useOfflineSync();
 
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
@@ -53,10 +57,11 @@ function PosScreen() {
     getCajaAbierta()
       .then((c) => setCajaId(c?.id))
       .catch(() => setCajaId(undefined));
-    getFavoritos()
+    (isOnline ? getFavoritos() : getFavoritosOffline())
       .then(setFavoritos)
-      .catch(() => setFavoritos([]));
+      .catch(() => getFavoritosOffline().then(setFavoritos));
     setTicketsEspera(listarTicketsEnEspera());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusInput]);
 
   const handleSuspender = useCallback(() => {
@@ -118,15 +123,15 @@ function PosScreen() {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        setResults(await searchProducts(q));
+        setResults(isOnline ? await searchProducts(q) : await buscarProductosOffline(q));
       } catch {
-        toast.error("Error al buscar");
+        setResults(await buscarProductosOffline(q));
       } finally {
         setSearching(false);
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, isOnline]);
 
   const addToCart = useCallback(
     (p: Product) => {
@@ -170,7 +175,9 @@ function PosScreen() {
     const value = query.trim();
     if (!value) return;
     try {
-      const found = await findProductByCode(value);
+      const found = isOnline
+        ? await findProductByCode(value).catch(() => buscarPorCodigoOffline(value))
+        : await buscarPorCodigoOffline(value);
       if (found) {
         addToCart(found);
         setQuery("");
@@ -187,31 +194,56 @@ function PosScreen() {
     } catch {
       toast.error("Error al buscar");
     }
-  }, [query, results, addToCart, focusInput]);
+  }, [query, results, addToCart, focusInput, isOnline]);
 
   const handleConfirm = useCallback(
     async (data: ConfirmData) => {
       setProcessing(true);
+      const user = getCurrentUser();
+      const saleInput: CreateSaleInput = {
+        items: cart.items.map((i) => ({
+          productId: i.product.id,
+          name: i.product.name,
+          quantity: i.quantity,
+          price: i.product.price,
+        })),
+        paymentMethod: data.paymentMethod,
+        cashAmount: data.cashAmount,
+        changeAmount: data.changeAmount,
+        transferAmount: data.transferAmount,
+        cajaId,
+        clienteId: data.clienteId,
+        userId: user?.id,
+        userName: user?.nombre,
+      };
+
       try {
-        const user = getCurrentUser();
-        const res = await createSale({
-          items: cart.items.map((i) => ({
-            productId: i.product.id,
-            name: i.product.name,
-            quantity: i.quantity,
-            price: i.product.price,
-          })),
-          paymentMethod: data.paymentMethod,
-          cashAmount: data.cashAmount,
-          changeAmount: data.changeAmount,
-          transferAmount: data.transferAmount,
-          cajaId,
-          clienteId: data.clienteId,
-          userId: user?.id,
-          userName: user?.nombre,
-        });
+        let saleNumber: string;
+        let total: number;
+
+        if (data.paymentMethod === "fiado") {
+          // El fiado necesita validar/actualizar el saldo del cliente en el momento: no se puede encolar offline.
+          const res = await createSale(saleInput);
+          saleNumber = res.saleNumber;
+          total = res.total;
+        } else {
+          try {
+            const res = await createSale(saleInput);
+            saleNumber = res.saleNumber;
+            total = res.total;
+          } catch (e) {
+            if (!(e instanceof NetworkUnavailableError)) throw e;
+            await encolarVentaPendiente(saleInput);
+            for (const i of cart.items) await descontarStockOffline(i.product.id, i.quantity);
+            saleNumber = "PENDIENTE";
+            total = cart.items.reduce((s, i) => s + precioLinea(i.product, i.quantity), 0);
+            toast.warning("Sin conexión: venta guardada, se sincroniza sola al volver el internet");
+          }
+        }
+
         const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
-        toast.success(`Ticket #${res.saleNumber}${vuelto}`);
+        if (saleNumber !== "PENDIENTE") toast.success(`Ticket #${saleNumber}${vuelto}`);
+        const res = { saleNumber, total };
         setLastTicket({
           saleNumber: res.saleNumber,
           createdAt: new Date(),
@@ -262,6 +294,19 @@ function PosScreen() {
             <Kbd>F3</Kbd> Buscar
             <Kbd>Esc</Kbd> Limpiar
           </span>
+          {!isOnline && (
+            <span className="flex items-center gap-1.5 rounded-full bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive">
+              <WifiOff className="h-3.5 w-3.5" /> Sin conexión
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <button
+              onClick={() => syncVentasPendientes()}
+              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/20"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> {pendingCount} venta(s) sin sincronizar
+            </button>
+          )}
           {ticketsEspera.length > 0 && (
             <button
               onClick={() => setEsperaOpen(true)}
