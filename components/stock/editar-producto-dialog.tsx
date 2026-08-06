@@ -42,6 +42,8 @@ export function EditarProductoDialog({
   const [lote, setLote] = useState("");
   const [disabled, setDisabled] = useState(false);
   const [revisar, setRevisar] = useState(false);
+  const [favorito, setFavorito] = useState(false);
+  const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [ajusteTipo, setAjusteTipo] = useState<AjusteTipo>("entrada");
@@ -60,6 +62,8 @@ export function EditarProductoDialog({
       setLote(product.lote ? String(product.lote) : "");
       setDisabled(product.disabled);
       setRevisar(product.revisar);
+      setFavorito(product.favorito);
+      setFechaVencimiento(product.fechaVencimiento ? product.fechaVencimiento.toISOString().slice(0, 10) : "");
       setAjusteTipo("entrada");
       setAjusteCantidad("");
     }
@@ -89,6 +93,8 @@ export function EditarProductoDialog({
         lote: loteNum,
         disabled,
         revisar,
+        favorito,
+        fechaVencimiento: fechaVencimiento || undefined,
       });
       onOpenChange(false);
     } finally {
@@ -175,14 +181,23 @@ export function EditarProductoDialog({
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <label className="flex flex-1 items-center justify-between rounded-xl border px-3 py-2.5">
+          <div>
+            <Label className="mb-1 block text-xs">Fecha de vencimiento</Label>
+            <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="rounded-xl" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">Deshabilitado</span>
               <Switch checked={disabled} onCheckedChange={setDisabled} />
             </label>
-            <label className="flex flex-1 items-center justify-between rounded-xl border px-3 py-2.5">
+            <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">A revisar</span>
               <Switch checked={revisar} onCheckedChange={setRevisar} />
+            </label>
+            <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">Producto rápido (grilla del POS)</span>
+              <Switch checked={favorito} onCheckedChange={setFavorito} />
             </label>
           </div>
 

@@ -16,6 +16,8 @@ export interface Product {
   stockMinimo: number;
   lote?: number;
   revisar: boolean;
+  favorito: boolean;
+  fechaVencimiento?: Date;
   disabled: boolean;
   // Oferta de catálogo (descuento propio del kiosko, la sync no lo toca)
   ofertaActiva: boolean;

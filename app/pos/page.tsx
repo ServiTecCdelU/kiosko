@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta } from "@/lib/pricing";
 import { useCart } from "@/hooks/useCart";
-import { searchProducts, findProductByCode } from "@/services/products-service";
+import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
 import { createSale } from "@/services/sales-service";
 import { getCajaAbierta } from "@/services/caja-service";
 import { getCurrentUser } from "@/hooks/use-auth";
@@ -32,6 +32,7 @@ function PosScreen() {
   const [searching, setSearching] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
+  const [favoritos, setFavoritos] = useState<Product[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
 
@@ -42,6 +43,9 @@ function PosScreen() {
     getCajaAbierta()
       .then((c) => setCajaId(c?.id))
       .catch(() => setCajaId(undefined));
+    getFavoritos()
+      .then(setFavoritos)
+      .catch(() => setFavoritos([]));
   }, [focusInput]);
 
   // Atajos de teclado para mostrador: F2 cobrar · F3 buscar · Esc limpiar
@@ -219,9 +223,35 @@ function PosScreen() {
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-card p-2">
             {query.trim().length < 2 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                Escribi al menos 2 letras o escanea un producto
-              </p>
+              favoritos.length > 0 ? (
+                <div>
+                  <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
+                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {favoritos.map((p) => {
+                      const sinStock = p.stock <= 0;
+                      return (
+                        <li key={p.id}>
+                          <button
+                            onClick={() => addToCart(p)}
+                            disabled={sinStock}
+                            className={cn(
+                              "flex h-20 w-full flex-col items-center justify-center gap-1 rounded-xl border px-2 text-center transition-colors",
+                              sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
+                            )}
+                          >
+                            <span className="line-clamp-2 text-xs font-medium">{p.name}</span>
+                            <span className="text-sm font-semibold text-primary">{formatCurrency(precioFinal(p))}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Escribi al menos 2 letras o escanea un producto
+                </p>
+              )
             ) : searching ? (
               <p className="py-10 text-center text-sm text-muted-foreground">Buscando...</p>
             ) : results.length === 0 ? (

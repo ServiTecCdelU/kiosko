@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
+  getProductsPage, setOferta, getStockStats, getCategorias, updateProduct, getVencimientosProximos,
   type SetOfertaInput, type StockStats, type UpdateProductInput,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -48,6 +48,7 @@ export default function StockPage() {
   const [ofertaProduct, setOfertaProduct] = useState<Product | null>(null);
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [vencimientos, setVencimientos] = useState<Product[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -69,6 +70,14 @@ export default function StockPage() {
   const loadCategorias = useCallback(async () => {
     try {
       setCategorias(await getCategorias());
+    } catch {
+      // no crítico
+    }
+  }, []);
+
+  const loadVencimientos = useCallback(async () => {
+    try {
+      setVencimientos(await getVencimientosProximos(7));
     } catch {
       // no crítico
     }
@@ -102,11 +111,12 @@ export default function StockPage() {
   useEffect(() => {
     loadStats();
     loadCategorias();
-  }, [loadStats, loadCategorias]);
+    loadVencimientos();
+  }, [loadStats, loadCategorias, loadVencimientos]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([load(), loadStats(), loadCategorias()]);
-  }, [load, loadStats, loadCategorias]);
+    await Promise.all([load(), loadStats(), loadCategorias(), loadVencimientos()]);
+  }, [load, loadStats, loadCategorias, loadVencimientos]);
 
   const openEdit = (p: Product) => {
     setSelected(p);
@@ -183,6 +193,17 @@ export default function StockPage() {
           </button>
         ))}
       </div>
+
+      {vencimientos.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            {vencimientos.length} producto{vencimientos.length > 1 ? "s" : ""} vencen en los próximos 7 días:{" "}
+            {vencimientos.slice(0, 3).map((p) => p.name).join(", ")}
+            {vencimientos.length > 3 && ` y ${vencimientos.length - 3} más`}
+          </span>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">

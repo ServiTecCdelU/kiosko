@@ -18,6 +18,8 @@ export function mapRow(d: Record<string, any>): Product {
     stockMinimo: Number(d.stock_minimo) || 0,
     lote: d.lote != null ? Number(d.lote) : undefined,
     revisar: d.revisar ?? false,
+    favorito: d.favorito ?? false,
+    fechaVencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento) : undefined,
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
     ofertaTipo: d.oferta_tipo ?? undefined,
@@ -155,6 +157,8 @@ export interface UpdateProductInput {
   lote?: number;
   disabled: boolean;
   revisar: boolean;
+  favorito: boolean;
+  fechaVencimiento?: string; // YYYY-MM-DD
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
@@ -171,10 +175,41 @@ export async function updateProduct(productId: string, input: UpdateProductInput
       lote: input.lote ?? null,
       disabled: input.disabled,
       revisar: input.revisar,
+      favorito: input.favorito,
+      fecha_vencimiento: input.fechaVencimiento || null,
     })
     .eq("comercio_id", getComercioId())
     .eq("id", productId);
   if (error) throw new Error(error.message);
+}
+
+export async function getFavoritos(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("comercio_id", getComercioId())
+    .eq("disabled", false)
+    .eq("favorito", true)
+    .order("name", { ascending: true })
+    .limit(60);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapRow);
+}
+
+export async function getVencimientosProximos(dias = 7): Promise<Product[]> {
+  const limite = new Date();
+  limite.setDate(limite.getDate() + dias);
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("comercio_id", getComercioId())
+    .eq("disabled", false)
+    .not("fecha_vencimiento", "is", null)
+    .lte("fecha_vencimiento", limite.toISOString().slice(0, 10))
+    .order("fecha_vencimiento", { ascending: true })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapRow);
 }
 
 export interface SetOfertaInput {
