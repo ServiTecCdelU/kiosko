@@ -1,5 +1,5 @@
 // services/products-service.ts — lectura del catalogo (client, anon)
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { OfertaTipo, Product } from "@/lib/types";
 
@@ -34,23 +34,12 @@ export function mapRow(d: Record<string, any>): Product {
 }
 
 // Quita caracteres que rompen el filtro .or() de PostgREST
-function sanitize(q: string): string {
-  return q.replace(/[,()%]/g, " ").trim();
-}
 
 export async function searchProducts(query: string, limit = 24): Promise<Product[]> {
-  const q = sanitize(query);
-  if (!q) return [];
-  const { data, error } = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("disabled", false)
-    .or(`name.ilike.%${q}%,codigo.ilike.%${q}%,codigo_barras.ilike.%${q}%`)
-    .order("name", { ascending: true })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  const { productos } = await consultar<{ productos: Record<string, any>[] }>(
+    "/api/consultas/productos", "buscar", { query, limit },
+  );
+  return productos.map(mapRow);
 }
 
 export interface ProductsPageParams {
@@ -68,44 +57,12 @@ export interface ProductsPageResult {
   total: number;
 }
 
-function applyCommonFilters(q: any, comercioId: string, s: string, categoria?: string) {
-  let query = q.eq("comercio_id", comercioId).eq("disabled", false);
-  if (s) query = query.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
-  if (categoria) query = query.eq("category", categoria);
-  return query;
-}
 
 export async function getProductsPage(params: ProductsPageParams): Promise<ProductsPageResult> {
-  const s = params.search ? sanitize(params.search) : "";
-  const comercioId = getComercioId();
-
-  // Stock bajo / agotados: PostgREST no compara dos columnas, se trae un set amplio y se filtra aca.
-  if (params.soloStockBajo || params.soloAgotados) {
-    let q = applyCommonFilters(supabase.from("productos").select("*"), comercioId, s, params.categoria);
-    if (params.soloRevisar) q = q.eq("revisar", true);
-    const { data, error } = await q.order("stock", { ascending: true }).limit(1000);
-    if (error) throw new Error(error.message);
-    let products: Product[] = (data ?? []).map(mapRow).filter((p: Product) => p.stockControlado);
-    products = params.soloAgotados
-      ? products.filter((p) => p.stock <= 0)
-      : products.filter((p) => p.stock <= p.stockMinimo);
-    return { products, total: products.length };
-  }
-
-  const page = params.page ?? 0;
-  const size = params.pageSize ?? 30;
-  let q = applyCommonFilters(
-    supabase.from("productos").select("*", { count: "exact" }),
-    comercioId,
-    s,
-    params.categoria,
+  const { productos, total } = await consultar<{ productos: Record<string, any>[]; total: number }>(
+    "/api/consultas/productos", "pagina", { params },
   );
-  if (params.soloRevisar) q = q.eq("revisar", true);
-  const { data, count, error } = await q
-    .order("name", { ascending: true })
-    .range(page * size, page * size + size - 1);
-  if (error) throw new Error(error.message);
-  return { products: (data ?? []).map(mapRow), total: count ?? 0 };
+  return { products: productos.map(mapRow), total };
 }
 
 export interface StockStats {
@@ -117,37 +74,12 @@ export interface StockStats {
 
 /** Trae id/stock/stock_minimo/revisar de todo el catalogo activo para calcular las tarjetas del dashboard. */
 export async function getStockStats(): Promise<StockStats> {
-  const comercioId = getComercioId();
-  const { data, error } = await supabase
-    .from("productos")
-    .select("stock, stock_minimo, revisar, stock_controlado")
-    .eq("comercio_id", comercioId)
-    .eq("disabled", false)
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  const rows = data ?? [];
-  const controlados = rows.filter((r) => r.stock_controlado !== false);
-  return {
-    total: rows.length,
-    stockBajo: controlados.filter((r) => Number(r.stock) > 0 && Number(r.stock) <= Number(r.stock_minimo)).length,
-    agotados: controlados.filter((r) => Number(r.stock) <= 0).length,
-    revisar: rows.filter((r) => r.revisar).length,
-  };
+  return consultar<StockStats>("/api/consultas/productos", "stats");
 }
 
 export async function getCategorias(): Promise<string[]> {
-  const comercioId = getComercioId();
-  const { data, error } = await supabase
-    .from("productos")
-    .select("category")
-    .eq("comercio_id", comercioId)
-    .eq("disabled", false)
-    .not("category", "is", null)
-    .neq("category", "")
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  const set = new Set((data ?? []).map((r) => String(r.category)).filter(Boolean));
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
+  const { categorias } = await consultar<{ categorias: string[] }>("/api/consultas/productos", "categorias");
+  return categorias;
 }
 
 export interface UpdateProductInput {
@@ -210,15 +142,10 @@ export async function logCambioPrecio(
 }
 
 export async function getHistorialPrecio(productId: string, limit = 10): Promise<CambioPrecio[]> {
-  const { data, error } = await supabase
-    .from("producto_auditoria")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("producto_id", productId)
-    .order("fecha", { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((d) => ({
+  const { cambios } = await consultar<{ cambios: Record<string, any>[] }>(
+    "/api/consultas/productos", "historialPrecio", { productId, limit },
+  );
+  return cambios.map((d) => ({
     id: d.id,
     campo: d.campo,
     valorAnterior: d.valor_anterior ?? "",
@@ -229,15 +156,10 @@ export async function getHistorialPrecio(productId: string, limit = 10): Promise
 }
 
 /** Catalogo completo activo, para cachear en IndexedDB y poder vender sin conexion. */
+
 export async function getCatalogoCompleto(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("disabled", false)
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  const { productos } = await consultar<{ productos: Record<string, any>[] }>("/api/consultas/productos", "catalogo");
+  return productos.map(mapRow);
 }
 
 export interface AumentoPrecio {
@@ -252,75 +174,22 @@ export interface AumentoPrecio {
 
 /** Mayores subas de precio en los ultimos N dias, cruzando todo el catalogo. */
 export async function getMayoresAumentos(dias = 30, limit = 15): Promise<AumentoPrecio[]> {
-  const comercioId = getComercioId();
-  const desde = new Date();
-  desde.setDate(desde.getDate() - dias);
-
-  const { data: cambios, error } = await supabase
-    .from("producto_auditoria")
-    .select("producto_id, valor_anterior, valor_nuevo, usuario_nombre, fecha")
-    .eq("comercio_id", comercioId)
-    .eq("campo", "price")
-    .gte("fecha", desde.toISOString())
-    .order("fecha", { ascending: false })
-    .limit(500);
-  if (error) throw new Error(error.message);
-  if (!cambios || cambios.length === 0) return [];
-
-  const ids = Array.from(new Set(cambios.map((c) => c.producto_id)));
-  const { data: productos } = await supabase
-    .from("productos")
-    .select("id, name")
-    .eq("comercio_id", comercioId)
-    .in("id", ids);
-  const nombrePorId = new Map((productos ?? []).map((p) => [p.id, p.name]));
-
-  return cambios
-    .map((c) => {
-      const anterior = Number(c.valor_anterior) || 0;
-      const nuevo = Number(c.valor_nuevo) || 0;
-      return {
-        productoId: c.producto_id,
-        nombre: nombrePorId.get(c.producto_id) ?? c.producto_id,
-        precioAnterior: anterior,
-        precioNuevo: nuevo,
-        variacionPct: anterior > 0 ? ((nuevo - anterior) / anterior) * 100 : 0,
-        usuarioNombre: c.usuario_nombre ?? undefined,
-        fecha: new Date(c.fecha),
-      };
-    })
-    .filter((c) => c.variacionPct > 0)
-    .sort((a, b) => b.variacionPct - a.variacionPct)
-    .slice(0, limit);
+  const { aumentos } = await consultar<{ aumentos: (Omit<AumentoPrecio, "fecha"> & { fecha: string })[] }>(
+    "/api/consultas/productos", "mayoresAumentos", { dias, limit },
+  );
+  return aumentos.map((a) => ({ ...a, fecha: new Date(a.fecha) }));
 }
 
 export async function getFavoritos(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("disabled", false)
-    .eq("favorito", true)
-    .order("name", { ascending: true })
-    .limit(60);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  const { productos } = await consultar<{ productos: Record<string, any>[] }>("/api/consultas/productos", "favoritos");
+  return productos.map(mapRow);
 }
 
 export async function getVencimientosProximos(dias = 7): Promise<Product[]> {
-  const limite = new Date();
-  limite.setDate(limite.getDate() + dias);
-  const { data, error } = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("disabled", false)
-    .not("fecha_vencimiento", "is", null)
-    .lte("fecha_vencimiento", limite.toISOString().slice(0, 10))
-    .order("fecha_vencimiento", { ascending: true })
-    .limit(100);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapRow);
+  const { productos } = await consultar<{ productos: Record<string, any>[] }>(
+    "/api/consultas/productos", "vencimientos", { dias },
+  );
+  return productos.map(mapRow);
 }
 
 export interface SetOfertaInput {
@@ -346,27 +215,8 @@ export async function setOferta(productId: string, oferta: SetOfertaInput): Prom
 export async function findProductByCode(code: string): Promise<Product | null> {
   const c = code.trim();
   if (!c) return null;
-  const comercioId = getComercioId();
-
-  const byBarcode = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", comercioId)
-    .eq("codigo_barras", c)
-    .eq("disabled", false)
-    .limit(1)
-    .maybeSingle();
-  if (byBarcode.data) return mapRow(byBarcode.data);
-
-  const byCodigo = await supabase
-    .from("productos")
-    .select("*")
-    .eq("comercio_id", comercioId)
-    .eq("codigo", c)
-    .eq("disabled", false)
-    .limit(1)
-    .maybeSingle();
-  if (byCodigo.data) return mapRow(byCodigo.data);
-
-  return null;
+  const { producto } = await consultar<{ producto: Record<string, any> | null }>(
+    "/api/consultas/productos", "porCodigo", { code: c },
+  );
+  return producto ? mapRow(producto) : null;
 }

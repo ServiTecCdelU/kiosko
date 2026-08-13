@@ -1,5 +1,5 @@
 // services/clientes-service.ts — clientes y cuenta corriente (client, anon)
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { Cliente, CuentaMov } from "@/lib/types";
 
@@ -39,38 +39,25 @@ function sanitize(q: string): string {
 }
 
 export async function listClientes(search = "", limit = 200): Promise<Cliente[]> {
-  let q = supabase.from("clientes").select("*").eq("comercio_id", getComercioId()).eq("activo", true);
-  const s = sanitize(search);
-  if (s) q = q.or(`nombre.ilike.%${s}%,telefono.ilike.%${s}%,documento.ilike.%${s}%`);
-  const { data, error } = await q.order("nombre", { ascending: true }).limit(limit);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapCliente);
+  const { clientes } = await consultar<{ clientes: Record<string, any>[] }>(
+    "/api/consultas/caja", "listarClientes", { search, limit },
+  );
+  return clientes.map(mapCliente);
 }
 
 /** Busqueda acotada para el selector del POS. */
 export async function searchClientes(query: string, limit = 8): Promise<Cliente[]> {
-  const s = sanitize(query);
-  if (!s) return [];
-  const { data, error } = await supabase
-    .from("clientes")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("activo", true)
-    .or(`nombre.ilike.%${s}%,telefono.ilike.%${s}%,documento.ilike.%${s}%`)
-    .order("nombre", { ascending: true })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapCliente);
+  const { clientes } = await consultar<{ clientes: Record<string, any>[] }>(
+    "/api/consultas/caja", "buscarClientes", { search: query, limit },
+  );
+  return clientes.map(mapCliente);
 }
 
 export async function getCliente(id: string): Promise<Cliente | null> {
-  const { data } = await supabase
-    .from("clientes")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("id", id)
-    .maybeSingle();
-  return data ? mapCliente(data) : null;
+  const { cliente } = await consultar<{ cliente: Record<string, any> | null }>(
+    "/api/consultas/caja", "cliente", { id },
+  );
+  return cliente ? mapCliente(cliente) : null;
 }
 
 export interface CrearClienteInput {
@@ -95,15 +82,10 @@ export async function crearCliente(input: CrearClienteInput): Promise<Cliente> {
 }
 
 export async function getMovimientos(clienteId: string, limit = 50): Promise<CuentaMov[]> {
-  const { data, error } = await supabase
-    .from("cuenta_corriente_mov")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("cliente_id", clienteId)
-    .order("fecha", { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapMov);
+  const { movimientos } = await consultar<{ movimientos: Record<string, any>[] }>(
+    "/api/consultas/caja", "movimientosCliente", { clienteId, limit },
+  );
+  return movimientos.map(mapMov);
 }
 
 export interface PagoResult {
