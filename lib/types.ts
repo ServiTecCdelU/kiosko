@@ -44,6 +44,10 @@ export interface SaleItem {
   subtotal: number;
 }
 
+// "tarjeta" ya no se ofrece en el POS: era para cobrar con un posnet de banco
+// sin integracion (el cajero cobraba aparte y lo marcaba a mano). Con el lector
+// Point andando se saco, porque elegirlo por error registraba la venta sin
+// cobrar nada. Se mantiene el valor para que las ventas viejas sigan leyendose.
 export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado" | "mercadopago" | "tarjeta" | "mercadopago_point";
 export type VentaEstado = "completada" | "anulada";
 
