@@ -133,23 +133,35 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
               ) : (
                 <ul className="space-y-1">
                   {movs.map((m) => {
+                    // El sentido se deduce del saldo, no del tipo: una anulacion
+                    // es 'ajuste' pero reduce la deuda igual que un pago. Ademas
+                    // hay movimientos viejos guardados con monto negativo, asi
+                    // que se muestra siempre el valor absoluto.
+                    const bajaDeuda =
+                      m.saldoAnterior != null && m.saldoNuevo != null
+                        ? m.saldoNuevo < m.saldoAnterior
+                        : m.tipo === "pago" || m.monto < 0;
                     const esPago = m.tipo === "pago";
+                    const importe = Math.abs(m.monto);
                     return (
                       <li key={m.id} className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2">
                         <div className="flex items-center gap-2">
                           <span className={cn(
                             "flex h-7 w-7 items-center justify-center rounded-lg",
-                            esPago ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
+                            bajaDeuda ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
                           )}>
                             {esPago ? <Banknote className="h-4 w-4" /> : m.ventaId ? <ShoppingCart className="h-4 w-4" /> : <NotebookPen className="h-4 w-4" />}
                           </span>
                           <div>
                             <p className="text-sm font-medium">{TIPO_LABEL[m.tipo]}</p>
+                            {m.referencia && (
+                              <p className="text-xs text-muted-foreground">{m.referencia}</p>
+                            )}
                             <p className="text-xs text-muted-foreground">{formatDateTime(m.fecha)}</p>
                           </div>
                         </div>
-                        <span className={cn("cifra text-sm font-semibold", esPago ? "text-success" : "text-warning")}>
-                          {esPago ? "-" : "+"}{formatCurrency(m.monto)}
+                        <span className={cn("cifra text-sm font-semibold", bajaDeuda ? "text-success" : "text-warning")}>
+                          {bajaDeuda ? "-" : "+"}{formatCurrency(importe)}
                         </span>
                       </li>
                     );

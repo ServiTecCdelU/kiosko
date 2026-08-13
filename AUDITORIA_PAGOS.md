@@ -97,9 +97,9 @@ cancela, el diálogo queda girando indefinidamente y bloquea la caja.
 
 ---
 
-## 🟡 Medios
+## 🟡 Medios — CORREGIDOS (el 6 y el 8 requieren correr `supabase/19_signo_ajuste_cuenta.sql`)
 
-### 6. Las anulaciones de fiado se muestran mal en la ficha del cliente
+### 6. ✅ Las anulaciones de fiado se muestran mal en la ficha del cliente
 
 `anular_venta_kiosko` (`09_anulacion_caja_mov.sql`) inserta el movimiento de
 reversa con `monto = -total` y `tipo = 'ajuste'`, pero la convención documentada
@@ -113,13 +113,13 @@ cargo, como si fuera deuda nueva en vez de una reversa.
 **Corrección**: unificar el criterio — guardar el monto positivo y que el tipo
 mande, o contemplar el signo al renderizar.
 
-### 7. Los botones de Mercado Pago quedan habilitados sin conexión
+### 7. ✅ Los botones de Mercado Pago quedan habilitados sin conexión
 
 Ambos métodos necesitan internet, pero se pueden elegir estando offline: recién
 falla al confirmar, con un toast. Convendría deshabilitarlos cuando
 `isOnline === false`, como ya se hace conceptualmente con el fiado.
 
-### 8. En caja y reportes, Mercado Pago se mezcla con "transferencia"
+### 8. ✅ En caja y reportes, Mercado Pago se mezcla con "transferencia"
 
 `caja-service.ts:118` y `reportes-service.ts:91` agrupan `transferencia`,
 `mercadopago`, `mercadopago_point` y `tarjeta` en un solo total. Para el arqueo

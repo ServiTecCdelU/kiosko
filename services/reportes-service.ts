@@ -7,6 +7,8 @@ export interface ResumenReporte {
   cantidad: number;
   efectivo: number;
   transferencia: number;
+  /** Cobros por Mercado Pago (QR y Point), aparte de la transferencia bancaria. */
+  mercadoPago: number;
   fiado: number;
   ticketPromedio: number;
   costoTotal: number;
@@ -77,6 +79,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
   const ventas = data ?? [];
   let efectivo = 0;
   let transferencia = 0;
+  let mercadoPago = 0;
   let fiado = 0;
   const dias = new Map<string, number>();
   const productos = new Map<string, ProductoAcum>();
@@ -85,10 +88,14 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
     const total = Number(v.total) || 0;
     if (v.payment_method === "fiado") {
       fiado += total;
+    } else if (v.payment_method === "mercadopago" || v.payment_method === "mercadopago_point") {
+      // La plata de Mercado Pago no es efectivo del cajon ni una transferencia
+      // bancaria: queda en la cuenta de MP, asi que se reporta aparte.
+      mercadoPago += total;
     } else {
       // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
       const tr =
-        ["transferencia", "mercadopago", "mercadopago_point", "tarjeta"].includes(v.payment_method)
+        ["transferencia", "tarjeta"].includes(v.payment_method)
           ? total
           : v.payment_method === "mixto"
             ? Math.min(total, Number(v.transfer_amount) || 0)
@@ -148,7 +155,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
     rubros.set(rubro, r);
   }
 
-  const totalVentas = efectivo + transferencia + fiado;
+  const totalVentas = efectivo + transferencia + mercadoPago + fiado;
   const cantidad = ventas.length;
   const margenBruto = totalVentas - costoTotal;
 
@@ -167,6 +174,7 @@ export async function getReporte(desde: Date, hasta: Date, topN = 10): Promise<R
       cantidad,
       efectivo,
       transferencia,
+      mercadoPago,
       fiado,
       ticketPromedio: cantidad > 0 ? totalVentas / cantidad : 0,
       costoTotal,

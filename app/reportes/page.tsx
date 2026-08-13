@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank, ArrowUpRight } from "lucide-react";
+import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank, ArrowUpRight, QrCode } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,6 +99,7 @@ export default function ReportesPage() {
             <Kpi label="Ventas" value={String(r?.cantidad ?? 0)} icon={<Receipt className="h-4 w-4" />} />
             <Kpi label="Efectivo" value={formatCurrency(r?.efectivo ?? 0)} icon={<Banknote className="h-4 w-4" />} />
             <Kpi label="Transferencia" value={formatCurrency(r?.transferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
+            <Kpi label="Mercado Pago" value={formatCurrency(r?.mercadoPago ?? 0)} icon={<QrCode className="h-4 w-4" />} />
             <Kpi label="Fiado" value={formatCurrency(r?.fiado ?? 0)} icon={<Coins className="h-4 w-4" />} />
             <Kpi
               label="Margen bruto"

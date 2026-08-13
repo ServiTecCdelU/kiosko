@@ -12,6 +12,7 @@ function mapCaja(d: Record<string, any>): Caja {
     montoCierre: d.monto_cierre != null ? Number(d.monto_cierre) : undefined,
     totalEfectivo: Number(d.total_efectivo) || 0,
     totalTransferencia: Number(d.total_transferencia) || 0,
+    totalMercadoPago: Number(d.total_mercadopago) || 0,
     totalVentas: Number(d.total_ventas) || 0,
     cantidadVentas: Number(d.cantidad_ventas) || 0,
     totalRetiros: Number(d.total_retiros) || 0,
@@ -42,6 +43,8 @@ function mapCajaMov(d: Record<string, any>): CajaMovimiento {
 export interface ResumenCaja {
   totalEfectivo: number;
   totalTransferencia: number;
+  /** Cobros por Mercado Pago (QR y Point), separados de la transferencia bancaria. */
+  totalMercadoPago: number;
   totalVentas: number;
   cantidadVentas: number;
   totalRetiros: number;
@@ -109,13 +112,22 @@ export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
 
   let efectivo = 0;
   let transferencia = 0;
+  let mercadoPago = 0;
   for (const v of ventas ?? []) {
     // El fiado no mueve la caja: no es efectivo ni transferencia al momento de la venta.
     if (v.payment_method === "fiado") continue;
     const t = Number(v.total) || 0;
+
+    // Mercado Pago se contabiliza aparte: no es efectivo del cajon ni una
+    // transferencia bancaria, la plata queda en la cuenta de MP.
+    if (v.payment_method === "mercadopago" || v.payment_method === "mercadopago_point") {
+      mercadoPago += t;
+      continue;
+    }
+
     // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
     const tr =
-      ["transferencia", "mercadopago", "mercadopago_point", "tarjeta"].includes(v.payment_method)
+      ["transferencia", "tarjeta"].includes(v.payment_method)
         ? t
         : v.payment_method === "mixto"
           ? Math.min(t, Number(v.transfer_amount) || 0)
@@ -137,7 +149,8 @@ export async function getResumenCaja(cajaId: string): Promise<ResumenCaja> {
   return {
     totalEfectivo: efectivo,
     totalTransferencia: transferencia,
-    totalVentas: efectivo + transferencia,
+    totalMercadoPago: mercadoPago,
+    totalVentas: efectivo + transferencia + mercadoPago,
     cantidadVentas: (ventas ?? []).length,
     totalRetiros,
     totalAportes,
@@ -218,6 +231,7 @@ export async function cerrarCaja(
       monto_cierre: montoCierreContado,
       total_efectivo: resumen.totalEfectivo,
       total_transferencia: resumen.totalTransferencia,
+      total_mercadopago: resumen.totalMercadoPago,
       total_ventas: resumen.totalVentas,
       cantidad_ventas: resumen.cantidadVentas,
       total_retiros: resumen.totalRetiros,

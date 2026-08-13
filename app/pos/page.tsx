@@ -573,6 +573,7 @@ function PosScreen() {
             onConfirm={handleConfirm}
             onSuspend={handleSuspender}
             processing={processing}
+            isOnline={isOnline}
           />
         </div>
       </div>

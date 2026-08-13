@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Wallet, LockOpen, Lock, TrendingUp, Banknote, CreditCard,
-  ArrowDownCircle, ArrowUpCircle, Receipt, Ban,
+  ArrowDownCircle, ArrowUpCircle, Receipt, Ban, QrCode,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -177,10 +177,11 @@ export default function CajaPage() {
             <span className="text-sm text-muted-foreground">desde {formatDateTime(caja.openedAt)}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <StatCard label="Apertura" value={formatCurrency(caja.montoApertura)} icon={<Wallet className="h-4 w-4" />} />
             <StatCard label="Ventas efectivo" value={formatCurrency(resumen?.totalEfectivo ?? 0)} icon={<Banknote className="h-4 w-4" />} />
             <StatCard label="Ventas transfer." value={formatCurrency(resumen?.totalTransferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
+            <StatCard label="Mercado Pago" value={formatCurrency(resumen?.totalMercadoPago ?? 0)} icon={<QrCode className="h-4 w-4" />} />
             <StatCard label="Total vendido" value={formatCurrency(resumen?.totalVentas ?? 0)} icon={<TrendingUp className="h-4 w-4" />} highlight />
           </div>
 
@@ -406,6 +407,7 @@ function Historial({ historial }: { historial: Caja[] }) {
                 <TableHead className="text-right">Apertura</TableHead>
                 <TableHead className="text-right">Efectivo</TableHead>
                 <TableHead className="text-right">Transfer.</TableHead>
+                <TableHead className="text-right">Mercado Pago</TableHead>
                 <TableHead className="text-right">Diferencia</TableHead>
               </TableRow>
             </TableHeader>
@@ -416,6 +418,7 @@ function Historial({ historial }: { historial: Caja[] }) {
                   <TableCell className="cifra text-right">{formatCurrency(c.montoApertura)}</TableCell>
                   <TableCell className="cifra text-right">{formatCurrency(c.totalEfectivo)}</TableCell>
                   <TableCell className="cifra text-right">{formatCurrency(c.totalTransferencia)}</TableCell>
+                  <TableCell className="cifra text-right">{formatCurrency(c.totalMercadoPago)}</TableCell>
                   <TableCell className={cn("cifra text-right font-medium", (c.diferencia ?? 0) < 0 ? "text-destructive" : (c.diferencia ?? 0) > 0 ? "text-warning" : "")}>
                     {formatCurrency(c.diferencia ?? 0)}
                   </TableCell>

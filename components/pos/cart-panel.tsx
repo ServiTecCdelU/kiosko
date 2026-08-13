@@ -37,10 +37,12 @@ interface CartPanelProps {
   onConfirm: (data: ConfirmData) => void;
   onSuspend?: () => void;
   processing: boolean;
+  /** Los metodos de Mercado Pago necesitan conexion: se deshabilitan sin ella. */
+  isOnline?: boolean;
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
-  { items, total, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing },
+  { items, total, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true },
   ref,
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
@@ -194,8 +196,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
           <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
           <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
-          <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP QR" />
-          <MethodButton active={method === "mercadopago_point"} onClick={() => setMethod("mercadopago_point")} icon={<Radio className="h-4 w-4" />} label="MP Point" />
+          <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP QR" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
+          <MethodButton active={method === "mercadopago_point"} onClick={() => setMethod("mercadopago_point")} icon={<Radio className="h-4 w-4" />} label="MP Point" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
           <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
         </div>
 
@@ -294,19 +296,24 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 });
 
 function MethodButton({
-  active, onClick, icon, label,
+  active, onClick, icon, label, disabled, title,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
+      title={title}
       className={cn(
         "flex flex-col items-center justify-center gap-1 rounded-xl border py-2 text-xs font-medium transition-colors",
         active ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
+        disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
       )}
     >
       {icon}
