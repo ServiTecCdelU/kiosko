@@ -1,7 +1,7 @@
 // app/api/mercadopago/point/cobrar/route.ts — envia el cobro al lector fisico Point
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { crearIntentoPagoPoint } from "@/lib/server/mercadopago";
+import { crearIntentoPagoPoint, cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,8 +29,9 @@ export async function POST(req: Request) {
 
   const externalReference = crypto.randomUUID();
 
+  let intento: { id: string } | null = null;
   try {
-    const intento = await crearIntentoPagoPoint(deviceId, total, externalReference);
+    intento = await crearIntentoPagoPoint(deviceId, total, externalReference);
 
     const { error } = await supabaseAdmin.from("pagos_mp_pendientes").insert({
       id: crypto.randomUUID(),
@@ -45,6 +46,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ externalReference, intentId: intento.id });
   } catch (e) {
+    // Si el cobro ya salio al lector pero no lo pudimos registrar, hay que
+    // cancelarlo: si queda encolado, el lector rechaza todos los cobros
+    // siguientes con un 409 ("ya hay un intento en curso").
+    if (intento) {
+      await cancelarIntentoPagoPoint(deviceId, intento.id).catch(() => {});
+    }
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo enviar el cobro al lector" }, { status: 400 });
   }
 }
