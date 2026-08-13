@@ -75,9 +75,9 @@ lista real de métodos, y confirmar qué constraint tiene hoy la base productiva
 
 ---
 
-## 🟠 Altos
+## 🟠 Altos — CORREGIDOS
 
-### 4. Anular una venta de Mercado Pago no devuelve la plata
+### 4. ✅ Anular una venta de Mercado Pago no devuelve la plata
 
 `anular_venta_kiosko` devuelve el stock y revierte el fiado, pero no toca el
 pago de Mercado Pago: la plata sigue en la cuenta. Tampoco se cancela ni marca
@@ -87,7 +87,7 @@ el registro de `pagos_mp_pendientes` asociado.
 `mercadopago` o `mercadopago_point`, que la devolución hay que hacerla a mano
 desde la app de Mercado Pago.
 
-### 5. Los diálogos de MP QR y MP Point esperan para siempre
+### 5. ✅ Los diálogos de MP QR y MP Point esperan para siempre
 
 `mercadopago-point-dialog.tsx` y `mercadopago-qr-dialog.tsx` consultan el estado
 cada 2 segundos sin límite de tiempo. Si el cliente se arrepiente y nadie

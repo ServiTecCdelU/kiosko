@@ -27,6 +27,11 @@ export function AnularVentaDialog({ venta, onOpenChange, onSubmit }: AnularVenta
 
   if (!venta) return null;
 
+  // Anular devuelve el stock y revierte el fiado, pero NO devuelve la plata de
+  // Mercado Pago: esa devolucion se hace a mano desde la app de MP.
+  const esMercadoPago =
+    venta.paymentMethod === "mercadopago" || venta.paymentMethod === "mercadopago_point";
+
   const handle = async () => {
     setWorking(true);
     try {
@@ -50,6 +55,23 @@ export function AnularVentaDialog({ venta, onOpenChange, onSubmit }: AnularVenta
             Venta {venta.saleNumber ?? venta.id} por <strong className="text-foreground">{formatCurrency(venta.total)}</strong>.
             El stock se devuelve automáticamente.
           </p>
+
+          {esMercadoPago && (
+            <div className="rounded-xl bg-warning/15 px-3 py-2 text-sm text-warning-foreground">
+              <p className="font-semibold">Esta venta se cobró por Mercado Pago</p>
+              <p className="mt-0.5">
+                Anular acá no le devuelve la plata al cliente. La devolución hay que hacerla
+                a mano desde la app de Mercado Pago (Actividad → el pago → Devolver).
+              </p>
+            </div>
+          )}
+
+          {venta.paymentMethod === "fiado" && (
+            <div className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Se le va a descontar {formatCurrency(venta.total)} de la deuda al cliente.
+            </div>
+          )}
+
           <div>
             <Label className="mb-1 block text-xs">Motivo (opcional)</Label>
             <Input

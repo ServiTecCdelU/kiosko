@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils/format";
 import { consultarEstadoPago, cancelarCobroPoint, ErrorCancelacionPoint, type CobroPoint, type EstadoPagoQR } from "@/services/mercadopago-service";
 
+/** Cuanto espera el dialogo antes de darse por vencido. */
+const ESPERA_MAX_MS = 4 * 60 * 1000;
+
 interface MercadoPagoPointDialogProps {
   cobro: CobroPoint | null;
   total: number;
@@ -21,14 +24,28 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
   const [cancelando, setCancelando] = useState(false);
   const [avisoCancelacion, setAvisoCancelacion] = useState<string | null>(null);
   const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
+  const [expirado, setExpirado] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!cobro) return;
     setEstado("pendiente");
     setAvisoCancelacion(null);
+    setExpirado(false);
+    const vence = Date.now() + ESPERA_MAX_MS;
 
     intervalRef.current = setInterval(async () => {
+      // Sin limite de tiempo el dialogo queda girando para siempre y traba la
+      // caja si el cliente se arrepiente y nadie cancela.
+      if (Date.now() > vence) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setExpirado(true);
+        // Best effort: si el cobro todavia no llego a la pantalla del lector,
+        // esto lo libera. Si ya esta en pantalla, MP lo rechaza y hay que
+        // cancelarlo desde el lector.
+        cancelarCobroPoint(cobro.externalReference).catch(() => {});
+        return;
+      }
       try {
         const res = await consultarEstadoPago(cobro.externalReference);
         setEstado(res.estado);
@@ -73,7 +90,7 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
   };
 
   return (
-    <Dialog open={!!cobro} onOpenChange={(o) => !o && estado !== "pendiente" && onOpenChange(o)}>
+    <Dialog open={!!cobro} onOpenChange={(o) => !o && (estado !== "pendiente" || expirado) && onOpenChange(o)}>
       <DialogContent className="rounded-2xl sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Cobrando en el lector</DialogTitle>
@@ -81,7 +98,7 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
         <div className="flex flex-col items-center gap-3 py-4">
           <p className="cifra text-2xl font-bold text-money">{formatCurrency(total)}</p>
 
-          {estado === "pendiente" && (
+          {estado === "pendiente" && !expirado && (
             <>
               <CreditCard className="h-16 w-16 animate-pulse-soft text-primary" />
               <p className="text-center text-sm text-muted-foreground">
@@ -111,6 +128,19 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
             </div>
           )}
 
+          {expirado && estado === "pendiente" && (
+            <div className="space-y-1 text-center">
+              <p className="flex items-center justify-center gap-2 text-lg font-semibold text-warning">
+                <AlertTriangle className="h-6 w-6" /> Se agotó la espera
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Pasaron 4 minutos sin que se complete el pago. Si el cobro sigue en la pantalla
+                del lector, cancelalo con la tecla roja. Si el cliente igual termina pagando,
+                la venta se registra sola.
+              </p>
+            </div>
+          )}
+
           {avisoCancelacion && (
             <p className="rounded-xl bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
               {avisoCancelacion}
@@ -118,7 +148,7 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
           )}
         </div>
         <DialogFooter>
-          {estado === "pendiente" ? (
+          {estado === "pendiente" && !expirado ? (
             <Button variant="outline" className="rounded-xl" disabled={cancelando} onClick={handleCancelar}>
               {cancelando ? "Cancelando..." : "Cancelar cobro"}
             </Button>

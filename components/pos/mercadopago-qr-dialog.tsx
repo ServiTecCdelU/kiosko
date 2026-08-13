@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils/format";
 import { consultarEstadoPago, type CobroQR, type EstadoPagoQR } from "@/services/mercadopago-service";
 
+/** Cuanto espera el dialogo antes de darse por vencido. */
+const ESPERA_MAX_MS = 5 * 60 * 1000;
+
 interface MercadoPagoQrDialogProps {
   cobro: CobroQR | null;
   total: number;
@@ -19,14 +22,23 @@ interface MercadoPagoQrDialogProps {
 export function MercadoPagoQrDialog({ cobro, total, onOpenChange, onAprobado }: MercadoPagoQrDialogProps) {
   const [estado, setEstado] = useState<EstadoPagoQR>("pendiente");
   const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
+  const [expirado, setExpirado] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!cobro) return;
     setEstado("pendiente");
     setErrorMotivo(null);
+    setExpirado(false);
+    const vence = Date.now() + ESPERA_MAX_MS;
 
     intervalRef.current = setInterval(async () => {
+      // Sin limite de tiempo el dialogo queda girando para siempre y traba la caja.
+      if (Date.now() > vence) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setExpirado(true);
+        return;
+      }
       try {
         const res = await consultarEstadoPago(cobro.externalReference);
         setEstado(res.estado);
@@ -58,7 +70,7 @@ export function MercadoPagoQrDialog({ cobro, total, onOpenChange, onAprobado }: 
         <div className="flex flex-col items-center gap-3 py-2">
           <p className="cifra text-2xl font-bold text-money">{formatCurrency(total)}</p>
 
-          {estado === "pendiente" && (
+          {estado === "pendiente" && !expirado && (
             <>
               <img src={cobro.qrDataUrl} alt="QR de pago" className="h-64 w-64 rounded-xl border" />
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -76,6 +88,18 @@ export function MercadoPagoQrDialog({ cobro, total, onOpenChange, onAprobado }: 
               <XCircle className="h-6 w-6" /> Pago {estado === "rechazado" ? "rechazado" : "cancelado"}
             </p>
           )}
+          {expirado && estado === "pendiente" && (
+            <div className="space-y-1 text-center">
+              <p className="flex items-center justify-center gap-2 text-lg font-semibold text-warning">
+                <AlertTriangle className="h-6 w-6" /> Se agotó la espera
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Pasaron 5 minutos sin que se complete el pago. Podés cerrar y cobrar de otra forma.
+                Si el cliente igual termina pagando el QR, la venta se registra sola.
+              </p>
+            </div>
+          )}
+
           {estado === "error" && (
             <div className="space-y-1 text-center">
               <p className="flex items-center justify-center gap-2 text-lg font-semibold text-destructive">
@@ -90,7 +114,7 @@ export function MercadoPagoQrDialog({ cobro, total, onOpenChange, onAprobado }: 
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
-            {estado === "pendiente" ? "Cancelar" : "Cerrar"}
+            {estado === "pendiente" && !expirado ? "Cancelar" : "Cerrar"}
           </Button>
         </DialogFooter>
       </DialogContent>
