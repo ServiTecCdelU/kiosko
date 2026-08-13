@@ -104,6 +104,30 @@ export async function listarDispositivosMP(): Promise<DispositivoMP[]> {
   }));
 }
 
+/**
+ * Pone el lector en modo PDV (integrado con la API). Es obligatorio: en modo
+ * STANDALONE el lector rechaza los cobros enviados por API.
+ * OJO: hay que reiniciar el lector para que el cambio tome efecto.
+ */
+export async function cambiarModoOperacionMP(
+  deviceId: string,
+  modo: "PDV" | "STANDALONE" = "PDV",
+): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`${MP_API}/point/integration-api/devices/${deviceId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ operating_mode: modo }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message ?? "No se pudo cambiar el modo de operacion del lector");
+  }
+}
+
 export interface IntentoPagoPoint {
   id: string;
 }
