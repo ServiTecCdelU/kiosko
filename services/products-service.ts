@@ -168,27 +168,15 @@ export interface UpdateProductInput {
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
-  const { error } = await supabase
-    .from("productos")
-    .update({
-      codigo: input.codigo || null,
-      codigo_barras: input.codigoBarras || null,
-      name: input.name,
-      category: input.category,
-      price: input.price,
-      precio_base: input.costo ?? null,
-      stock_minimo: input.stockMinimo,
-      lote: input.lote ?? null,
-      disabled: input.disabled,
-      revisar: input.revisar,
-      favorito: input.favorito,
-      fecha_vencimiento: input.fechaVencimiento || null,
-      unidad: input.unidad,
-      stock_controlado: input.stockControlado,
-    })
-    .eq("comercio_id", getComercioId())
-    .eq("id", productId);
-  if (error) throw new Error(error.message);
+  const res = await fetch("/api/productos", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productId, input, comercioId: getComercioId() }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? "No se pudo actualizar el producto");
+  }
 }
 
 export interface CambioPrecio {
@@ -207,16 +195,18 @@ export async function logCambioPrecio(
   valorNuevo: number,
   usuarioNombre?: string,
 ): Promise<void> {
-  const { error } = await supabase.from("producto_auditoria").insert({
-    id: crypto.randomUUID(),
-    comercio_id: getComercioId(),
-    producto_id: productId,
-    campo,
-    valor_anterior: String(valorAnterior),
-    valor_nuevo: String(valorNuevo),
-    usuario_nombre: usuarioNombre ?? null,
+  const res = await fetch("/api/productos/auditoria", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      productId, campo, valorAnterior, valorNuevo, usuarioNombre,
+      comercioId: getComercioId(),
+    }),
   });
-  if (error) throw new Error(error.message);
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? "No se pudo registrar el cambio de precio");
+  }
 }
 
 export async function getHistorialPrecio(productId: string, limit = 10): Promise<CambioPrecio[]> {
@@ -342,20 +332,17 @@ export interface SetOfertaInput {
 
 /** Marca/actualiza la oferta de catálogo de un producto (descuento propio, incluye combos). */
 export async function setOferta(productId: string, oferta: SetOfertaInput): Promise<void> {
-  const { error } = await supabase
-    .from("productos")
-    .update({
-      oferta_activa: oferta.activa,
-      oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
-      oferta_valor: oferta.activa ? oferta.valor ?? 0 : 0,
-      oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? oferta.cantidad ?? null : null,
-    })
-    .eq("comercio_id", getComercioId())
-    .eq("id", productId);
-  if (error) throw new Error(error.message);
+  const res = await fetch("/api/productos", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productId, oferta, comercioId: getComercioId() }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? "No se pudo actualizar la oferta");
+  }
 }
 
-// Lookup exacto para el lector de codigo de barras: prueba codigo_barras y luego codigo
 export async function findProductByCode(code: string): Promise<Product | null> {
   const c = code.trim();
   if (!c) return null;

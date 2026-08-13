@@ -2,7 +2,6 @@
 import { supabase } from "@/lib/supabase";
 import { getComercioId } from "@/hooks/use-auth";
 import type { Caja, CajaMovimiento, CajaMovTipo } from "@/lib/types";
-import { generateReadableId } from "@/services/supabase-helpers";
 
 function mapCaja(d: Record<string, any>): Caja {
   return {
@@ -190,63 +189,34 @@ export async function abrirCaja(
   usuarioId?: string,
   usuarioNombre?: string,
 ): Promise<Caja> {
-  const yaAbierta = await getCajaAbierta();
-  if (yaAbierta) throw new Error("Ya hay una caja abierta");
-
-  const id = await generateReadableId("caja", "caja", new Date().toISOString().slice(0, 10));
-  const { data, error } = await supabase
-    .from("caja")
-    .insert({
-      id,
-      comercio_id: getComercioId(),
-      estado: "abierta",
-      monto_apertura: montoApertura,
-      abierta_por: usuarioId ?? null,
-      abierta_por_nombre: usuarioNombre ?? null,
-      opened_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const res = await fetch("/api/caja", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ montoApertura, usuarioId, usuarioNombre, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo abrir la caja");
   return mapCaja(data);
 }
 
+/**
+ * Cierra la caja. El arqueo (totales y diferencia) lo recalcula el servidor a
+ * partir de la base: aca solo se manda lo que el cajero contó.
+ */
 export async function cerrarCaja(
   cajaId: string,
-  montoApertura: number,
+  _montoApertura: number,
   montoCierreContado: number,
   usuarioId?: string,
   notas?: string,
 ): Promise<Caja> {
-  const resumen = await getResumenCaja(cajaId);
-  // Arqueo real: lo que abrió + lo vendido en efectivo + aportes − retiros − gastos.
-  const esperadoEfectivo =
-    montoApertura + resumen.totalEfectivo + resumen.totalAportes - resumen.totalRetiros - resumen.totalGastos;
-  const diferencia = montoCierreContado - esperadoEfectivo;
-
-  const { data, error } = await supabase
-    .from("caja")
-    .update({
-      estado: "cerrada",
-      monto_cierre: montoCierreContado,
-      total_efectivo: resumen.totalEfectivo,
-      total_transferencia: resumen.totalTransferencia,
-      total_mercadopago: resumen.totalMercadoPago,
-      total_ventas: resumen.totalVentas,
-      cantidad_ventas: resumen.cantidadVentas,
-      total_retiros: resumen.totalRetiros,
-      total_aportes: resumen.totalAportes,
-      total_gastos: resumen.totalGastos,
-      diferencia,
-      cerrada_por: usuarioId ?? null,
-      notas: notas ?? null,
-      closed_at: new Date().toISOString(),
-    })
-    .eq("comercio_id", getComercioId())
-    .eq("id", cajaId)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const res = await fetch("/api/caja", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cajaId, montoCierreContado, usuarioId, notas, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo cerrar la caja");
   return mapCaja(data);
 }
 

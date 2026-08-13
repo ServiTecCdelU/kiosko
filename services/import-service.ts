@@ -1,6 +1,5 @@
 // services/import-service.ts — importación masiva de productos desde lista de precios (Excel)
 import * as XLSX from "xlsx-js-style";
-import { supabase } from "@/lib/supabase";
 import { getComercioId } from "@/hooks/use-auth";
 import { mapRow } from "@/services/products-service";
 import type { Product } from "@/lib/types";
@@ -245,107 +244,29 @@ export async function importProducts(
     return true;
   });
 
-  const BATCH_SIZE = 25;
-  for (let i = 0; i < usable.length; i += BATCH_SIZE) {
-    const batch = usable.slice(i, i + BATCH_SIZE);
-    await Promise.all(batch.map((row) => importRow(row, comercioId, options, summary)));
-    onProgress?.(Math.min(i + BATCH_SIZE, usable.length), usable.length);
+  // Las escrituras ocurren en el servidor. Se manda por lotes para no pasarse
+  // del limite de tamaño de request ni del tiempo maximo de la funcion.
+  const TAMANIO_LOTE = 200;
+  for (let i = 0; i < usable.length; i += TAMANIO_LOTE) {
+    const lote = usable.slice(i, i + TAMANIO_LOTE);
+    const res = await fetch("/api/productos/importar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filas: lote,
+        estrategia: options.stockStrategy,
+        comercioId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error ?? "No se pudo importar");
+
+    summary.creados += data.creados ?? 0;
+    summary.actualizados += data.actualizados ?? 0;
+    summary.conAdvertencias += data.conAdvertencias ?? 0;
+
+    onProgress?.(Math.min(i + TAMANIO_LOTE, usable.length), usable.length);
   }
 
   return summary;
-}
-
-async function importRow(
-  row: ParsedRow,
-  comercioId: string,
-  options: ImportOptions,
-  summary: ImportSummary,
-): Promise<void> {
-  const revisar = row.warnings.length > 0;
-  if (revisar) summary.conAdvertencias++;
-
-  let existing: Product | null = null;
-  if (row.barra) {
-    const { data } = await supabase
-      .from("productos")
-      .select("*")
-      .eq("comercio_id", comercioId)
-      .eq("codigo_barras", row.barra)
-      .limit(1)
-      .maybeSingle();
-    if (data) existing = mapRow(data);
-  }
-  if (!existing && row.codigo) {
-    const { data } = await supabase
-      .from("productos")
-      .select("*")
-      .eq("comercio_id", comercioId)
-      .eq("codigo", row.codigo)
-      .limit(1)
-      .maybeSingle();
-    if (data) existing = mapRow(data);
-  }
-
-  const category = toCategory(row.rubro, row.subrubro);
-
-  if (existing) {
-    if (options.stockStrategy === "solo_nuevos") return;
-
-    const stock =
-      options.stockStrategy === "reemplazar"
-        ? row.stock
-        : options.stockStrategy === "sumar"
-          ? existing.stock + row.stock
-          : existing.stock;
-
-    const nuevoPrecio = row.precio || existing.price;
-    const { error } = await supabase
-      .from("productos")
-      .update({
-        name: row.descripcion || existing.name,
-        price: nuevoPrecio,
-        precio_base: row.costo ?? existing.precioBase ?? null,
-        category: category || existing.category,
-        codigo: row.codigo || existing.codigo,
-        codigo_barras: row.barra || existing.codigoBarras,
-        stock,
-        lote: row.lote ?? existing.lote ?? null,
-        revisar,
-      })
-      .eq("comercio_id", comercioId)
-      .eq("id", existing.id);
-    if (error) throw new Error(error.message);
-    if (nuevoPrecio !== existing.price) {
-      await supabase.from("producto_auditoria").insert({
-        id: crypto.randomUUID(),
-        comercio_id: comercioId,
-        producto_id: existing.id,
-        campo: "price",
-        valor_anterior: String(existing.price),
-        valor_nuevo: String(nuevoPrecio),
-        usuario_nombre: "Importación Excel",
-      });
-    }
-    summary.actualizados++;
-  } else {
-    const { error } = await supabase.from("productos").insert({
-      id: crypto.randomUUID(),
-      comercio_id: comercioId,
-      codigo: row.codigo || null,
-      codigo_barras: row.barra || null,
-      name: row.descripcion,
-      description: "",
-      price: row.precio,
-      precio_base: row.costo ?? null,
-      category,
-      image_url: "",
-      stock: row.stock,
-      stock_minimo: 0,
-      lote: row.lote ?? null,
-      revisar,
-      disabled: false,
-    });
-    if (error) throw new Error(error.message);
-    summary.creados++;
-  }
 }

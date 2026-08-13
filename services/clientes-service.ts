@@ -1,7 +1,6 @@
 // services/clientes-service.ts — clientes y cuenta corriente (client, anon)
 import { supabase } from "@/lib/supabase";
 import { getComercioId } from "@/hooks/use-auth";
-import { generateReadableId } from "@/services/supabase-helpers";
 import type { Cliente, CuentaMov } from "@/lib/types";
 
 function mapCliente(d: Record<string, any>): Cliente {
@@ -85,23 +84,13 @@ export interface CrearClienteInput {
 export async function crearCliente(input: CrearClienteInput): Promise<Cliente> {
   const nombre = input.nombre.trim();
   if (!nombre) throw new Error("El nombre es obligatorio");
-  const id = await generateReadableId("clientes", "cli", nombre);
-  const { data, error } = await supabase
-    .from("clientes")
-    .insert({
-      id,
-      comercio_id: getComercioId(),
-      nombre,
-      telefono: input.telefono?.trim() || null,
-      documento: input.documento?.trim() || null,
-      limite_credito: input.limiteCredito ?? 0,
-      saldo: 0,
-      notas: input.notas?.trim() || null,
-      activo: true,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const res = await fetch("/api/clientes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, nombre, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el cliente");
   return mapCliente(data);
 }
 
@@ -123,24 +112,19 @@ export interface PagoResult {
   saldoNuevo: number;
 }
 
-/** Registra un abono del cliente (reduce la deuda) via RPC atomica. */
+/** Registra un abono del cliente (reduce la deuda) via API route. */
 export async function registrarPago(
   clienteId: string,
   monto: number,
   usuario?: string,
   referencia?: string,
 ): Promise<PagoResult> {
-  const { data, error } = await supabase.rpc("registrar_pago_cuenta", {
-    p_cliente_id: clienteId,
-    p_monto: monto,
-    p_usuario: usuario ?? null,
-    p_referencia: referencia ?? null,
-    p_comercio_id: getComercioId(),
+  const res = await fetch("/api/clientes/pago", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clienteId, monto, usuario, referencia, comercioId: getComercioId() }),
   });
-  if (error) throw new Error(error.message);
-  return {
-    clienteId: data.cliente_id,
-    saldoAnterior: Number(data.saldo_anterior) || 0,
-    saldoNuevo: Number(data.saldo_nuevo) || 0,
-  };
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");
+  return data as PagoResult;
 }
