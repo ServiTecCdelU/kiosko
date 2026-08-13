@@ -43,7 +43,29 @@ export async function POST(req: Request) {
     if (pendiente.estado !== "pendiente") return NextResponse.json({ ok: true }); // ya procesado, evita duplicar
 
     if (pago.status === "approved") {
-      const venta = await procesarVenta(pendiente.sale_input);
+      // El pago YA entro. Si no se puede registrar la venta (sin stock, caja
+      // cerrada, etc.) no alcanza con fallar: hay que dejar constancia, porque
+      // si no queda plata cobrada sin venta y nadie se entera.
+      let venta;
+      try {
+        venta = await procesarVenta(pendiente.sale_input);
+      } catch (e) {
+        const motivo = e instanceof Error ? e.message : "error desconocido";
+        await supabaseAdmin
+          .from("pagos_mp_pendientes")
+          .update({
+            estado: "error",
+            payment_id: pago.id,
+            error_motivo: motivo,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", pendiente.id);
+        // 200 a proposito: reintentar no sirve (el motivo no se arregla solo) y
+        // dejaria a MP notificando en loop. El caso queda marcado para resolver
+        // a mano: devolver el pago o cargar la venta.
+        return NextResponse.json({ ok: true, registrado: false, motivo });
+      }
+
       await supabaseAdmin
         .from("pagos_mp_pendientes")
         .update({ estado: "aprobado", payment_id: pago.id, venta_id: venta.id, updated_at: new Date().toISOString() })

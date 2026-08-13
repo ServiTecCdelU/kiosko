@@ -65,7 +65,17 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const transferPortion = method === "mixto" ? total - cashPortion : 0;
 
   const faltaCliente = method === "fiado" && !cliente;
-  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente;
+
+  // Limite de credito: 0 = sin limite. La validacion definitiva la hace la RPC
+  // (process_sale_kiosko), esto es para avisar antes de confirmar.
+  const deudaProyectada = cliente ? cliente.saldo + total : 0;
+  const excedeCredito =
+    method === "fiado" &&
+    !!cliente &&
+    cliente.limiteCredito > 0 &&
+    deudaProyectada > cliente.limiteCredito;
+
+  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente || excedeCredito;
 
   const handleConfirm = () => {
     if (disabled) return;
@@ -190,6 +200,35 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         </div>
 
         {method === "fiado" && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
+
+        {method === "fiado" && cliente && (
+          <div
+            className={cn(
+              "mb-3 rounded-xl px-3 py-2 text-sm",
+              excedeCredito ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span>Debe ahora</span>
+              <span className="cifra font-semibold">{formatCurrency(cliente.saldo)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Con esta venta</span>
+              <span className="cifra font-semibold">{formatCurrency(deudaProyectada)}</span>
+            </div>
+            {cliente.limiteCredito > 0 && (
+              <div className="flex items-center justify-between gap-2">
+                <span>Límite</span>
+                <span className="cifra font-semibold">{formatCurrency(cliente.limiteCredito)}</span>
+              </div>
+            )}
+            {excedeCredito && (
+              <p className="mt-1 font-semibold">
+                Supera el límite de crédito. Cobrá una parte o subile el límite al cliente.
+              </p>
+            )}
+          </div>
+        )}
 
         {method === "efectivo" && (
           <div className="mb-3 space-y-2">

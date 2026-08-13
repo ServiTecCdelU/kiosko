@@ -20,22 +20,29 @@ export async function crearCobroQR(saleInput: CreateSaleInput, total: number): P
   return data as CobroQR;
 }
 
-export type EstadoPagoQR = "pendiente" | "aprobado" | "rechazado" | "cancelado";
+// 'error' = el pago entro pero la venta no se pudo registrar (sin stock, caja
+// cerrada, etc.). Hay plata cobrada sin venta: requiere resolverlo a mano.
+export type EstadoPagoQR = "pendiente" | "aprobado" | "rechazado" | "cancelado" | "error";
 
 export interface EstadoPago {
   estado: EstadoPagoQR;
   ventaId: string | null;
+  errorMotivo: string | null;
 }
 
 export async function consultarEstadoPago(externalReference: string): Promise<EstadoPago> {
   const { data, error } = await supabase
     .from("pagos_mp_pendientes")
-    .select("estado, venta_id")
+    .select("estado, venta_id, error_motivo")
     .eq("comercio_id", getComercioId())
     .eq("external_reference", externalReference)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return { estado: (data?.estado ?? "pendiente") as EstadoPagoQR, ventaId: data?.venta_id ?? null };
+  return {
+    estado: (data?.estado ?? "pendiente") as EstadoPagoQR,
+    ventaId: data?.venta_id ?? null,
+    errorMotivo: data?.error_motivo ?? null,
+  };
 }
 
 // ── Lector fisico Mercado Pago Point ─────────────────────────────

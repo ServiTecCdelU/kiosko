@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CreditCard, CheckCircle2, XCircle } from "lucide-react";
+import { CreditCard, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -20,6 +20,7 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
   const [estado, setEstado] = useState<EstadoPagoQR>("pendiente");
   const [cancelando, setCancelando] = useState(false);
   const [avisoCancelacion, setAvisoCancelacion] = useState<string | null>(null);
+  const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -31,10 +32,11 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
       try {
         const res = await consultarEstadoPago(cobro.externalReference);
         setEstado(res.estado);
+        setErrorMotivo(res.errorMotivo);
         if (res.estado === "aprobado" && res.ventaId) {
           if (intervalRef.current) clearInterval(intervalRef.current);
           onAprobado(res.ventaId);
-        } else if (res.estado === "rechazado" || res.estado === "cancelado") {
+        } else if (res.estado === "rechazado" || res.estado === "cancelado" || res.estado === "error") {
           if (intervalRef.current) clearInterval(intervalRef.current);
         }
       } catch {
@@ -96,6 +98,17 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
             <p className="flex items-center gap-2 text-lg font-semibold text-destructive">
               <XCircle className="h-6 w-6" /> Pago {estado === "rechazado" ? "rechazado" : "cancelado"}
             </p>
+          )}
+          {estado === "error" && (
+            <div className="space-y-1 text-center">
+              <p className="flex items-center justify-center gap-2 text-lg font-semibold text-destructive">
+                <AlertTriangle className="h-6 w-6" /> Se cobró, pero no se registró
+              </p>
+              <p className="text-sm font-medium text-destructive">
+                El pago entró en Mercado Pago y la venta NO quedó cargada. Anotala a mano o devolvé el pago.
+              </p>
+              {errorMotivo && <p className="text-xs text-muted-foreground">Motivo: {errorMotivo}</p>}
+            </div>
           )}
 
           {avisoCancelacion && (

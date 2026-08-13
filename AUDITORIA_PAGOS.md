@@ -11,9 +11,9 @@ de test mueve stock, caja y reportes de verdad).
 
 ---
 
-## 🔴 Críticos
+## 🔴 Críticos — CORREGIDOS (requiere correr `supabase/18_correcciones_pagos.sql`)
 
-### 1. El límite de crédito no se valida nunca
+### 1. ✅ El límite de crédito no se valida nunca
 
 `clientes.limite_credito` se guarda, se muestra en la ficha del cliente… y no
 se controla en ningún lado.
@@ -30,7 +30,7 @@ $500.000 sin que el sistema diga nada.
 si `limite_credito > 0` y `saldo + p_total > limite_credito`, abortar. Además,
 avisar en el POS antes de confirmar, mostrando saldo actual y límite.
 
-### 2. Pago aprobado + venta fallida = plata sin venta
+### 2. ✅ Pago aprobado + venta fallida = plata sin venta
 
 En `app/api/mercadopago/webhook/route.ts`, cuando llega un pago aprobado se
 llama a `procesarVenta`. Si esa función falla, se devuelve 500 y el registro
@@ -51,7 +51,7 @@ tipo `error` guardando el motivo, mostrarlo en el diálogo del POS ("el pago
 entró pero no se pudo registrar la venta — revisar"), y dejar esos casos
 visibles en alguna pantalla para resolverlos a mano.
 
-### 3. Los scripts SQL del repo no permiten los métodos de pago de Mercado Pago
+### 3. ✅ Los scripts SQL del repo no permiten los métodos de pago de Mercado Pago
 
 La última definición del constraint está en `06_multitenant.sql:182-184`:
 
