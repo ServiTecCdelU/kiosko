@@ -26,8 +26,26 @@ export async function POST(req: Request) {
 
   try {
     if (pendiente.device_id && pendiente.intent_id) {
-      await cancelarIntentoPagoPoint(pendiente.device_id, pendiente.intent_id);
+      const resultado = await cancelarIntentoPagoPoint(pendiente.device_id, pendiente.intent_id);
+
+      // Si el lector NO acepto la cancelacion, el cobro sigue vivo ahi y el
+      // cliente todavia puede pagar. No hay que tocar el estado: si lo dejamos
+      // en 'cancelado', el webhook descarta el pago aprobado y la venta nunca
+      // se registra (entraria la plata sin venta).
+      if (!resultado.cancelado) {
+        return NextResponse.json(
+          {
+            ok: false,
+            enTerminal: resultado.enTerminal,
+            error: resultado.enTerminal
+              ? "El cobro ya esta en la pantalla del lector. Cancelalo desde el lector."
+              : resultado.mensaje,
+          },
+          { status: 409 },
+        );
+      }
     }
+
     if (pendiente.estado === "pendiente") {
       await supabaseAdmin
         .from("pagos_mp_pendientes")

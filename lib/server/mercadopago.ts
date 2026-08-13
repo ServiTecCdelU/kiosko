@@ -155,14 +155,33 @@ export async function crearIntentoPagoPoint(
   return { id: data.id };
 }
 
-export async function cancelarIntentoPagoPoint(deviceId: string, intentId: string): Promise<void> {
+export type ResultadoCancelacion =
+  | { cancelado: true }
+  | { cancelado: false; enTerminal: boolean; mensaje: string };
+
+/**
+ * Cancela un cobro encolado. OJO: si el cobro ya se mostro en la pantalla del
+ * lector (current_state ON_TERMINAL), Mercado Pago responde 409 y NO se puede
+ * cancelar por API — hay que cancelarlo con la tecla del propio lector.
+ * Por eso devuelve un resultado en vez de tirar excepcion: quien llama tiene
+ * que saber distinguir "cancelado de verdad" de "sigue vivo en el lector".
+ */
+export async function cancelarIntentoPagoPoint(
+  deviceId: string,
+  intentId: string,
+): Promise<ResultadoCancelacion> {
   const token = getAccessToken();
   const res = await fetch(`${MP_API}/point/integration-api/devices/${deviceId}/payment-intents/${intentId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok && res.status !== 404) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.message ?? "No se pudo cancelar el cobro en el lector");
-  }
+  if (res.ok || res.status === 404) return { cancelado: true };
+
+  const data = await res.json().catch(() => null);
+  const crudo = JSON.stringify(data ?? "");
+  return {
+    cancelado: false,
+    enTerminal: res.status === 409 || /ON_TERMINAL/i.test(crudo),
+    mensaje: data?.message ?? "No se pudo cancelar el cobro en el lector",
+  };
 }

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils/format";
-import { consultarEstadoPago, cancelarCobroPoint, type CobroPoint, type EstadoPagoQR } from "@/services/mercadopago-service";
+import { consultarEstadoPago, cancelarCobroPoint, ErrorCancelacionPoint, type CobroPoint, type EstadoPagoQR } from "@/services/mercadopago-service";
 
 interface MercadoPagoPointDialogProps {
   cobro: CobroPoint | null;
@@ -19,11 +19,13 @@ interface MercadoPagoPointDialogProps {
 export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado }: MercadoPagoPointDialogProps) {
   const [estado, setEstado] = useState<EstadoPagoQR>("pendiente");
   const [cancelando, setCancelando] = useState(false);
+  const [avisoCancelacion, setAvisoCancelacion] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!cobro) return;
     setEstado("pendiente");
+    setAvisoCancelacion(null);
 
     intervalRef.current = setInterval(async () => {
       try {
@@ -49,11 +51,22 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
 
   const handleCancelar = async () => {
     setCancelando(true);
+    setAvisoCancelacion(null);
     try {
       await cancelarCobroPoint(cobro.externalReference);
+      onOpenChange(false);
+    } catch (e) {
+      // No se cierra el dialogo: el cobro sigue vivo en el lector y el cliente
+      // todavia puede pagar. Si cerraramos, el cajero creeria que se cancelo.
+      setAvisoCancelacion(
+        e instanceof ErrorCancelacionPoint && e.enTerminal
+          ? "El cobro ya está en la pantalla del lector, así que no se puede cancelar desde acá. Cancelalo con la tecla roja del lector; si el cliente igual paga, la venta se registra sola."
+          : e instanceof Error
+            ? e.message
+            : "No se pudo cancelar el cobro",
+      );
     } finally {
       setCancelando(false);
-      onOpenChange(false);
     }
   };
 
@@ -82,6 +95,12 @@ export function MercadoPagoPointDialog({ cobro, total, onOpenChange, onAprobado 
           {(estado === "rechazado" || estado === "cancelado") && (
             <p className="flex items-center gap-2 text-lg font-semibold text-destructive">
               <XCircle className="h-6 w-6" /> Pago {estado === "rechazado" ? "rechazado" : "cancelado"}
+            </p>
+          )}
+
+          {avisoCancelacion && (
+            <p className="rounded-xl bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+              {avisoCancelacion}
             </p>
           )}
         </div>

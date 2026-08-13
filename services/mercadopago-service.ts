@@ -81,6 +81,16 @@ export async function cobrarConPoint(saleInput: CreateSaleInput, total: number, 
   return data as CobroPoint;
 }
 
+/** Error de cancelacion que distingue el caso "el cobro sigue vivo en el lector". */
+export class ErrorCancelacionPoint extends Error {
+  readonly enTerminal: boolean;
+  constructor(mensaje: string, enTerminal: boolean) {
+    super(mensaje);
+    this.name = "ErrorCancelacionPoint";
+    this.enTerminal = enTerminal;
+  }
+}
+
 export async function cancelarCobroPoint(externalReference: string): Promise<void> {
   const res = await fetch("/api/mercadopago/point/cancelar", {
     method: "POST",
@@ -89,6 +99,9 @@ export async function cancelarCobroPoint(externalReference: string): Promise<voi
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.error ?? "No se pudo cancelar el cobro");
+    throw new ErrorCancelacionPoint(
+      data?.error ?? "No se pudo cancelar el cobro",
+      data?.enTerminal === true,
+    );
   }
 }

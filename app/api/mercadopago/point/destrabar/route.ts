@@ -30,9 +30,16 @@ export async function POST(req: Request) {
 
   for (const p of pendientes ?? []) {
     if (!p.intent_id) continue;
+
+    let ok = false;
     try {
-      await cancelarIntentoPagoPoint(deviceId, p.intent_id);
-      resultados.push({ intentId: p.intent_id, cancelado: true });
+      const r = await cancelarIntentoPagoPoint(deviceId, p.intent_id);
+      ok = r.cancelado;
+      resultados.push(
+        r.cancelado
+          ? { intentId: p.intent_id, cancelado: true }
+          : { intentId: p.intent_id, cancelado: false, motivo: r.enTerminal ? "sigue en la pantalla del lector" : r.mensaje },
+      );
     } catch (e) {
       resultados.push({
         intentId: p.intent_id,
@@ -40,10 +47,16 @@ export async function POST(req: Request) {
         motivo: e instanceof Error ? e.message : "error",
       });
     }
-    await supabaseAdmin
-      .from("pagos_mp_pendientes")
-      .update({ estado: "cancelado", updated_at: new Date().toISOString() })
-      .eq("id", p.id);
+
+    // Solo se marca cancelado si el lector realmente lo solto. Si sigue vivo,
+    // se deja en 'pendiente' para que el webhook pueda registrar la venta si
+    // el cliente termina pagando.
+    if (ok) {
+      await supabaseAdmin
+        .from("pagos_mp_pendientes")
+        .update({ estado: "cancelado", updated_at: new Date().toISOString() })
+        .eq("id", p.id);
+    }
   }
 
   return NextResponse.json({ encontrados: pendientes?.length ?? 0, resultados });
