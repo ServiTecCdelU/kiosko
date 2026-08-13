@@ -24,13 +24,26 @@ export async function POST(req: Request) {
   }
 
   // No puede haber dos cajas abiertas a la vez.
-  const { data: abierta } = await supabaseAdmin
+  // Se pide una lista y no maybeSingle(): con maybeSingle, si por lo que fuera
+  // ya hubiera mas de una abierta, PostgREST devuelve error y data queda null,
+  // o sea que la guarda dejaria pasar justo el caso que tiene que frenar.
+  // Ante cualquier duda se falla cerrando, no abriendo.
+  const { data: abiertas, error: errorAbiertas } = await supabaseAdmin
     .from("caja")
     .select("id")
     .eq("comercio_id", comercioId)
     .eq("estado", "abierta")
-    .maybeSingle();
-  if (abierta) return NextResponse.json({ error: "Ya hay una caja abierta" }, { status: 409 });
+    .limit(2);
+
+  if (errorAbiertas) {
+    return NextResponse.json(
+      { error: "No se pudo verificar si hay una caja abierta" },
+      { status: 500 },
+    );
+  }
+  if ((abiertas?.length ?? 0) > 0) {
+    return NextResponse.json({ error: "Ya hay una caja abierta" }, { status: 409 });
+  }
 
   const id = await generarIdLegible("caja", "caja", new Date().toISOString().slice(0, 10));
 
