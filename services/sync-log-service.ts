@@ -1,7 +1,7 @@
 // services/sync-log-service.ts
 // Lectura del historial de sincronizaciones (client-side, anon).
 
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import type { SyncLog } from "@/lib/types";
 
 function mapSyncLog(d: Record<string, any>): SyncLog {
@@ -18,17 +18,13 @@ function mapSyncLog(d: Record<string, any>): SyncLog {
 }
 
 export async function getSyncLogs(limit = 20): Promise<SyncLog[]> {
-  const { data } = await supabase
-    .from("sync_log")
-    .select("*")
-    .order("started_at", { ascending: false })
-    .limit(limit);
-  return (data ?? []).map(mapSyncLog);
+  const { logs } = await consultar<{ logs: Record<string, any>[] }>(
+    "/api/consultas/ventas", "syncLogs", { limit },
+  );
+  return logs.map(mapSyncLog);
 }
 
 export async function getProductosCount(): Promise<number> {
-  const { count } = await supabase
-    .from("productos")
-    .select("id", { count: "exact", head: true });
+  const { count } = await consultar<{ count: number }>("/api/consultas/ventas", "productosCount");
   return count ?? 0;
 }

@@ -1,5 +1,5 @@
 // services/stock-service.ts — movimientos de stock
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { StockMovimiento, StockMovTipo } from "@/lib/types";
 
@@ -43,12 +43,8 @@ function mapMov(d: Record<string, any>): StockMovimiento {
 }
 
 export async function getMovimientos(productoId: string, limit = 30): Promise<StockMovimiento[]> {
-  const { data } = await supabase
-    .from("stock_movimientos")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("producto_id", productoId)
-    .order("fecha", { ascending: false })
-    .limit(limit);
-  return (data ?? []).map(mapMov);
+  const { movimientos } = await consultar<{ movimientos: Record<string, any>[] }>(
+    "/api/consultas/ventas", "movimientosStock", { productoId, limit },
+  );
+  return movimientos.map(mapMov);
 }

@@ -1,5 +1,5 @@
 // services/sales-service.ts — alta de ventas (client helper hacia /api/ventas)
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { PaymentMethod, Sale } from "@/lib/types";
 
@@ -77,25 +77,17 @@ function mapSale(d: Record<string, any>): Sale {
 }
 
 export async function getVentaById(ventaId: string): Promise<Sale | null> {
-  const { data, error } = await supabase
-    .from("ventas")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("id", ventaId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data ? mapSale(data) : null;
+  const { venta } = await consultar<{ venta: Record<string, any> | null }>(
+    "/api/consultas/ventas", "ventaPorId", { ventaId },
+  );
+  return venta ? mapSale(venta) : null;
 }
 
 export async function getVentasDeCaja(cajaId: string): Promise<Sale[]> {
-  const { data, error } = await supabase
-    .from("ventas")
-    .select("*")
-    .eq("comercio_id", getComercioId())
-    .eq("caja_id", cajaId)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapSale);
+  const { ventas } = await consultar<{ ventas: Record<string, any>[] }>(
+    "/api/consultas/ventas", "ventasDeCaja", { cajaId },
+  );
+  return ventas.map(mapSale);
 }
 
 export interface AnularVentaInput {

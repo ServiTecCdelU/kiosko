@@ -1,5 +1,3 @@
-import { supabase } from '@/lib/supabase'
-
 /**
  * Convierte cualquier valor de fecha (string ISO, Date) a Date.
  */
@@ -18,25 +16,4 @@ export const slugify = (text: string): string => {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]/g, '')
-}
-
-export const generateReadableId = async (
-  table: string,
-  prefix: string,
-  identifier: string,
-): Promise<string> => {
-  const slug = slugify(identifier)
-  const base = `${prefix}_${slug}`
-  let num = 1
-  while (num < 1000) {
-    const candidateId = `${base}_${num}`
-    const { data } = await supabase
-      .from(table)
-      .select('id')
-      .eq('id', candidateId)
-      .maybeSingle()
-    if (!data) return candidateId
-    num++
-  }
-  return `${base}_${Date.now()}`
 }

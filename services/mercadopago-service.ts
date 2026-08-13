@@ -1,5 +1,5 @@
 // services/mercadopago-service.ts — cobro con QR y con lector Point (client helper)
-import { supabase } from "@/lib/supabase";
+import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { CreateSaleInput } from "@/services/sales-service";
 
@@ -31,18 +31,7 @@ export interface EstadoPago {
 }
 
 export async function consultarEstadoPago(externalReference: string): Promise<EstadoPago> {
-  const { data, error } = await supabase
-    .from("pagos_mp_pendientes")
-    .select("estado, venta_id, error_motivo")
-    .eq("comercio_id", getComercioId())
-    .eq("external_reference", externalReference)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return {
-    estado: (data?.estado ?? "pendiente") as EstadoPagoQR,
-    ventaId: data?.venta_id ?? null,
-    errorMotivo: data?.error_motivo ?? null,
-  };
+  return consultar<EstadoPago>("/api/consultas/ventas", "estadoPagoMP", { externalReference });
 }
 
 // ── Lector fisico Mercado Pago Point ─────────────────────────────
