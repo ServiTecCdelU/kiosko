@@ -75,9 +75,51 @@ Esto es lo que determina qué construir, en orden de impacto real:
 |---|---|---|
 | 15 | ✅ **Modo offline (PWA)** | Hecho: service worker manual (`public/sw.js`, sin tocar `next.config.mjs`) que cachea la app shell; catálogo completo cacheado en IndexedDB (`lib/offline/db.ts`) para buscar y cobrar sin señal; las ventas offline se guardan en una cola local y se sincronizan solas al volver la conexión (`hooks/use-offline-sync.ts`). El fiado no se puede cobrar offline (necesita validar saldo en el momento). |
 | 16 | ✅ **Cobro con QR de Mercado Pago** | Hecho: nuevo método de pago "MP" en el POS, genera un QR (Checkout Pro) que el cliente escanea; la venta real recién se registra cuando el webhook de Mercado Pago confirma el pago aprobado (`process_sale_kiosko` no se dispara antes). Requiere completar `MP_ACCESS_TOKEN` y `NEXT_PUBLIC_APP_URL` en `.env.local` y correr `supabase/16_mercadopago_qr.sql`. El fiado y el modo offline no aplican a este método (necesita conexión y confirmación en el momento). |
-| 16b | ✅ **Cobro con lector Mercado Pago Point** | Extra no planeado originalmente: método "MP Point" que manda el cobro directo al lector físico emparejado (Point Integration API) — el cliente paga apoyando/insertando la tarjeta en el lector, sin QR. Reutiliza el mismo webhook y tabla `pagos_mp_pendientes` del ítem 16. Requiere `supabase/17_mercadopago_point.sql`. **No verificado contra un lector real** — probar con una venta chica antes de usarlo en el mostrador. |
+| 16b | ✅ **Cobro con lector Mercado Pago Point** | Extra no planeado originalmente: método "MP Point" que manda el cobro directo al lector físico emparejado (Point Integration API) — el cliente paga apoyando/insertando la tarjeta en el lector, sin QR. Reutiliza el mismo webhook y tabla `pagos_mp_pendientes` del ítem 16. Requiere `supabase/17_mercadopago_point.sql`. **Verificado contra un lector real** (Newland N950): cobra, el webhook confirma y la venta se registra. Ver "Puesta en marcha del lector Point" más abajo. |
 | 16c | ✅ **Tarjeta manual (posnet de banco/Prisma/Payway)** | Extra no planeado: método "Tarjeta" simple para cuando el posnet es de un banco/procesadora sin integración de API — el cajero cobra aparte en el posnet físico y marca la venta como pagada acá, se contabiliza como transferencia. |
 | 17 | ✅ **Historial de precios por producto** | Hecho: la auditoría de precios (ítem 13) ahora también registra los cambios que vienen de la importación de Excel y de la sincronización con la distribuidora (antes solo capturaba ediciones manuales). Nueva tabla "Mayores aumentos de precio (últimos 30 días)" en `/reportes`, cruzando todo el catálogo para detectar qué subió más y cuándo. |
+
+---
+
+## 3b. Puesta en marcha del lector Point
+
+Pasos necesarios para que el método "MP Point" funcione. Todos son obligatorios;
+si falta uno, el cobro no llega al lector o la venta no se registra.
+
+1. **`MP_ACCESS_TOKEN`** — Access Token de **producción** (empieza con `APP_USR-`).
+   Los lectores físicos no funcionan con credenciales `TEST-`. De las cuatro
+   credenciales que muestra el panel de MP solo se usa esta: Public Key, Client ID
+   y Client Secret no hacen falta.
+2. **`NEXT_PUBLIC_APP_URL`** — la URL pública del deploy, sin barra final.
+3. **Webhook en el panel de MP** — Developers → Tus integraciones → Webhooks,
+   modo Producción, evento **"Pagos"** (aparece como *Pagos (legacy)*, es el correcto:
+   nuestro webhook espera `type=payment`), URL `<APP_URL>/api/mercadopago/webhook`.
+   A diferencia del QR, el cobro Point **no** manda `notification_url` por request,
+   así que sin esto la tarjeta se cobra y la venta nunca se registra.
+4. **Lector en modo PDV** — de fábrica viene en `STANDALONE` y rechaza los cobros
+   por API. Se cambia con `PATCH /api/mercadopago/dispositivos`
+   (`{"deviceId": "..."}`) y **hay que reiniciar el lector** para que tome efecto.
+   Verificar con `GET /api/mercadopago/dispositivos` que diga `operatingMode: "PDV"`.
+   En PDV el lector deja de cobrar por su cuenta desde su propio menú.
+5. **`supabase/17_mercadopago_point.sql`** aplicado.
+
+### Cancelar un cobro
+
+Mercado Pago solo deja cancelar por API mientras el cobro no llegó a la pantalla
+del lector. Una vez que se muestra (`current_state ON_TERMINAL`) responde 409 y
+hay que cancelarlo con la tecla del propio lector. En ese caso el pago **se deja
+en `pendiente` a propósito**: si el cliente igual termina pagando, el webhook
+registra la venta. Marcarlo como cancelado haría entrar la plata sin venta.
+
+Si un lector queda trabado con un cobro viejo ("there is already..."), se libera
+con `POST /api/mercadopago/point/destrabar` (`{"deviceId": "..."}`), que cancela
+los cobros pendientes registrados para ese lector.
+
+### QR
+
+El QR del ítem 16 (método "MP") se muestra en la **pantalla del POS**, no en la
+del lector. El lector no puede mostrar QR con la Point Integration API que usamos:
+para eso habría que migrar a la Orders API de MP, que unifica Point + QR.
 
 ---
 
