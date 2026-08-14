@@ -34,3 +34,6 @@ supabase.txt
 next-env.d.ts
 
 .vercel
+
+# base de prueba para los tests de integracion
+.env.test.local

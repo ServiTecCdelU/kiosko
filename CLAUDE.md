@@ -24,7 +24,8 @@ npm run dev       # Servidor de desarrollo
 npm run build     # Build de producción (errores TS ignorados — ver next.config.mjs)
 npm run lint      # ESLint
 npm run start     # Servidor de producción
-npm test          # Tests (node:test nativo, sin dependencias)
+npm test          # Tests unitarios (node:test nativo, sin dependencias)
+npm run test:db   # Tests contra una base Supabase de PRUEBA (ver abajo)
 ```
 
 ### Tests
@@ -32,11 +33,26 @@ Se usa el runner incorporado de Node (`node:test`), sin librerías extra. Los
 archivos son `lib/**/*.test.ts` y los imports entre módulos locales necesitan
 la extensión `.ts` (Node resuelve ESM de forma estricta).
 
-Cubren la lógica de plata que es pura: precios y ofertas (`lib/pricing.ts`),
-agregación del arqueo de caja (`lib/arqueo.ts`) y límite de crédito
-(`lib/credito.ts`). Las RPC de Postgres (`process_sale_kiosko`,
-`anular_venta_kiosko`) **no están cubiertas**: harían falta una base de prueba
-separada, hoy no existe.
+`npm test` cubre la lógica de plata que es pura: precios y ofertas
+(`lib/pricing.ts`), agregación del arqueo (`lib/arqueo.ts`) y límite de crédito
+(`lib/credito.ts`). Corre en milisegundos y no toca ninguna base.
+
+`npm run test:db` (`tests/db/`) prueba las RPC de Postgres —`process_sale_kiosko`,
+`anular_venta_kiosko`, `registrar_pago_cuenta`— contra una base **real**.
+Si no está configurada, los tests se saltan solos; nunca fallan por eso.
+
+#### Armar la base de prueba (una sola vez)
+1. Crear un proyecto Supabase nuevo y **gratuito**, aparte del de producción.
+2. Correr ahí `supabase/01_schema.sql` … `22_cerrar_anon_rls.sql`, en orden.
+3. Crear `.env.test.local` en la raíz (está en `.gitignore`):
+   ```
+   TEST_SUPABASE_URL=https://xxxx.supabase.co
+   TEST_SUPABASE_SERVICE_KEY=sb_secret_...
+   ```
+
+**Los tests borran datos.** Cada uno crea su propio comercio aislado y lo limpia
+al terminar, pero por las dudas el arnés aborta si `TEST_SUPABASE_URL` coincide
+con la URL de producción. Nunca apuntar esto al proyecto real.
 
 ## Reglas del Proyecto
 
