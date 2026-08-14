@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
+import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
 
@@ -68,14 +69,11 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 
   const faltaCliente = method === "fiado" && !cliente;
 
-  // Limite de credito: 0 = sin limite. La validacion definitiva la hace la RPC
-  // (process_sale_kiosko), esto es para avisar antes de confirmar.
-  const deudaProyectada = cliente ? cliente.saldo + total : 0;
-  const excedeCredito =
-    method === "fiado" &&
-    !!cliente &&
-    cliente.limiteCredito > 0 &&
-    deudaProyectada > cliente.limiteCredito;
+  // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
+  // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
+  const credito = cliente ? evaluarCredito(cliente.saldo, cliente.limiteCredito, total) : null;
+  const deudaProyectada = credito?.deudaProyectada ?? 0;
+  const excedeCredito = method === "fiado" && !!credito && credito.supera;
 
   const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente || excedeCredito;
 

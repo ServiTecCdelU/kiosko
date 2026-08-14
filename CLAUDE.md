@@ -24,9 +24,19 @@ npm run dev       # Servidor de desarrollo
 npm run build     # Build de producción (errores TS ignorados — ver next.config.mjs)
 npm run lint      # ESLint
 npm run start     # Servidor de producción
+npm test          # Tests (node:test nativo, sin dependencias)
 ```
 
-No hay tests en este proyecto.
+### Tests
+Se usa el runner incorporado de Node (`node:test`), sin librerías extra. Los
+archivos son `lib/**/*.test.ts` y los imports entre módulos locales necesitan
+la extensión `.ts` (Node resuelve ESM de forma estricta).
+
+Cubren la lógica de plata que es pura: precios y ofertas (`lib/pricing.ts`),
+agregación del arqueo de caja (`lib/arqueo.ts`) y límite de crédito
+(`lib/credito.ts`). Las RPC de Postgres (`process_sale_kiosko`,
+`anular_venta_kiosko`) **no están cubiertas**: harían falta una base de prueba
+separada, hoy no existe.
 
 ## Reglas del Proyecto
 

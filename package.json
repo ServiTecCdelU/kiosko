@@ -6,7 +6,9 @@
     "build": "node ./node_modules/next/dist/bin/next build",
     "dev": "node ./node_modules/next/dist/bin/next dev",
     "lint": "eslint .",
-    "start": "node ./node_modules/next/dist/bin/next start"
+    "start": "node ./node_modules/next/dist/bin/next start",
+    "test": "node --test \"lib/**/*.test.ts\"",
+    "test:watch": "node --test --watch \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
