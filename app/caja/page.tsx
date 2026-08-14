@@ -25,6 +25,7 @@ import {
 import { getVentasDeCaja, anularVenta } from "@/services/sales-service";
 import { MovimientoDialog } from "@/components/caja/movimiento-dialog";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
+import { CobrosSinResolver } from "@/components/caja/cobros-sin-resolver";
 import { getCurrentUser } from "@/hooks/use-auth";
 import type { Caja, CajaMovimiento, CajaMovTipo, Sale } from "@/lib/types";
 
@@ -144,6 +145,12 @@ export default function CajaPage() {
 
   return (
     <AppShell title="Caja">
+      {/* Se dibuja solo si hay algo sin resolver, y va afuera del bloque de la
+          caja abierta: si el pago fallo, hay que verlo aunque no haya caja. */}
+      <div className="mb-4">
+        <CobrosSinResolver />
+      </div>
+
       {loading ? (
         <div className="space-y-3">
           <Skeleton className="h-40 w-full rounded-2xl" />

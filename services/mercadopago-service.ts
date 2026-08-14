@@ -101,3 +101,36 @@ export async function cancelarCobroPoint(externalReference: string): Promise<voi
     );
   }
 }
+
+// ── Cobros sin resolver (plata que entro sin venta, o cobros colgados) ──
+
+export interface CobroSinResolver {
+  id: string;
+  externalReference: string;
+  paymentId: string | null;
+  estado: "error" | "pendiente";
+  errorMotivo: string | null;
+  total: number | null;
+  items: number;
+  createdAt: string;
+}
+
+export async function listarCobrosSinResolver(): Promise<CobroSinResolver[]> {
+  const { cobros } = await consultar<{ cobros: CobroSinResolver[] }>(
+    "/api/consultas/ventas",
+    "cobrosMPProblema",
+  );
+  return cobros;
+}
+
+export async function resolverCobro(id: string, nota?: string): Promise<void> {
+  const res = await fetch("/api/mercadopago/resolver", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, nota, comercioId: getComercioId() }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? "No se pudo marcar como resuelto");
+  }
+}

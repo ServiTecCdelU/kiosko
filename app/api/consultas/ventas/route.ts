@@ -102,6 +102,39 @@ export async function POST(req: Request) {
       });
     }
 
+    /**
+     * Cobros de Mercado Pago que necesitan atencion humana:
+     *  - 'error'    : el pago entro pero la venta no se pudo registrar.
+     *  - 'pendiente' viejos: se genero el cobro y nunca se confirmo ni cancelo.
+     * Los pendientes recientes no se muestran: pueden estar en curso ahora mismo.
+     */
+    case "cobrosMPProblema": {
+      const minutosGracia = 30;
+      const corte = new Date(Date.now() - minutosGracia * 60 * 1000).toISOString();
+
+      const { data, error } = await supabaseAdmin
+        .from("pagos_mp_pendientes")
+        .select("id, external_reference, payment_id, estado, error_motivo, sale_input, created_at, updated_at")
+        .eq("comercio_id", comercioId)
+        .or(`estado.eq.error,and(estado.eq.pendiente,created_at.lt.${corte})`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      const cobros = (data ?? []).map((c: any) => ({
+        id: c.id,
+        externalReference: c.external_reference,
+        paymentId: c.payment_id ?? null,
+        estado: c.estado,
+        errorMotivo: c.error_motivo ?? null,
+        // Del carrito guardado solo interesa el monto, para reconocer el cobro.
+        total: Number(c.sale_input?.transferAmount) || null,
+        items: Array.isArray(c.sale_input?.items) ? c.sale_input.items.length : 0,
+        createdAt: c.created_at,
+      }));
+      return NextResponse.json({ cobros });
+    }
+
     default:
       return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
   }
