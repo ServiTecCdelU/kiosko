@@ -110,3 +110,28 @@ export async function registrarPago(
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");
   return data as PagoResult;
 }
+
+// ── Deudores ──────────────────────────────────────────────────────
+
+export interface Deudor {
+  id: string;
+  nombre: string;
+  telefono: string | null;
+  saldo: number;
+  limiteCredito: number;
+  superaLimite: boolean;
+  ultimoPago: string | null;
+  nuncaPago: boolean;
+  /** Dias desde el ultimo pago; si nunca pago, desde su cargo mas viejo. */
+  diasSinPagar: number | null;
+}
+
+export interface Deudores {
+  deudores: Deudor[];
+  totalPorCobrar: number;
+}
+
+export async function listarDeudores(): Promise<Deudores> {
+  const r = await consultar<Deudores>("/api/consultas/caja", "deudores");
+  return { deudores: r.deudores ?? [], totalPorCobrar: r.totalPorCobrar ?? 0 };
+}

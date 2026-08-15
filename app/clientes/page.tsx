@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { listClientes } from "@/services/clientes-service";
+import { DeudoresPanel } from "@/components/clientes/deudores-panel";
 import { NuevoClienteDialog } from "@/components/clientes/nuevo-cliente-dialog";
 import { ClienteDetailDialog } from "@/components/clientes/cliente-detail-dialog";
 import type { Cliente } from "@/lib/types";
@@ -71,6 +72,8 @@ export default function ClientesPage() {
           <p className="cifra-hero mt-1.5 text-3xl">{conDeuda}</p>
         </div>
       </div>
+
+      <DeudoresPanel onVerCliente={abrirDetalle} />
 
       {/* Buscador + alta */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">

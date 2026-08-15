@@ -137,6 +137,68 @@ export async function POST(req: Request) {
       return NextResponse.json({ movimientos: data ?? [] });
     }
 
+    /**
+     * Deudores ordenados por antiguedad. La "antiguedad" es cuanto hace que el
+     * cliente no paga: si nunca pago, se cuenta desde su cargo mas viejo. Es el
+     * dato que define a quien hay que reclamarle, mas que el monto.
+     */
+    case "deudores": {
+      const { data: clientes, error } = await supabaseAdmin
+        .from("clientes")
+        .select("id, nombre, telefono, saldo, limite_credito")
+        .eq("comercio_id", comercioId)
+        .eq("activo", true)
+        .gt("saldo", 0)
+        .limit(500);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (!clientes || clientes.length === 0) return NextResponse.json({ deudores: [] });
+
+      const ids = clientes.map((c: any) => c.id);
+      const { data: movs } = await supabaseAdmin
+        .from("cuenta_corriente_mov")
+        .select("cliente_id, tipo, fecha")
+        .eq("comercio_id", comercioId)
+        .in("cliente_id", ids)
+        .order("fecha", { ascending: false });
+
+      const ultimoPago = new Map<string, string>();
+      const primerCargo = new Map<string, string>();
+      for (const m of movs ?? []) {
+        if (m.tipo === "pago" && !ultimoPago.has(m.cliente_id)) {
+          ultimoPago.set(m.cliente_id, m.fecha);
+        }
+        // Vienen de mas nuevo a mas viejo, asi que el ultimo que se ve es el primero.
+        if (m.tipo === "cargo") primerCargo.set(m.cliente_id, m.fecha);
+      }
+
+      const ahora = Date.now();
+      const dias = (iso?: string) =>
+        iso ? Math.floor((ahora - new Date(iso).getTime()) / 86400000) : null;
+
+      const deudores = clientes
+        .map((c: any) => {
+          const pago = ultimoPago.get(c.id);
+          const cargo = primerCargo.get(c.id);
+          const referencia = pago ?? cargo;
+          return {
+            id: c.id,
+            nombre: c.nombre,
+            telefono: c.telefono ?? null,
+            saldo: Number(c.saldo) || 0,
+            limiteCredito: Number(c.limite_credito) || 0,
+            superaLimite:
+              Number(c.limite_credito) > 0 && Number(c.saldo) > Number(c.limite_credito),
+            ultimoPago: pago ?? null,
+            nuncaPago: !pago,
+            diasSinPagar: dias(referencia),
+          };
+        })
+        .sort((a, b) => (b.diasSinPagar ?? -1) - (a.diasSinPagar ?? -1));
+
+      const totalPorCobrar = deudores.reduce((s, d) => s + d.saldo, 0);
+      return NextResponse.json({ deudores, totalPorCobrar });
+    }
+
     default:
       return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
   }
