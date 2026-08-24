@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       pagadorNombre: body?.pagadorNombre ?? null,
       cuotas: body?.cuotas ?? null,
       recargoPct: body?.recargoPct ?? null,
+      creditoMonto: body?.creditoMonto ?? null,
     });
     return NextResponse.json(res);
   } catch (e) {

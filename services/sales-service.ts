@@ -24,6 +24,8 @@ export interface CreateSaleInput {
   pagadorNombre?: string;
   cuotas?: number;
   recargoPct?: number;
+  /** Mixto: monto (sin recargo) de la porcion que va por Credito. */
+  creditoMonto?: number;
 }
 
 export interface ProcessSaleResult {

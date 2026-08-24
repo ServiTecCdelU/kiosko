@@ -26,12 +26,21 @@ export interface ConfirmData {
   pagadorNombre?: string;
   cuotas?: number;
   recargoPct?: number;
+  /** Mixto: monto (sin recargo) de la porcion que va por Credito. */
+  creditoMonto?: number;
 }
 
 /** Metodos que no identifican por si solos a quien paga: hace falta pedir nombre y apellido. */
 const METODOS_CON_PAGADOR: PaymentMethod[] = ["transferencia", "debito", "credito", "mixto"];
 
-type MixtoSubmetodo = "transferencia" | "debito" | "credito";
+type MixtoMetodo = "efectivo" | "transferencia" | "debito" | "credito";
+
+const MIXTO_METODOS: { value: MixtoMetodo; label: string; icon: React.ReactNode }[] = [
+  { value: "efectivo", label: "Efectivo", icon: <Banknote className="h-3.5 w-3.5" /> },
+  { value: "transferencia", label: "Transfer.", icon: <CreditCard className="h-3.5 w-3.5" /> },
+  { value: "debito", label: "Débito", icon: <CreditCard className="h-3.5 w-3.5" /> },
+  { value: "credito", label: "Crédito", icon: <CreditCard className="h-3.5 w-3.5" /> },
+];
 
 /** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
 export interface CartPanelHandle {
@@ -57,8 +66,9 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
   const [pagaCon, setPagaCon] = useState("");
-  const [efectivoMixto, setEfectivoMixto] = useState("");
-  const [mixtoSubmetodo, setMixtoSubmetodo] = useState<MixtoSubmetodo>("transferencia");
+  const [mixtoParte1Metodo, setMixtoParte1Metodo] = useState<MixtoMetodo>("efectivo");
+  const [mixtoParte2Metodo, setMixtoParte2Metodo] = useState<MixtoMetodo>("transferencia");
+  const [mixtoMontoParte1, setMixtoMontoParte1] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [pagadorNombre, setPagadorNombre] = useState("");
   const [cuotas, setCuotas] = useState("1");
@@ -70,8 +80,9 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   useEffect(() => {
     if (items.length === 0) {
       setPagaCon("");
-      setEfectivoMixto("");
-      setMixtoSubmetodo("transferencia");
+      setMixtoParte1Metodo("efectivo");
+      setMixtoParte2Metodo("transferencia");
+      setMixtoMontoParte1("");
       setCliente(null);
       setPagadorNombre("");
       setCuotas("1");
@@ -93,24 +104,35 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const vuelto = method === "efectivo" ? Math.max(0, pagaConNum - total) : 0;
   const faltaEfectivo = method === "efectivo" && pagaConNum < total;
 
-  // Mixto: el efectivo ingresado es la porcion en mano; el resto va por el submetodo elegido.
-  const cashPortion = method === "mixto" ? Math.min(Math.max(0, Number(efectivoMixto) || 0), total) : 0;
-  const restoPreRecargo = method === "mixto" ? total - cashPortion : 0;
+  // Mixto: dos partes con metodo propio cada una (ej: transferencia + credito).
+  // No pueden repetir metodo entre si.
+  const parte1MontoNum = method === "mixto" ? Math.min(Math.max(0, Number(mixtoMontoParte1) || 0), total) : 0;
+  const parte2MontoNum = method === "mixto" ? total - parte1MontoNum : 0;
+  const parte1EsCredito = method === "mixto" && mixtoParte1Metodo === "credito";
+  const parte2EsCredito = method === "mixto" && mixtoParte2Metodo === "credito";
+  const mixtoTieneCredito = parte1EsCredito || parte2EsCredito;
+  const creditoBaseMixto = parte1EsCredito ? parte1MontoNum : parte2EsCredito ? parte2MontoNum : 0;
 
   const faltaCliente = method === "fiado" && !cliente;
 
   const requierePagador = METODOS_CON_PAGADOR.includes(method);
   const faltaPagador = requierePagador && pagadorNombre.trim().length === 0;
 
-  const esCredito = method === "credito" || (method === "mixto" && mixtoSubmetodo === "credito");
+  const esCredito = method === "credito" || mixtoTieneCredito;
   const recargoPctNum = esCredito ? Math.max(0, Number(recargoPct) || 0) : 0;
   const cuotasNum = esCredito ? Math.max(1, Number(cuotas) || 1) : undefined;
 
-  // Para credito puro el recargo va sobre todo el total; en mixto solo sobre la porcion no efectivo.
-  const baseConRecargo = method === "mixto" ? restoPreRecargo : total;
+  // Para credito puro el recargo va sobre todo el total; en mixto solo sobre la porcion a credito.
+  const baseConRecargo = method === "mixto" ? creditoBaseMixto : total;
   const recargoMonto = Math.round(baseConRecargo * (recargoPctNum / 100) * 100) / 100;
   const totalConRecargo = total + recargoMonto;
-  const transferPortion = method === "mixto" ? restoPreRecargo + recargoMonto : 0;
+
+  const parte1Final = parte1MontoNum + (parte1EsCredito ? recargoMonto : 0);
+  const parte2Final = parte2MontoNum + (parte2EsCredito ? recargoMonto : 0);
+  const cashPortion =
+    (mixtoParte1Metodo === "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo === "efectivo" ? parte2Final : 0);
+  const transferPortion =
+    (mixtoParte1Metodo !== "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo !== "efectivo" ? parte2Final : 0);
 
   // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
   // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
@@ -136,7 +158,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       onConfirm({
         paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion,
         pagadorNombre, discount,
-        ...(mixtoSubmetodo === "credito" ? { cuotas: cuotasNum, recargoPct: recargoPctNum } : {}),
+        ...(mixtoTieneCredito ? { cuotas: cuotasNum, recargoPct: recargoPctNum, creditoMonto: creditoBaseMixto } : {}),
       });
     } else if (method === "fiado") {
       onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id, discount });
@@ -327,7 +349,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                 <span className="text-muted-foreground">
                   {method === "mixto" ? "Total con recargo (porción crédito)" : "Total con recargo"}
                 </span>
-                <span className="cifra font-semibold">{formatCurrency(method === "mixto" ? total + recargoMonto : totalConRecargo)}</span>
+                <span className="cifra font-semibold">{formatCurrency(totalConRecargo)}</span>
               </div>
             )}
           </div>
@@ -388,43 +410,78 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         {method === "mixto" && (
           <div className="mb-3 space-y-2">
             <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <p className="mb-1 text-xs text-muted-foreground">Parte 1</p>
+                <div className="inline-flex w-full rounded-xl border p-0.5">
+                  {MIXTO_METODOS.map((m) => (
+                    <button
+                      key={m.value}
+                      disabled={m.value === mixtoParte2Metodo}
+                      onClick={() => setMixtoParte1Metodo(m.value)}
+                      title={m.label}
+                      className={cn(
+                        "flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium",
+                        mixtoParte1Metodo === m.value
+                          ? "bg-primary text-primary-foreground"
+                          : m.value === mixtoParte2Metodo
+                            ? "cursor-not-allowed opacity-30"
+                            : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {m.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="mb-1 text-xs text-muted-foreground">Parte 2</p>
+                <div className="inline-flex w-full rounded-xl border p-0.5">
+                  {MIXTO_METODOS.map((m) => (
+                    <button
+                      key={m.value}
+                      disabled={m.value === mixtoParte1Metodo}
+                      onClick={() => setMixtoParte2Metodo(m.value)}
+                      title={m.label}
+                      className={cn(
+                        "flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium",
+                        mixtoParte2Metodo === m.value
+                          ? "bg-primary text-primary-foreground"
+                          : m.value === mixtoParte1Metodo
+                            ? "cursor-not-allowed opacity-30"
+                            : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {m.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <Input
-                type="number" inputMode="decimal" placeholder="Efectivo en mano"
-                value={efectivoMixto} onChange={(e) => setEfectivoMixto(e.target.value)}
+                type="number" inputMode="decimal" placeholder={`Monto en ${MIXTO_METODOS.find((m) => m.value === mixtoParte1Metodo)?.label}`}
+                value={mixtoMontoParte1} onChange={(e) => setMixtoMontoParte1(e.target.value)}
                 className="rounded-xl"
               />
-              <Button variant="outline" className="rounded-xl" onClick={() => setEfectivoMixto(String(total))}>
-                Todo
+              <Button variant="outline" className="rounded-xl" onClick={() => setMixtoMontoParte1(String(total / 2))}>
+                Mitad
               </Button>
             </div>
 
-            <div className="inline-flex w-full rounded-xl border p-0.5">
-              {(["transferencia", "debito", "credito"] as MixtoSubmetodo[]).map((sm) => (
-                <button
-                  key={sm}
-                  onClick={() => setMixtoSubmetodo(sm)}
-                  className={cn(
-                    "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium capitalize",
-                    mixtoSubmetodo === sm ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {sm === "transferencia" ? "Transfer." : sm === "debito" ? "Débito" : "Crédito"}
-                </button>
-              ))}
-            </div>
-
             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <Banknote className="h-3.5 w-3.5" /> Efectivo
+                {MIXTO_METODOS.find((m) => m.value === mixtoParte1Metodo)?.icon}
+                {MIXTO_METODOS.find((m) => m.value === mixtoParte1Metodo)?.label}
               </span>
-              <span className="cifra font-semibold">{formatCurrency(cashPortion)}</span>
+              <span className="cifra font-semibold">{formatCurrency(parte1Final)}</span>
             </div>
             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3.5 w-3.5" />
-                {mixtoSubmetodo === "transferencia" ? "Transferencia" : mixtoSubmetodo === "debito" ? "Débito" : "Crédito"}
+                {MIXTO_METODOS.find((m) => m.value === mixtoParte2Metodo)?.icon}
+                {MIXTO_METODOS.find((m) => m.value === mixtoParte2Metodo)?.label}
               </span>
-              <span className="cifra font-semibold">{formatCurrency(transferPortion)}</span>
+              <span className="cifra font-semibold">{formatCurrency(parte2Final)}</span>
             </div>
           </div>
         )}

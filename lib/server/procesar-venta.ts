@@ -19,6 +19,8 @@ export interface ProcesarVentaInput {
   cuotas?: number | null;
   /** % de recargo por cuotas (Credito): se suma al total autoritativo calculado aca. */
   recargoPct?: number | null;
+  /** Mixto: monto (sin recargo) de la parte que va por Credito, para aplicarle el recargo solo a esa porcion. */
+  creditoMonto?: number | null;
 }
 
 export interface ProcesarVentaResult {
@@ -83,10 +85,14 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
     transferAmount = Math.round(subtotal * (1 + recargoPct / 100) * 100) / 100;
     total = transferAmount;
   } else if (input.paymentMethod === "mixto") {
+    // Mixto reparte el total en dos partes con metodo propio cada una (ej:
+    // transferencia + credito, o credito + debito). Solo la porcion que se
+    // paga a credito lleva recargo; creditoMonto es esa porcion SIN recargo.
     cashAmount = Math.max(0, Math.min(cashAmount, subtotal));
     const restoSinRecargo = subtotal - cashAmount;
     recargoPct = Math.max(0, Number(input.recargoPct) || 0);
-    const recargoMonto = restoSinRecargo * (recargoPct / 100);
+    const creditoBase = Math.max(0, Math.min(Number(input.creditoMonto) || 0, restoSinRecargo));
+    const recargoMonto = creditoBase * (recargoPct / 100);
     transferAmount = Math.round((restoSinRecargo + recargoMonto) * 100) / 100;
     total = Math.round((subtotal + recargoMonto) * 100) / 100;
   } else if (input.paymentMethod === "transferencia" || input.paymentMethod === "debito") {

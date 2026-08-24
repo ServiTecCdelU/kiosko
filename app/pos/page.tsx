@@ -360,6 +360,7 @@ function PosScreen() {
         pagadorNombre: data.pagadorNombre,
         cuotas: data.cuotas,
         recargoPct: data.recargoPct,
+        creditoMonto: data.creditoMonto,
         discount: data.discount,
       };
 
