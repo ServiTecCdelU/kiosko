@@ -68,18 +68,45 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
   const discount = Number(input.discount) || 0;
   const subtotal = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
 
-  // El recargo por cuotas (Credito) se calcula aca, nunca se confia en un
-  // total mandado por el navegador.
-  const recargoPct = input.paymentMethod === "credito" ? Math.max(0, Number(input.recargoPct) || 0) : 0;
-  const total = Math.round((subtotal * (1 + recargoPct / 100)) * 100) / 100;
+  // El recargo por cuotas se calcula aca, nunca se confia en un total
+  // mandado por el navegador. Solo existe para Credito (recargo sobre todo
+  // el total) y para la porcion a credito de un Mixto (recargo solo sobre
+  // esa porcion, no sobre el efectivo).
+  let cashAmount = Number(input.cashAmount) || 0;
+  let transferAmount = Number(input.transferAmount) || 0;
+  let total = subtotal;
+  let recargoPct = 0;
+
+  if (input.paymentMethod === "credito") {
+    recargoPct = Math.max(0, Number(input.recargoPct) || 0);
+    cashAmount = 0;
+    transferAmount = Math.round(subtotal * (1 + recargoPct / 100) * 100) / 100;
+    total = transferAmount;
+  } else if (input.paymentMethod === "mixto") {
+    cashAmount = Math.max(0, Math.min(cashAmount, subtotal));
+    const restoSinRecargo = subtotal - cashAmount;
+    recargoPct = Math.max(0, Number(input.recargoPct) || 0);
+    const recargoMonto = restoSinRecargo * (recargoPct / 100);
+    transferAmount = Math.round((restoSinRecargo + recargoMonto) * 100) / 100;
+    total = Math.round((subtotal + recargoMonto) * 100) / 100;
+  } else if (input.paymentMethod === "transferencia" || input.paymentMethod === "debito") {
+    cashAmount = 0;
+    transferAmount = subtotal;
+    total = subtotal;
+  } else {
+    // efectivo, fiado, mercadopago, mercadopago_point, tarjeta: sin recargo,
+    // se respeta lo que mando el cliente para cash/transfer (efectivo puede
+    // superar el total por el vuelto).
+    total = subtotal;
+  }
 
   const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", {
     p_items: items,
     p_total: total,
     p_payment_method: input.paymentMethod ?? "efectivo",
-    p_cash_amount: Number(input.cashAmount) || 0,
+    p_cash_amount: cashAmount,
     p_change_amount: Number(input.changeAmount) || 0,
-    p_transfer_amount: Number(input.transferAmount) || 0,
+    p_transfer_amount: transferAmount,
     p_discount: discount,
     p_caja_id: input.cajaId ?? null,
     p_user_id: input.userId ?? null,

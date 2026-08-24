@@ -6,7 +6,7 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode, Radio } from "lucide-react";
+import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode, Radio, Tag, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ export interface ConfirmData {
   cashAmount: number;
   changeAmount: number;
   transferAmount: number;
+  discount?: number;
   clienteId?: string;
   pagadorNombre?: string;
   cuotas?: number;
@@ -29,6 +30,8 @@ export interface ConfirmData {
 
 /** Metodos que no identifican por si solos a quien paga: hace falta pedir nombre y apellido. */
 const METODOS_CON_PAGADOR: PaymentMethod[] = ["transferencia", "debito", "credito", "mixto"];
+
+type MixtoSubmetodo = "transferencia" | "debito" | "credito";
 
 /** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
 export interface CartPanelHandle {
@@ -49,44 +52,65 @@ interface CartPanelProps {
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
-  { items, total, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true },
+  { items, total: totalBruto, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true },
   ref,
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
   const [pagaCon, setPagaCon] = useState("");
   const [efectivoMixto, setEfectivoMixto] = useState("");
+  const [mixtoSubmetodo, setMixtoSubmetodo] = useState<MixtoSubmetodo>("transferencia");
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [pagadorNombre, setPagadorNombre] = useState("");
   const [cuotas, setCuotas] = useState("1");
   const [recargoPct, setRecargoPct] = useState("");
+  const [mostrarDescuento, setMostrarDescuento] = useState(false);
+  const [descuentoModo, setDescuentoModo] = useState<"monto" | "porcentaje">("monto");
+  const [descuentoValor, setDescuentoValor] = useState("");
 
   useEffect(() => {
     if (items.length === 0) {
       setPagaCon("");
       setEfectivoMixto("");
+      setMixtoSubmetodo("transferencia");
       setCliente(null);
       setPagadorNombre("");
       setCuotas("1");
       setRecargoPct("");
+      setMostrarDescuento(false);
+      setDescuentoModo("monto");
+      setDescuentoValor("");
     }
   }, [items.length]);
+
+  const descuentoValorNum = Math.max(0, Number(descuentoValor) || 0);
+  const descuentoMonto = !mostrarDescuento ? 0
+    : descuentoModo === "porcentaje"
+      ? Math.min(totalBruto, Math.round(totalBruto * (Math.min(descuentoValorNum, 100) / 100) * 100) / 100)
+      : Math.min(totalBruto, descuentoValorNum);
+  const total = Math.max(0, Math.round((totalBruto - descuentoMonto) * 100) / 100);
 
   const pagaConNum = Number(pagaCon) || 0;
   const vuelto = method === "efectivo" ? Math.max(0, pagaConNum - total) : 0;
   const faltaEfectivo = method === "efectivo" && pagaConNum < total;
 
-  // Mixto: el efectivo ingresado es la porcion en mano; el resto va por transferencia.
+  // Mixto: el efectivo ingresado es la porcion en mano; el resto va por el submetodo elegido.
   const cashPortion = method === "mixto" ? Math.min(Math.max(0, Number(efectivoMixto) || 0), total) : 0;
-  const transferPortion = method === "mixto" ? total - cashPortion : 0;
+  const restoPreRecargo = method === "mixto" ? total - cashPortion : 0;
 
   const faltaCliente = method === "fiado" && !cliente;
 
   const requierePagador = METODOS_CON_PAGADOR.includes(method);
   const faltaPagador = requierePagador && pagadorNombre.trim().length === 0;
 
-  const recargoPctNum = method === "credito" ? Math.max(0, Number(recargoPct) || 0) : 0;
-  const cuotasNum = method === "credito" ? Math.max(1, Number(cuotas) || 1) : undefined;
-  const totalConRecargo = method === "credito" ? Math.round(total * (1 + recargoPctNum / 100) * 100) / 100 : total;
+  const esCredito = method === "credito" || (method === "mixto" && mixtoSubmetodo === "credito");
+  const recargoPctNum = esCredito ? Math.max(0, Number(recargoPct) || 0) : 0;
+  const cuotasNum = esCredito ? Math.max(1, Number(cuotas) || 1) : undefined;
+
+  // Para credito puro el recargo va sobre todo el total; en mixto solo sobre la porcion no efectivo.
+  const baseConRecargo = method === "mixto" ? restoPreRecargo : total;
+  const recargoMonto = Math.round(baseConRecargo * (recargoPctNum / 100) * 100) / 100;
+  const totalConRecargo = total + recargoMonto;
+  const transferPortion = method === "mixto" ? restoPreRecargo + recargoMonto : 0;
 
   // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
   // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
@@ -98,25 +122,30 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 
   const handleConfirm = () => {
     if (disabled) return;
+    const discount = descuentoMonto > 0 ? descuentoMonto : undefined;
     if (method === "transferencia") {
-      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre });
+      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount });
     } else if (method === "debito") {
-      onConfirm({ paymentMethod: "debito", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre });
+      onConfirm({ paymentMethod: "debito", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount });
     } else if (method === "credito") {
       onConfirm({
         paymentMethod: "credito", cashAmount: 0, changeAmount: 0, transferAmount: totalConRecargo,
-        pagadorNombre, cuotas: cuotasNum, recargoPct: recargoPctNum,
+        pagadorNombre, cuotas: cuotasNum, recargoPct: recargoPctNum, discount,
       });
     } else if (method === "mixto") {
-      onConfirm({ paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion, pagadorNombre });
+      onConfirm({
+        paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion,
+        pagadorNombre, discount,
+        ...(mixtoSubmetodo === "credito" ? { cuotas: cuotasNum, recargoPct: recargoPctNum } : {}),
+      });
     } else if (method === "fiado") {
-      onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id });
+      onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id, discount });
     } else if (method === "mercadopago") {
-      onConfirm({ paymentMethod: "mercadopago", cashAmount: 0, changeAmount: 0, transferAmount: total });
+      onConfirm({ paymentMethod: "mercadopago", cashAmount: 0, changeAmount: 0, transferAmount: total, discount });
     } else if (method === "mercadopago_point") {
-      onConfirm({ paymentMethod: "mercadopago_point", cashAmount: 0, changeAmount: 0, transferAmount: total });
+      onConfirm({ paymentMethod: "mercadopago_point", cashAmount: 0, changeAmount: 0, transferAmount: total, discount });
     } else {
-      onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0 });
+      onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0, discount });
     }
   };
 
@@ -211,22 +240,62 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       </div>
 
       <div className="border-t border-border/60 p-4">
-        <div className="mb-3 flex items-end justify-between">
-          <span className="eyebrow">Total</span>
-          <span className="cifra-hero text-money text-5xl">{formatCurrency(total)}</span>
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            onClick={() => setMostrarDescuento((v) => !v)}
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <Tag className="h-3.5 w-3.5" /> Descuento
+            <ChevronDown className={cn("h-3 w-3 transition-transform", mostrarDescuento && "rotate-180")} />
+          </button>
         </div>
 
-        <div className="mb-3 grid grid-cols-4 gap-1.5">
+        {mostrarDescuento && (
+          <div className="mb-3 flex items-center gap-1.5">
+            <div className="inline-flex rounded-xl border p-0.5">
+              <button
+                onClick={() => setDescuentoModo("monto")}
+                className={cn("rounded-lg px-2.5 py-1 text-xs font-medium", descuentoModo === "monto" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+              >
+                $
+              </button>
+              <button
+                onClick={() => setDescuentoModo("porcentaje")}
+                className={cn("rounded-lg px-2.5 py-1 text-xs font-medium", descuentoModo === "porcentaje" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+              >
+                %
+              </button>
+            </div>
+            <Input
+              type="number" inputMode="decimal"
+              placeholder={descuentoModo === "monto" ? "Descuento en $" : "Descuento en %"}
+              value={descuentoValor} onChange={(e) => setDescuentoValor(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+        )}
+
+        <div className="mb-3 flex items-end justify-between">
+          <span className="eyebrow">Total</span>
+          <div className="text-right">
+            {descuentoMonto > 0 && (
+              <span className="mr-1.5 text-sm text-muted-foreground line-through">{formatCurrency(totalBruto)}</span>
+            )}
+            <span className="cifra-hero text-money text-5xl">{formatCurrency(total)}</span>
+          </div>
+        </div>
+
+        <div className="mb-3 grid grid-cols-3 gap-1.5">
           <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
           <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
           <MethodButton active={method === "debito"} onClick={() => setMethod("debito")} icon={<CreditCard className="h-4 w-4" />} label="Débito" />
           <MethodButton active={method === "credito"} onClick={() => setMethod("credito")} icon={<CreditCard className="h-4 w-4" />} label="Crédito" />
           <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
+          <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
           {/* MP QR y MP Point comentados por ahora (ver pedido del 2026-08-24)
           <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP QR" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
           <MethodButton active={method === "mercadopago_point"} onClick={() => setMethod("mercadopago_point")} icon={<Radio className="h-4 w-4" />} label="MP Point" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
           */}
-          <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
         </div>
 
         {requierePagador && (
@@ -239,7 +308,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           </div>
         )}
 
-        {method === "credito" && (
+        {esCredito && (
           <div className="mb-3 space-y-2">
             <div className="flex items-center gap-2">
               <Input
@@ -255,8 +324,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
             </div>
             {recargoPctNum > 0 && (
               <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Total con recargo</span>
-                <span className="cifra font-semibold">{formatCurrency(totalConRecargo)}</span>
+                <span className="text-muted-foreground">
+                  {method === "mixto" ? "Total con recargo (porción crédito)" : "Total con recargo"}
+                </span>
+                <span className="cifra font-semibold">{formatCurrency(method === "mixto" ? total + recargoMonto : totalConRecargo)}</span>
               </div>
             )}
           </div>
@@ -326,6 +397,22 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                 Todo
               </Button>
             </div>
+
+            <div className="inline-flex w-full rounded-xl border p-0.5">
+              {(["transferencia", "debito", "credito"] as MixtoSubmetodo[]).map((sm) => (
+                <button
+                  key={sm}
+                  onClick={() => setMixtoSubmetodo(sm)}
+                  className={cn(
+                    "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium capitalize",
+                    mixtoSubmetodo === sm ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {sm === "transferencia" ? "Transfer." : sm === "debito" ? "Débito" : "Crédito"}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Banknote className="h-3.5 w-3.5" /> Efectivo
@@ -334,7 +421,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
             </div>
             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3.5 w-3.5" /> Transferencia
+                <CreditCard className="h-3.5 w-3.5" />
+                {mixtoSubmetodo === "transferencia" ? "Transferencia" : mixtoSubmetodo === "debito" ? "Débito" : "Crédito"}
               </span>
               <span className="cifra font-semibold">{formatCurrency(transferPortion)}</span>
             </div>
