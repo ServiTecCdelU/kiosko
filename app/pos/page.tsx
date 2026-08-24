@@ -227,6 +227,9 @@ function PosScreen() {
         cashAmount: data.cashAmount,
         changeAmount: data.changeAmount,
         userName,
+        pagadorNombre: data.pagadorNombre,
+        cuotas: data.cuotas,
+        recargoPct: data.recargoPct,
       });
       cart.clear();
       setQuery("");
@@ -354,6 +357,9 @@ function PosScreen() {
         clienteId: data.clienteId,
         userId: user?.id,
         userName: user?.nombre,
+        pagadorNombre: data.pagadorNombre,
+        cuotas: data.cuotas,
+        recargoPct: data.recargoPct,
       };
 
       try {

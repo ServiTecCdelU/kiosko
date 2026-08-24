@@ -38,7 +38,7 @@ export async function crearPreferenciaMP(input: CrearPreferenciaInput): Promise<
     body: JSON.stringify({
       items: [
         {
-          title: input.descripcion || "Compra Kiosko Despensa",
+          title: input.descripcion || "Compra Demo",
           quantity: 1,
           unit_price: input.total,
           currency_id: "ARS",

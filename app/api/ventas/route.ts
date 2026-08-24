@@ -28,6 +28,9 @@ export async function POST(req: Request) {
       userName: body?.userName ?? null,
       clienteId: body?.clienteId ?? null,
       comercioId: String(body?.comercioId ?? "comercio_1"),
+      pagadorNombre: body?.pagadorNombre ?? null,
+      cuotas: body?.cuotas ?? null,
+      recargoPct: body?.recargoPct ?? null,
     });
     return NextResponse.json(res);
   } catch (e) {

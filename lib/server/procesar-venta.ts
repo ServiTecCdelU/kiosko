@@ -15,6 +15,10 @@ export interface ProcesarVentaInput {
   userName?: string | null;
   clienteId?: string | null;
   comercioId: string;
+  pagadorNombre?: string | null;
+  cuotas?: number | null;
+  /** % de recargo por cuotas (Credito): se suma al total autoritativo calculado aca. */
+  recargoPct?: number | null;
 }
 
 export interface ProcesarVentaResult {
@@ -62,7 +66,12 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
   });
 
   const discount = Number(input.discount) || 0;
-  const total = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
+  const subtotal = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
+
+  // El recargo por cuotas (Credito) se calcula aca, nunca se confia en un
+  // total mandado por el navegador.
+  const recargoPct = input.paymentMethod === "credito" ? Math.max(0, Number(input.recargoPct) || 0) : 0;
+  const total = Math.round((subtotal * (1 + recargoPct / 100)) * 100) / 100;
 
   const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", {
     p_items: items,
@@ -77,6 +86,9 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
     p_user_name: input.userName ?? null,
     p_cliente_id: input.clienteId ?? null,
     p_comercio_id: comercioId,
+    p_pagador_nombre: input.pagadorNombre ?? null,
+    p_cuotas: input.cuotas ?? null,
+    p_recargo_pct: recargoPct,
   });
 
   if (error) throw new Error(error.message);

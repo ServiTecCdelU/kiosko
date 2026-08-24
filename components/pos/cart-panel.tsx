@@ -22,7 +22,13 @@ export interface ConfirmData {
   changeAmount: number;
   transferAmount: number;
   clienteId?: string;
+  pagadorNombre?: string;
+  cuotas?: number;
+  recargoPct?: number;
 }
+
+/** Metodos que no identifican por si solos a quien paga: hace falta pedir nombre y apellido. */
+const METODOS_CON_PAGADOR: PaymentMethod[] = ["transferencia", "debito", "credito", "mixto"];
 
 /** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
 export interface CartPanelHandle {
@@ -50,12 +56,18 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const [pagaCon, setPagaCon] = useState("");
   const [efectivoMixto, setEfectivoMixto] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [pagadorNombre, setPagadorNombre] = useState("");
+  const [cuotas, setCuotas] = useState("1");
+  const [recargoPct, setRecargoPct] = useState("");
 
   useEffect(() => {
     if (items.length === 0) {
       setPagaCon("");
       setEfectivoMixto("");
       setCliente(null);
+      setPagadorNombre("");
+      setCuotas("1");
+      setRecargoPct("");
     }
   }, [items.length]);
 
@@ -69,20 +81,34 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 
   const faltaCliente = method === "fiado" && !cliente;
 
+  const requierePagador = METODOS_CON_PAGADOR.includes(method);
+  const faltaPagador = requierePagador && pagadorNombre.trim().length === 0;
+
+  const recargoPctNum = method === "credito" ? Math.max(0, Number(recargoPct) || 0) : 0;
+  const cuotasNum = method === "credito" ? Math.max(1, Number(cuotas) || 1) : undefined;
+  const totalConRecargo = method === "credito" ? Math.round(total * (1 + recargoPctNum / 100) * 100) / 100 : total;
+
   // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
   // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
   const credito = cliente ? evaluarCredito(cliente.saldo, cliente.limiteCredito, total) : null;
   const deudaProyectada = credito?.deudaProyectada ?? 0;
   const excedeCredito = method === "fiado" && !!credito && credito.supera;
 
-  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente || excedeCredito;
+  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente || excedeCredito || faltaPagador;
 
   const handleConfirm = () => {
     if (disabled) return;
     if (method === "transferencia") {
-      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total });
+      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre });
+    } else if (method === "debito") {
+      onConfirm({ paymentMethod: "debito", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre });
+    } else if (method === "credito") {
+      onConfirm({
+        paymentMethod: "credito", cashAmount: 0, changeAmount: 0, transferAmount: totalConRecargo,
+        pagadorNombre, cuotas: cuotasNum, recargoPct: recargoPctNum,
+      });
     } else if (method === "mixto") {
-      onConfirm({ paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion });
+      onConfirm({ paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion, pagadorNombre });
     } else if (method === "fiado") {
       onConfirm({ paymentMethod: "fiado", cashAmount: 0, changeAmount: 0, transferAmount: 0, clienteId: cliente?.id });
     } else if (method === "mercadopago") {
@@ -193,11 +219,48 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         <div className="mb-3 grid grid-cols-4 gap-1.5">
           <MethodButton active={method === "efectivo"} onClick={() => setMethod("efectivo")} icon={<Banknote className="h-4 w-4" />} label="Efectivo" />
           <MethodButton active={method === "transferencia"} onClick={() => setMethod("transferencia")} icon={<CreditCard className="h-4 w-4" />} label="Transfer." />
+          <MethodButton active={method === "debito"} onClick={() => setMethod("debito")} icon={<CreditCard className="h-4 w-4" />} label="Débito" />
+          <MethodButton active={method === "credito"} onClick={() => setMethod("credito")} icon={<CreditCard className="h-4 w-4" />} label="Crédito" />
           <MethodButton active={method === "mixto"} onClick={() => setMethod("mixto")} icon={<Coins className="h-4 w-4" />} label="Mixto" />
+          {/* MP QR y MP Point comentados por ahora (ver pedido del 2026-08-24)
           <MethodButton active={method === "mercadopago"} onClick={() => setMethod("mercadopago")} icon={<QrCode className="h-4 w-4" />} label="MP QR" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
           <MethodButton active={method === "mercadopago_point"} onClick={() => setMethod("mercadopago_point")} icon={<Radio className="h-4 w-4" />} label="MP Point" disabled={!isOnline} title={!isOnline ? "Necesita conexión a internet" : undefined} />
+          */}
           <MethodButton active={method === "fiado"} onClick={() => setMethod("fiado")} icon={<NotebookPen className="h-4 w-4" />} label="Fiado" />
         </div>
+
+        {requierePagador && (
+          <div className="mb-3">
+            <Input
+              placeholder="Nombre y apellido de quien paga"
+              value={pagadorNombre} onChange={(e) => setPagadorNombre(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+        )}
+
+        {method === "credito" && (
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number" inputMode="numeric" min={1} placeholder="Cuotas"
+                value={cuotas} onChange={(e) => setCuotas(e.target.value)}
+                className="rounded-xl"
+              />
+              <Input
+                type="number" inputMode="decimal" min={0} placeholder="% Recargo"
+                value={recargoPct} onChange={(e) => setRecargoPct(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+            {recargoPctNum > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Total con recargo</span>
+                <span className="cifra font-semibold">{formatCurrency(totalConRecargo)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {method === "fiado" && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
 

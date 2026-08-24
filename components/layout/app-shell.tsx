@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Store } from "lucide-react";
+import { LogOut, Store, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
 import { useAuth, AUTH_DISABLED } from "@/hooks/use-auth";
@@ -13,11 +14,26 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+const COLLAPSE_KEY = "kiosko_nav_colapsado";
+
 export function AppShell({ title, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, rol, logout } = useAuth();
   const items = visibleNavItems(rol);
+  const [colapsado, setColapsado] = useState(false);
+
+  useEffect(() => {
+    setColapsado(localStorage.getItem(COLLAPSE_KEY) === "1");
+  }, []);
+
+  const toggleColapsado = () => {
+    setColapsado((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -28,12 +44,17 @@ export function AppShell({ title, children }: AppShellProps) {
     <AuthGuard>
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Sidebar desktop */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-3 px-5 py-5">
-          <span className="grad-brand flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30">
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
+          colapsado ? "w-[68px]" : "w-60",
+        )}
+      >
+        <div className={cn("flex items-center gap-3 px-5 py-5", colapsado && "justify-center px-0")}>
+          <span className="grad-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30">
             <Store className="h-5 w-5" />
           </span>
-          <span className="text-base font-bold tracking-tight">Kiosko Despensa</span>
+          {!colapsado && <span className="text-base font-bold tracking-tight">Demo</span>}
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {items.map((item) => {
@@ -42,26 +63,43 @@ export function AppShell({ title, children }: AppShellProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                title={colapsado ? item.label : undefined}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  colapsado && "justify-center px-0",
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm shadow-sidebar-primary/40"
                     : "text-sidebar-foreground/75 hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
-                <item.icon className={cn("h-4 w-4 transition-transform", active && "scale-110")} />
-                {item.label}
+                <item.icon className={cn("h-4 w-4 shrink-0 transition-transform", active && "scale-110")} />
+                {!colapsado && item.label}
               </Link>
             );
           })}
         </nav>
+
+        <button
+          onClick={toggleColapsado}
+          className={cn(
+            "mx-3 mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            colapsado && "justify-center px-0",
+          )}
+          aria-label={colapsado ? "Mostrar menú" : "Ocultar menú"}
+        >
+          {colapsado ? <PanelLeftOpen className="h-4 w-4 shrink-0" /> : <PanelLeftClose className="h-4 w-4 shrink-0" />}
+          {!colapsado && "Ocultar menú"}
+        </button>
+
         {user && (
           <div className="border-t border-sidebar-border px-3 py-3">
-            <div className="flex items-center justify-between gap-2 px-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{user.nombre}</p>
-                <p className="text-xs capitalize text-sidebar-foreground/60">{user.rol}</p>
-              </div>
+            <div className={cn("flex items-center justify-between gap-2 px-2", colapsado && "justify-center px-0")}>
+              {!colapsado && (
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{user.nombre}</p>
+                  <p className="text-xs capitalize text-sidebar-foreground/60">{user.rol}</p>
+                </div>
+              )}
               {!AUTH_DISABLED && (
                 <button onClick={handleLogout} className="text-sidebar-foreground/70 hover:text-sidebar-foreground" aria-label="Salir">
                   <LogOut className="h-4 w-4" />

@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const preferencia = await crearPreferenciaMP({
       total,
       externalReference,
-      descripcion: `Venta Kiosko Despensa (${saleInput.items.length} items)`,
+      descripcion: `Venta Demo (${saleInput.items.length} items)`,
     });
 
     const { error } = await supabaseAdmin.from("pagos_mp_pendientes").insert({

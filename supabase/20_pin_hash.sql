@@ -10,6 +10,9 @@
 --
 -- Es idempotente: se puede correr mas de una vez sin romper nada.
 
+-- En Supabase, pgcrypto suele quedar instalado en el schema "extensions"
+-- (no en "public"), por eso la funcion de abajo agrega "extensions" al
+-- search_path explicitamente.
 create extension if not exists pgcrypto;
 
 -- 1. Columna nueva con el hash
@@ -38,7 +41,7 @@ create or replace function verificar_pin(p_pin text)
 returns table (id text, nombre text, rol text, comercio_id text)
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   return query

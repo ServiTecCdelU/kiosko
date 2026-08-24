@@ -144,7 +144,7 @@ function HomeContent() {
         </div>
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
-          Kiosko Despensa · Punto de venta
+          Demo · Punto de venta
         </p>
       </div>
     </main>
@@ -180,7 +180,7 @@ function BrandHeader({ nombre }: { nombre?: string }) {
         </span>
         <div>
           <h1 className="text-xl font-bold leading-none text-foreground sm:text-2xl">
-            Kiosko Despensa
+            Demo
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {saludo}

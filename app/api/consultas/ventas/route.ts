@@ -52,6 +52,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ventas: data ?? [] });
     }
 
+    case "ventasDeRango": {
+      const desde = String(body?.desde ?? "");
+      const hasta = String(body?.hasta ?? "");
+      if (!desde || !hasta) return NextResponse.json({ error: "Falta el rango de fechas" }, { status: 400 });
+      const { data, error } = await supabaseAdmin
+        .from("ventas")
+        .select("*")
+        .eq("comercio_id", comercioId)
+        .gte("created_at", desde)
+        .lte("created_at", hasta)
+        .order("created_at", { ascending: false })
+        .limit(LIMITE_MAX);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ ventas: data ?? [] });
+    }
+
     case "movimientosStock": {
       const productoId = String(body?.productoId ?? "");
       if (!productoId) return NextResponse.json({ error: "Falta el producto" }, { status: 400 });

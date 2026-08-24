@@ -21,6 +21,9 @@ export interface CreateSaleInput {
   clienteId?: string;
   userId?: string;
   userName?: string;
+  pagadorNombre?: string;
+  cuotas?: number;
+  recargoPct?: number;
 }
 
 export interface ProcessSaleResult {
@@ -68,6 +71,9 @@ function mapSale(d: Record<string, any>): Sale {
     clienteId: d.cliente_id ?? undefined,
     userId: d.user_id ?? undefined,
     userName: d.user_name ?? undefined,
+    pagadorNombre: d.pagador_nombre ?? undefined,
+    cuotas: d.cuotas != null ? Number(d.cuotas) : undefined,
+    recargoPct: d.recargo_pct != null ? Number(d.recargo_pct) : undefined,
     estado: d.estado ?? "completada",
     anuladaAt: d.anulada_at ? new Date(d.anulada_at) : undefined,
     anuladaPorNombre: d.anulada_por_nombre ?? undefined,
@@ -86,6 +92,13 @@ export async function getVentaById(ventaId: string): Promise<Sale | null> {
 export async function getVentasDeCaja(cajaId: string): Promise<Sale[]> {
   const { ventas } = await consultar<{ ventas: Record<string, any>[] }>(
     "/api/consultas/ventas", "ventasDeCaja", { cajaId },
+  );
+  return ventas.map(mapSale);
+}
+
+export async function getVentasDeRango(desde: Date, hasta: Date): Promise<Sale[]> {
+  const { ventas } = await consultar<{ ventas: Record<string, any>[] }>(
+    "/api/consultas/ventas", "ventasDeRango", { desde: desde.toISOString(), hasta: hasta.toISOString() },
   );
   return ventas.map(mapSale);
 }

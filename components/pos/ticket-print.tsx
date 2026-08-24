@@ -11,6 +11,9 @@ export interface TicketData {
   cashAmount: number;
   changeAmount: number;
   userName?: string;
+  pagadorNombre?: string;
+  cuotas?: number;
+  recargoPct?: number;
 }
 
 const METODO_LABEL: Record<PaymentMethod, string> = {
@@ -21,6 +24,8 @@ const METODO_LABEL: Record<PaymentMethod, string> = {
   mercadopago: "Mercado Pago (QR)",
   tarjeta: "Tarjeta (posnet)",
   mercadopago_point: "Mercado Pago (Point)",
+  debito: "Débito",
+  credito: "Crédito",
 };
 
 export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
@@ -28,7 +33,7 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
 
   return (
     <div id="ticket-print" className="bg-white p-2 font-mono text-[11px] leading-tight text-black">
-      <p className="text-center text-sm font-bold">Kiosko Despensa</p>
+      <p className="text-center text-sm font-bold">Demo</p>
       <p className="text-center">Ticket no fiscal</p>
       <p className="text-center">{formatDateTime(ticket.createdAt)}</p>
       <p className="text-center">#{ticket.saleNumber}</p>
@@ -53,6 +58,11 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
       {ticket.paymentMethod === "efectivo" && ticket.changeAmount > 0 && (
         <p>Vuelto: {formatCurrency(ticket.changeAmount)}</p>
       )}
+      {ticket.paymentMethod === "credito" && !!ticket.cuotas && <p>Cuotas: {ticket.cuotas}</p>}
+      {ticket.paymentMethod === "credito" && !!ticket.recargoPct && (
+        <p>Recargo: {ticket.recargoPct}%</p>
+      )}
+      {ticket.pagadorNombre && <p>Pagó: {ticket.pagadorNombre}</p>}
       {ticket.userName && <p>Atendió: {ticket.userName}</p>}
       <div className="my-1 border-t border-dashed border-black" />
       <p className="text-center">¡Gracias por su compra!</p>

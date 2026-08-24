@@ -7,8 +7,9 @@ const STORAGE_KEY = "kiosko_user";
 let cached: Usuario | null | undefined = undefined;
 
 // ── Auth temporalmente DESACTIVADO ──────────────────────────────
-// Se entra directo como admin demo mientras se implementa el login
-// con Google. Para reactivar el login por PIN: poner AUTH_DISABLED = false.
+// Ni PIN ni Google por ahora: se entra directo como admin demo.
+// Para reactivar: poner AUTH_DISABLED = false (el login por PIN ya
+// funciona, ver app/login/page.tsx y supabase/20_pin_hash.sql).
 export const AUTH_DISABLED = true;
 // Comercio por defecto mientras hay un solo tenant / auth desactivado.
 export const DEFAULT_COMERCIO_ID = "comercio_1";

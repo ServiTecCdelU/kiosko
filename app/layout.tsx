@@ -14,7 +14,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Kiosko Despensa - Punto de Venta",
+  title: "Demo - Punto de Venta",
   description: "Sistema de punto de venta para kiosko y despensa",
   manifest: "/manifest.json",
   themeColor: "#0d9488",

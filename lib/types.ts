@@ -48,7 +48,7 @@ export interface SaleItem {
 // sin integracion (el cajero cobraba aparte y lo marcaba a mano). Con el lector
 // Point andando se saco, porque elegirlo por error registraba la venta sin
 // cobrar nada. Se mantiene el valor para que las ventas viejas sigan leyendose.
-export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado" | "mercadopago" | "tarjeta" | "mercadopago_point";
+export type PaymentMethod = "efectivo" | "transferencia" | "mixto" | "fiado" | "mercadopago" | "tarjeta" | "mercadopago_point" | "debito" | "credito";
 export type VentaEstado = "completada" | "anulada";
 
 export interface Sale {
@@ -65,6 +65,10 @@ export interface Sale {
   clienteId?: string;
   userId?: string;
   userName?: string;
+  /** Nombre y apellido de quien pago, para Transferencia/Debito/Credito/Mixto. */
+  pagadorNombre?: string;
+  cuotas?: number;
+  recargoPct?: number;
   estado: VentaEstado;
   anuladaAt?: Date;
   anuladaPorNombre?: string;

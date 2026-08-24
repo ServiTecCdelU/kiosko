@@ -48,7 +48,7 @@ export function agregarResumenCaja(
     }
 
     // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
-    const tr = ["transferencia", "tarjeta"].includes(v.payment_method)
+    const tr = ["transferencia", "tarjeta", "debito", "credito"].includes(v.payment_method)
       ? t
       : v.payment_method === "mixto"
         ? Math.min(t, Number(v.transfer_amount) || 0)

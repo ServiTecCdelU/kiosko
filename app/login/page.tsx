@@ -56,7 +56,7 @@ export default function LoginPage() {
         <div className="grad-brand shadow-brand flex h-16 w-16 items-center justify-center rounded-3xl text-white">
           <Store className="h-8 w-8" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Kiosko Despensa</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Demo</h1>
         <p className="text-sm text-muted-foreground">Ingresá tu PIN</p>
       </div>
 
