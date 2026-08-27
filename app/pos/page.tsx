@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -31,6 +31,8 @@ import {
 import { getVentaById } from "@/services/sales-service";
 import { MercadoPagoQrDialog } from "@/components/pos/mercadopago-qr-dialog";
 import { MercadoPagoPointDialog } from "@/components/pos/mercadopago-point-dialog";
+import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
+import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
 import type { Product } from "@/lib/types";
 
 export default function PosPage() {
@@ -55,6 +57,8 @@ function PosScreen() {
   const [esperaOpen, setEsperaOpen] = useState(false);
   const [cobroQR, setCobroQR] = useState<CobroQR | null>(null);
   const [cobroPoint, setCobroPoint] = useState<CobroPoint | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [codigoNoEncontrado, setCodigoNoEncontrado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
   const { isOnline, pendingCount, syncVentasPendientes } = useOfflineSync();
@@ -204,6 +208,35 @@ function PosScreen() {
       toast.error("Error al buscar");
     }
   }, [query, results, addToCart, focusInput, isOnline]);
+
+  const handleScanDetected = useCallback(
+    async (codigo: string) => {
+      setScannerOpen(false);
+      try {
+        const found = isOnline
+          ? await findProductByCode(codigo).catch(() => buscarPorCodigoOffline(codigo))
+          : await buscarPorCodigoOffline(codigo);
+        if (found) {
+          addToCart(found);
+          toast.success(`${found.name} agregado`);
+        } else {
+          setCodigoNoEncontrado(codigo);
+        }
+      } catch {
+        toast.error("Error al buscar el código");
+      }
+    },
+    [addToCart, isOnline],
+  );
+
+  const handleProductoCreado = useCallback(
+    (p: Product) => {
+      addToCart(p);
+      toast.success(`${p.name} creado y agregado`);
+      focusInput();
+    },
+    [addToCart, focusInput],
+  );
 
   const finalizarTicket = useCallback(
     (saleNumber: string, total: number, data: ConfirmData, userName?: string) => {
@@ -464,22 +497,31 @@ function PosScreen() {
       <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_380px]">
         {/* Busqueda + resultados */}
         <div className="flex min-h-0 flex-col gap-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
-            <Input
-              ref={inputRef}
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleEnter();
-                }
-              }}
-              placeholder="Escaneá un código o buscá por nombre..."
-              className="card-premium h-14 rounded-2xl border-0 pl-12 text-base font-medium shadow-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
+              <Input
+                ref={inputRef}
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleEnter();
+                  }
+                }}
+                placeholder="Escaneá un código o buscá por nombre..."
+                className="card-premium h-14 rounded-2xl border-0 pl-12 text-base font-medium shadow-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
+            </div>
+            <button
+              onClick={() => setScannerOpen(true)}
+              aria-label="Escanear con la cámara"
+              className="card-premium flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-0 text-primary transition-colors hover:bg-primary/10"
+            >
+              <Camera className="h-5 w-5" />
+            </button>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-card p-2">
@@ -606,6 +648,17 @@ function PosScreen() {
         total={cart.total}
         onOpenChange={(o) => !o && setCobroPoint(null)}
         onAprobado={handleAprobadoPoint}
+      />
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScanDetected}
+      />
+      <QuickCreateProductDialog
+        open={codigoNoEncontrado !== null}
+        codigoBarras={codigoNoEncontrado ?? ""}
+        onOpenChange={(o) => !o && setCodigoNoEncontrado(null)}
+        onCreated={handleProductoCreado}
       />
     </main>
   );

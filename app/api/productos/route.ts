@@ -57,6 +57,49 @@ export async function PATCH(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
+export async function POST(req: Request) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
+  }
+
+  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const input = body?.input;
+  if (!input || typeof input !== "object") {
+    return NextResponse.json({ error: "Faltan los datos del producto" }, { status: 400 });
+  }
+
+  const name = String(input.name ?? "").trim();
+  const price = Number(input.price);
+  if (!name) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
+  if (!Number.isFinite(price) || price < 0) {
+    return NextResponse.json({ error: "Precio invalido" }, { status: 400 });
+  }
+  const stock = Number(input.stock) || 0;
+
+  const { data, error } = await supabaseAdmin
+    .from("productos")
+    .insert({
+      comercio_id: comercioId,
+      codigo_barras: input.codigoBarras || null,
+      name,
+      category: input.category || "",
+      price,
+      stock,
+      stock_minimo: 0,
+      unidad: "un",
+      stock_controlado: true,
+      revisar: true,
+    })
+    .select("id")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true, id: data.id });
+}
+
 export async function PUT(req: Request) {
   let body: any;
   try {

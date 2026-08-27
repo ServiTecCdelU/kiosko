@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers,
+  Package, PackageX, ClipboardList, Layers, PackagePlus,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { ajustarStock } from "@/services/stock-service";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
 import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
+import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
@@ -49,6 +50,7 @@ export default function StockPage() {
   const [ofertaProduct, setOfertaProduct] = useState<Product | null>(null);
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [nuevoOpen, setNuevoOpen] = useState(false);
   const [vencimientos, setVencimientos] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -231,6 +233,9 @@ export default function StockPage() {
             ))}
           </select>
         )}
+        <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
+          <PackagePlus className="mr-2 h-4 w-4" /> Nuevo producto
+        </Button>
         <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
           <Upload className="mr-2 h-4 w-4" /> Importar productos
         </Button>
@@ -377,6 +382,13 @@ export default function StockPage() {
       />
       <OfertaDialog product={ofertaProduct} open={ofertaOpen} onOpenChange={setOfertaOpen} onSubmit={handleOferta} />
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
+      <QuickCreateProductDialog
+        open={nuevoOpen}
+        codigoBarras=""
+        codigoEditable
+        onOpenChange={setNuevoOpen}
+        onCreated={() => refreshAll()}
+      />
     </AppShell>
   );
 }

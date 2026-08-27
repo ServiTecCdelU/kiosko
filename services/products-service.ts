@@ -212,6 +212,28 @@ export async function setOferta(productId: string, oferta: SetOfertaInput): Prom
   }
 }
 
+export interface CreateProductInput {
+  name: string;
+  price: number;
+  stock: number;
+  codigoBarras?: string;
+  category?: string;
+}
+
+export async function createProduct(input: CreateProductInput): Promise<string> {
+  const res = await fetch("/api/productos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input, comercioId: getComercioId() }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? "No se pudo crear el producto");
+  }
+  const data = await res.json();
+  return data.id as string;
+}
+
 export async function findProductByCode(code: string): Promise<Product | null> {
   const c = code.trim();
   if (!c) return null;
