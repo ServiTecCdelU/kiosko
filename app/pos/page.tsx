@@ -529,7 +529,7 @@ function PosScreen() {
               favoritos.length > 0 ? (
                 <div>
                   <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
-                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <ul className="flex flex-col gap-1">
                     {favoritos.map((p) => {
                       const sinStock = p.stockControlado && p.stock <= 0;
                       return (
@@ -538,12 +538,12 @@ function PosScreen() {
                             onClick={() => addToCart(p)}
                             disabled={sinStock}
                             className={cn(
-                              "flex h-20 w-full flex-col items-center justify-center gap-1 rounded-xl border px-2 text-center transition-colors",
+                              "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
                               sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
                             )}
                           >
-                            <span className="line-clamp-2 text-xs font-medium">{p.name}</span>
-                            <span className="text-sm font-semibold text-primary">{formatCurrency(precioFinal(p))}</span>
+                            <span className="line-clamp-1 text-sm font-medium">{p.name}</span>
+                            <span className="shrink-0 text-sm font-semibold text-primary">{formatCurrency(precioFinal(p))}</span>
                           </button>
                         </li>
                       );
@@ -560,7 +560,7 @@ function PosScreen() {
             ) : results.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">Sin resultados</p>
             ) : (
-              <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+              <ul className="flex flex-col gap-1">
                 {results.map((p) => {
                   const sinStock = p.stockControlado && p.stock <= 0;
                   const stockBajo = p.stockControlado && !sinStock && p.stock <= p.stockMinimo;
