@@ -22,8 +22,21 @@ export function BarcodeScannerDialog({ open, onOpenChange, onDetected }: Barcode
     (async () => {
       try {
         const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        const reader = new BrowserMultiFormatReader();
-        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
+        const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
+        // Limitar a los formatos de codigo de barras de productos (no QR) acelera muchisimo la deteccion.
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.ITF,
+        ]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 80 });
+
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        const trasera = devices.find((d) => /back|rear|trasera|environment/i.test(d.label));
+        const deviceId = trasera?.deviceId ?? devices[devices.length - 1]?.deviceId;
+
+        const controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current!, (result) => {
           if (result && !cancelled) {
             onDetected(result.getText());
           }
