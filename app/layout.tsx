@@ -14,10 +14,28 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Demo - Punto de Venta",
-  description: "Sistema de punto de venta para kiosko y despensa",
+  title: "MultiComercioPanel - ServiTec",
+  description: "Tu programa no impone las reglas: Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. La solución de gestión ideal para cualquier rubro.",
   manifest: "/manifest.json",
   themeColor: "#0d9488",
+  openGraph: {
+    title: "MultiComercioPanel - ServiTec",
+    description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Gestión integral para cualquier rubro.",
+    images: [
+      {
+        url: "/metadato.jpg",
+        width: 1200,
+        height: 630,
+        alt: "MultiComercioPanel - Se adapta a cualquier rubro",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MultiComercioPanel - ServiTec",
+    description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Se adapta a cualquier rubro.",
+    images: ["/metadato.jpg"],
+  },
 };
 
 export default function RootLayout({
