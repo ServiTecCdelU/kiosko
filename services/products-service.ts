@@ -192,6 +192,36 @@ export async function getVencimientosProximos(dias = 7): Promise<Product[]> {
   return productos.map(mapRow);
 }
 
+export interface ReposicionItem {
+  productoId: string;
+  nombre: string;
+  stockActual: number;
+  stockMinimo: number;
+  unidadesVendidas: number;
+  velocidadDiaria: number;
+  diasRestantes: number | null;
+}
+
+function mapReposicion(d: Record<string, any>): ReposicionItem {
+  return {
+    productoId: d.producto_id,
+    nombre: d.nombre,
+    stockActual: Number(d.stock_actual) || 0,
+    stockMinimo: Number(d.stock_minimo) || 0,
+    unidadesVendidas: Number(d.unidades_vendidas) || 0,
+    velocidadDiaria: Number(d.velocidad_diaria) || 0,
+    diasRestantes: d.dias_restantes != null ? Number(d.dias_restantes) : null,
+  };
+}
+
+/** Productos con menos dias de stock restante segun su ritmo real de venta. */
+export async function getReposicionPredictiva(dias = 14): Promise<ReposicionItem[]> {
+  const { productos } = await consultar<{ productos: Record<string, any>[] }>(
+    "/api/consultas/productos", "reposicion", { dias },
+  );
+  return productos.map(mapReposicion);
+}
+
 export interface SetOfertaInput {
   activa: boolean;
   tipo?: OfertaTipo;
