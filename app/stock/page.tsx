@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct, getVencimientosProximos,
-  logCambioPrecio,
-  type SetOfertaInput, type StockStats, type UpdateProductInput,
+  logCambioPrecio, getReposicionPredictiva,
+  type SetOfertaInput, type StockStats, type UpdateProductInput, type ReposicionItem,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
@@ -52,6 +52,7 @@ export default function StockPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [vencimientos, setVencimientos] = useState<Product[]>([]);
+  const [reposicion, setReposicion] = useState<ReposicionItem[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -86,6 +87,14 @@ export default function StockPage() {
     }
   }, []);
 
+  const loadReposicion = useCallback(async () => {
+    try {
+      setReposicion(await getReposicionPredictiva(14));
+    } catch {
+      // no crítico
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -115,7 +124,8 @@ export default function StockPage() {
     loadStats();
     loadCategorias();
     loadVencimientos();
-  }, [loadStats, loadCategorias, loadVencimientos]);
+    loadReposicion();
+  }, [loadStats, loadCategorias, loadVencimientos, loadReposicion]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([load(), loadStats(), loadCategorias(), loadVencimientos()]);
@@ -182,6 +192,11 @@ export default function StockPage() {
     [stats],
   );
 
+  const reposicionUrgente = useMemo(
+    () => reposicion.filter((r): r is ReposicionItem & { diasRestantes: number } => r.diasRestantes != null && r.diasRestantes <= 5),
+    [reposicion],
+  );
+
   return (
     <AppShell title="Stock">
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -208,6 +223,17 @@ export default function StockPage() {
             {vencimientos.length} producto{vencimientos.length > 1 ? "s" : ""} vencen en los próximos 7 días:{" "}
             {vencimientos.slice(0, 3).map((p) => p.name).join(", ")}
             {vencimientos.length > 3 && ` y ${vencimientos.length - 3} más`}
+          </span>
+        </div>
+      )}
+
+      {reposicionUrgente.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
+          <PackagePlus className="h-4 w-4 shrink-0" />
+          <span>
+            {reposicionUrgente.length} producto{reposicionUrgente.length > 1 ? "s" : ""} se agotan pronto según el ritmo de venta:{" "}
+            {reposicionUrgente.slice(0, 3).map((r) => `${r.nombre} (${r.diasRestantes}d)`).join(", ")}
+            {reposicionUrgente.length > 3 && ` y ${reposicionUrgente.length - 3} más`}
           </span>
         </div>
       )}
