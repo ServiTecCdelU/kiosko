@@ -1,7 +1,7 @@
 // lib/oferta-vencimiento.test.ts — correr con: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sugerirDescuentoVencimiento } from "./oferta-vencimiento.ts";
+import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "./oferta-vencimiento.ts";
 
 test("sugiere 40% si vence hoy o mañana", () => {
   assert.equal(sugerirDescuentoVencimiento(0), 40);
@@ -24,4 +24,25 @@ test("no sugiere nada si faltan mas de 7 dias", () => {
 
 test("no sugiere nada si ya vencio (dias negativos) -- se maneja aparte", () => {
   assert.equal(sugerirDescuentoVencimiento(-1), 40);
+});
+
+test("diasHastaVencimiento: mismo dia da 0", () => {
+  const hoy = new Date(2026, 0, 15, 23, 0, 0);
+  assert.equal(diasHastaVencimiento(new Date(2026, 0, 15), hoy), 0);
+});
+
+test("diasHastaVencimiento: mañana da 1", () => {
+  const hoy = new Date(2026, 0, 15);
+  assert.equal(diasHastaVencimiento(new Date(2026, 0, 16), hoy), 1);
+});
+
+test("diasHastaVencimiento: una fecha pasada da negativo", () => {
+  const hoy = new Date(2026, 0, 15);
+  assert.equal(diasHastaVencimiento(new Date(2026, 0, 10), hoy), -5);
+});
+
+test("diasHastaVencimiento: ignora la hora del dia, solo cuenta fechas calendario", () => {
+  const hoy = new Date(2026, 0, 15, 8, 0, 0);
+  const vencimiento = new Date(2026, 0, 16, 1, 0, 0);
+  assert.equal(diasHastaVencimiento(vencimiento, hoy), 1);
 });
