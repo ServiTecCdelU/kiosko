@@ -91,8 +91,8 @@ Este archivo se actualiza a medida que se completan tareas. Estado inicial: todo
 | 3. Endpoint `/api/consultas/productos` acción `reposicion` | ✅ hecho — commit `bea0c40` |
 | 4. `services/products-service.ts`: `getReposicionPredictiva` | ✅ hecho — commit `b7fe226` |
 | 5. UI: tarjeta "Reposición" en `/stock` | ✅ hecho — commit `740a009` |
-| 6. UI: botón "Aplicar oferta sugerida" en vencimientos | ⬜ pendiente |
-| 7. Verificación final (`npm test`, `npm run build`) | ⬜ pendiente |
+| 6. UI: botón "Aplicar oferta sugerida" en vencimientos | ✅ hecho — commit `885948c` |
+| 7. Verificación final (`npm test`, `npm run build`) | ✅ hecho — 52/52 tests, build OK |
 
 ---
 
