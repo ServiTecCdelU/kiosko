@@ -27,6 +27,7 @@ import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
+import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -217,13 +218,47 @@ export default function StockPage() {
       </div>
 
       {vencimientos.length > 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
-            {vencimientos.length} producto{vencimientos.length > 1 ? "s" : ""} vencen en los próximos 7 días:{" "}
-            {vencimientos.slice(0, 3).map((p) => p.name).join(", ")}
-            {vencimientos.length > 3 && ` y ${vencimientos.length - 3} más`}
-          </span>
+        <div className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              {vencimientos.length} producto{vencimientos.length > 1 ? "s" : ""} vencen en los próximos 7 días
+            </span>
+          </div>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {vencimientos.slice(0, 5).map((p) => {
+              const dias = p.fechaVencimiento ? diasHastaVencimiento(p.fechaVencimiento) : null;
+              const sugerido = dias != null ? sugerirDescuentoVencimiento(dias) : null;
+              return (
+                <li key={p.id} className="flex items-center justify-between gap-2 text-foreground">
+                  <span className="truncate">{p.name}</span>
+                  {sugerido != null && !tieneOferta(p) ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 rounded-xl px-2 text-xs"
+                      onClick={async () => {
+                        try {
+                          await setOferta(p.id, { activa: true, tipo: "porcentaje", valor: sugerido });
+                          toast.success(`Oferta del ${sugerido}% aplicada a ${p.name}`);
+                          loadVencimientos();
+                        } catch {
+                          toast.error("No se pudo aplicar la oferta");
+                        }
+                      }}
+                    >
+                      Aplicar {sugerido}% off
+                    </Button>
+                  ) : tieneOferta(p) ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">ya tiene oferta</span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {vencimientos.length > 5 && (
+            <p className="mt-1 text-xs text-muted-foreground">y {vencimientos.length - 5} más</p>
+          )}
         </div>
       )}
 
