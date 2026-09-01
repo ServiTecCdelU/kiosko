@@ -90,7 +90,7 @@ Este archivo se actualiza a medida que se completan tareas. Estado inicial: todo
 | 2. Lógica pura: sugerencia de oferta por vencimiento | ✅ hecho — commit `78f1f72`, 52/52 tests OK |
 | 3. Endpoint `/api/consultas/productos` acción `reposicion` | ✅ hecho — commit `bea0c40` |
 | 4. `services/products-service.ts`: `getReposicionPredictiva` | ✅ hecho — commit `b7fe226` |
-| 5. UI: tarjeta "Reposición" en `/stock` | ⬜ pendiente |
+| 5. UI: tarjeta "Reposición" en `/stock` | ✅ hecho — commit `740a009` |
 | 6. UI: botón "Aplicar oferta sugerida" en vencimientos | ⬜ pendiente |
 | 7. Verificación final (`npm test`, `npm run build`) | ⬜ pendiente |
 
