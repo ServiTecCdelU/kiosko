@@ -188,6 +188,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ productos: data ?? [] });
     }
 
+    case "reposicion": {
+      const dias = acotar(body?.dias, 14, 90);
+      const { data, error } = await supabaseAdmin.rpc("productos_reposicion_predictiva", {
+        p_comercio_id: comercioId,
+        p_dias: dias,
+      });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ productos: data ?? [] });
+    }
+
     case "porCodigo": {
       const c = String(body?.code ?? "").trim();
       if (!c) return NextResponse.json({ producto: null });
