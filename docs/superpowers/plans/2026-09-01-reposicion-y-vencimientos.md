@@ -86,7 +86,7 @@ Este archivo se actualiza a medida que se completan tareas. Estado inicial: todo
 
 | Tarea | Estado |
 |---|---|
-| 1. SQL en Supabase | ⬜ pendiente (requiere confirmación del usuario) |
+| 1. SQL en Supabase | ✅ hecho — confirmado por el usuario |
 | 2. Lógica pura: sugerencia de oferta por vencimiento | ✅ hecho — commit `78f1f72`, 52/52 tests OK |
 | 3. Endpoint `/api/consultas/productos` acción `reposicion` | ⬜ pendiente |
 | 4. `services/products-service.ts`: `getReposicionPredictiva` | ⬜ pendiente |
