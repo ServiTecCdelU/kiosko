@@ -75,7 +75,9 @@ export async function POST(req: Request) {
         const controlados = (data ?? []).filter((r: any) => r.stock_controlado !== false);
         const filtrados = p.soloAgotados
           ? controlados.filter((r: any) => Number(r.stock) <= 0)
-          : controlados.filter((r: any) => Number(r.stock) <= Number(r.stock_minimo));
+          : controlados.filter(
+              (r: any) => Number(r.stock) > 0 && Number(r.stock) <= Number(r.stock_minimo),
+            );
         return NextResponse.json({ productos: filtrados, total: filtrados.length });
       }
 
