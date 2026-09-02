@@ -1,7 +1,7 @@
 // public/sw.js — service worker minimo, servido tal cual (sin build step ni next.config.mjs).
 // Objetivo: que la app (shell + assets ya visitados) siga cargando sin internet.
 // Las ventas offline NO pasan por acá: se manejan en IndexedDB desde la app (lib/offline).
-const CACHE_NAME = "kiosko-shell-v2";
+const CACHE_NAME = "kiosko-shell-v3";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -40,18 +40,27 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Assets estaticos (_next/static, imagenes, fuentes): cache primero, se completa en segundo plano.
+  // OJO: nunca resolver respondWith() con `undefined` (si no hay cache y la red
+  // falla) — el navegador tira "Failed to convert value to 'Response'" y deja
+  // la pagina con chunks a medio cargar, lo que después revienta React con el
+  // error #130 (componente inválido) en la navegación siguiente.
   event.respondWith(
     caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const copia = res.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(request, copia));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
+      if (cached) {
+        fetch(request)
+          .then((res) => {
+            if (res.ok) caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
+          })
+          .catch(() => {});
+        return cached;
+      }
+      return fetch(request).then((res) => {
+        if (res.ok) {
+          const copia = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, copia));
+        }
+        return res;
+      });
     }),
   );
 });
