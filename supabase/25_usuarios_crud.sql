@@ -3,6 +3,10 @@
 -- aplicacion, sin que el PIN en texto plano salga nunca de Postgres.
 -- Mismo criterio que verificar_pin (20_pin_hash.sql): pgcrypto adentro de la
 -- base, hash bcrypt, nunca se expone pin_hash.
+--
+-- Correr este archivo completo en el SQL Editor de Supabase. Al final queda
+-- comentado (no ejecutado) el INSERT del primer usuario admin: hay que
+-- descomentarlo, poner un PIN propio de 4 digitos, y correrlo aparte.
 
 create or replace function crear_usuario_pin(
   p_comercio_id text,
@@ -67,3 +71,8 @@ begin
     where id = p_id;
 end;
 $$;
+
+-- Primer usuario admin real. Descomentar, poner un PIN propio de 4 digitos
+-- en vez de 'CAMBIAR', y correr esta linea por separado (por eso queda
+-- comentada: no se ejecuta sola con el resto del archivo).
+-- select crear_usuario_pin('comercio_1', 'Administrador', 'CAMBIAR', 'admin');
