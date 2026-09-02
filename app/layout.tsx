@@ -1,5 +1,5 @@
 import React from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import "@/app/globals.css";
@@ -13,11 +13,18 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
+// NEXT_PUBLIC_APP_URL puede venir sin protocolo (ej: "kiosko-three.vercel.app").
+function resolverAppUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL;
+  if (!raw) return "http://localhost:3000";
+  return raw.startsWith("http") ? raw : `https://${raw}`;
+}
+
 export const metadata: Metadata = {
+  metadataBase: new URL(resolverAppUrl()),
   title: "MultiComercioPanel - ServiTec",
   description: "Tu programa no impone las reglas: Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. La solución de gestión ideal para cualquier rubro.",
   manifest: "/manifest.json",
-  themeColor: "#0d9488",
   openGraph: {
     title: "MultiComercioPanel - ServiTec",
     description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Gestión integral para cualquier rubro.",
@@ -36,6 +43,10 @@ export const metadata: Metadata = {
     description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Se adapta a cualquier rubro.",
     images: ["/metadato.jpg"],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d9488",
 };
 
 export default function RootLayout({
