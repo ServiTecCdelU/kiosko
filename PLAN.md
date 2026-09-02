@@ -140,3 +140,55 @@ Hoy `getResumenCaja` (`services/caja-service.ts`) **no filtra por `estado`**. Si
 - [ ] `git add` de los archivos modificados.
 - [ ] Commit: `feat: anulacion de ventas y movimientos de caja (retiros, aportes y gastos)`.
 - [ ] `git push origin main`.
+
+---
+
+# 📋 Plan — De kiosko de 1 persona a supermercado con varios cajeros
+
+- **Fecha de análisis**: 2026-09-02
+- **Contexto del cambio**: el sistema se pensó y construyó para un kiosko/despensa
+  con un solo operador. El destino real es un supermercado con varios cajeros
+  trabajando en simultáneo, cada uno con su propio cajón de efectivo. Esto
+  cambia qué es urgente — varios riesgos que eran teóricos con un solo usuario
+  demo pasan a ser reales con personal real logueado con su propio PIN.
+- Este plan **complementa** a `PLAN_MEJORAS.md` (foco: qué necesita un kiosko/
+  despensa del día a día) y a la sección de arriba de este archivo (seguridad/
+  SaaS/deuda técnica original). Ya se hizo desde entonces: login por PIN activo
+  con roles admin/cajero (`hooks/use-auth.ts`), pantalla de administración de
+  usuarios (`/usuarios`), RLS cerrado y anon key revocado (`22_cerrar_anon_rls.sql`).
+
+## 🔴 Urgente por ser supermercado (no lo era con un solo operador)
+
+| # | Ítem | Por qué ahora importa | Alcance técnico |
+|---|---|---|---|
+| 1 | **Una sola caja abierta por comercio** | `idx_caja_una_abierta_por_comercio` (`supabase/21_una_caja_abierta.sql`) impide tener 2 cajas abiertas a la vez. Con varios cajeros logueados con su propio PIN en puestos distintos, cada uno con su cajón de plata, hoy todo se mezcla en un arqueo único — no se puede saber cuánto efectivo debería haber en cada cajón por separado. | Cambio grande: sacar la restricción única, agregar noción de "puesto/caja" por cajero, y adaptar apertura/cierre, arqueo, `process_sale_kiosko` (ya recibe `caja_id` explícito, ver `supabase/07_multitenant_rpc.sql:53`) y las pantallas de `/caja` y `/pos` para trabajar por caja en vez de "la única caja abierta". Requiere spec y plan propios — es el ítem más grande de esta lista. |
+| 2 | **`comercioId` viaja en el body de las rutas API, no sale de la sesión del servidor** | Con un solo usuario demo era un riesgo teórico. Con cajeros reales logueados, cualquiera con las herramientas de desarrollador del navegador puede en teoría mandar un `comercioId` ajeno. Hoy con un solo comercio no hay a dónde filtrar datos, pero hay que cerrarlo antes de confiar el sistema a más locales o a personal de menor confianza. | Server debe resolver `comercioId` desde una sesión/cookie firmada, no confiar en el valor que manda el cliente. Afecta ~21 rutas en `app/api/**/route.ts`. |
+| 3 | **Login por PIN sin límite de intentos** | Un PIN de 4 dígitos son 10.000 combinaciones. Con una terminal de cajero desatendida en un local grande, alguien con tiempo podría probar PINs. | Contador de intentos fallidos por IP o por PIN con bloqueo temporal, en `verificar_pin` o en `app/api/auth/login/route.ts`. |
+| 4 | **Token de Mercado Pago sin cifrar en la base** | `comercios.mp_access_token` en texto plano (`supabase/06_multitenant.sql`). Con más volumen de plata movida por MP en un súper, un backup o acceso filtrado a la base da control de los cobros. | Cifrar con pgcrypto o Supabase Vault; descifrar solo server-side al llamar a la API de MP. |
+
+## 🟠 Amplía la operación real de un súper (no hacía falta en un kiosko)
+
+| # | Ítem | Detalle |
+|---|---|---|
+| 5 | **Recepción de mercadería por proveedor/remito** | Hoy solo existe "ajuste de stock" genérico y la sincronización automática de catálogo. Un súper recibe de varios proveedores distintos y necesita historial de "qué entró, de quién, a qué costo" — no solo un `precio_base` único que se pisa. |
+| 6 | **Rol intermedio "encargado de turno"** | Hoy es admin (ve todo) o cajero (solo POS). Un súper suele tener un encargado que autoriza anulaciones o hace arqueos sin ser el dueño. |
+| 7 | **Balanza con código EAN de peso embebido** (prefijo 20-29) | Para un kiosko era prescindible (`PLAN_MEJORAS.md` sección 4 lo deprioriza a propósito); para una verdulería/carnicería de súper con volumen, pesar a mano cada producto en el POS es lento. |
+| 8 | **Devoluciones de cliente días después** | La anulación actual (`anular_venta_kiosko`) solo funciona con la caja del día todavía abierta. Un súper recibe devoluciones de compras de días anteriores. |
+
+## 🟡 Rendimiento a mayor escala
+
+| # | Ítem | Detalle |
+|---|---|---|
+| 9 | **Búsqueda de productos con catálogo grande** | Un súper tiene mucho más surtido que un kiosko. No es urgente si no se sintió lento todavía, pero conviene revisar cómo responde la búsqueda del POS (`/api/consultas/productos`) con miles de productos antes de que sea un problema en producción. |
+
+## Orden recomendado
+
+1. **Ítem 1 (múltiples cajas)** primero — es el que más bloquea operar con varios
+   cajeros simultáneos, que es justo el escenario real del súper. Requiere spec
+   y plan de implementación propios (cambio de esquema + varias pantallas).
+2. **Ítems 2-4 (seguridad)** — ninguno bloquea vender hoy con un solo comercio,
+   pero conviene cerrarlos antes de sumar más locales o de que haya plata real
+   en volumen circulando por MP.
+3. **Ítems 5-8** según qué tan seguido se sienta la falta en el día a día real
+   del primer súper que use el sistema — no conviene seguir planificando en el
+   vacío más allá de este punto (mismo criterio que `PLAN_MEJORAS.md`).
