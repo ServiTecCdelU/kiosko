@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PackagePlus } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -62,7 +63,7 @@ export function QuickCreateProductDialog({
       onOpenChange(false);
       if (creado) onCreated(creado);
     } catch (e) {
-      // el toast de error lo maneja quien llama, esto solo evita cerrar en error
+      toast.error(e instanceof Error ? e.message : "No se pudo crear el producto");
     } finally {
       setSaving(false);
     }

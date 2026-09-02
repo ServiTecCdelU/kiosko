@@ -82,6 +82,7 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("productos")
     .insert({
+      id: crypto.randomUUID(),
       comercio_id: comercioId,
       codigo: input.codigo || null,
       codigo_barras: input.codigoBarras || null,
