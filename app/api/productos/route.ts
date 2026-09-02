@@ -83,15 +83,20 @@ export async function POST(req: Request) {
     .from("productos")
     .insert({
       comercio_id: comercioId,
+      codigo: input.codigo || null,
       codigo_barras: input.codigoBarras || null,
       name,
       category: input.category || "",
       price,
+      precio_base: input.costo ?? null,
       stock,
-      stock_minimo: 0,
-      unidad: "un",
-      stock_controlado: true,
-      revisar: true,
+      stock_minimo: Number(input.stockMinimo) || 0,
+      lote: input.lote ?? null,
+      unidad: input.unidad === "kg" ? "kg" : "un",
+      stock_controlado: input.stockControlado ?? true,
+      fecha_vencimiento: input.fechaVencimiento || null,
+      favorito: !!input.favorito,
+      revisar: input.revisar ?? true,
     })
     .select("id")
     .single();

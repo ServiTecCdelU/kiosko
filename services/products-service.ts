@@ -246,8 +246,17 @@ export interface CreateProductInput {
   name: string;
   price: number;
   stock: number;
+  codigo?: string;
   codigoBarras?: string;
   category?: string;
+  costo?: number;
+  stockMinimo?: number;
+  lote?: number;
+  unidad?: "un" | "kg";
+  fechaVencimiento?: string;
+  favorito?: boolean;
+  revisar?: boolean;
+  stockControlado?: boolean;
 }
 
 export async function createProduct(input: CreateProductInput): Promise<string> {

@@ -23,7 +23,7 @@ import { ajustarStock } from "@/services/stock-service";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
 import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
-import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
+import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
@@ -443,10 +443,8 @@ export default function StockPage() {
       />
       <OfertaDialog product={ofertaProduct} open={ofertaOpen} onOpenChange={setOfertaOpen} onSubmit={handleOferta} />
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
-      <QuickCreateProductDialog
+      <NuevoProductoDialog
         open={nuevoOpen}
-        codigoBarras=""
-        codigoEditable
         onOpenChange={setNuevoOpen}
         onCreated={() => refreshAll()}
       />
