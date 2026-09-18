@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PIN_REGEX = /^[0-9]{4}$/;
-const ROLES = ["admin", "cajero"];
+const ROLES = ["admin", "encargado", "cajero"];
 
 export async function POST(req: Request) {
   let body: any;

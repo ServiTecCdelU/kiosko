@@ -96,8 +96,11 @@ export default function UsuariosPage() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.nombre}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={cn(u.rol === "admin" && "border-primary text-primary")}>
-                      {u.rol === "admin" ? "Administrador" : "Cajero"}
+                    <Badge variant="outline" className={cn(
+                      u.rol === "admin" && "border-primary text-primary",
+                      u.rol === "encargado" && "border-cyan-600 text-cyan-700 dark:text-cyan-400",
+                    )}>
+                      {u.rol === "admin" ? "Administrador" : u.rol === "encargado" ? "Encargado" : "Cajero"}
                     </Badge>
                   </TableCell>
                   <TableCell>

@@ -18,22 +18,33 @@ export async function POST(req: Request) {
   }
 
   const comercioId = String(body?.comercioId ?? "comercio_1");
+  const puestoId = String(body?.puestoId ?? "");
   const montoApertura = Number(body?.montoApertura);
   if (!Number.isFinite(montoApertura) || montoApertura < 0) {
     return NextResponse.json({ error: "Monto de apertura invalido" }, { status: 400 });
   }
+  if (!puestoId) return NextResponse.json({ error: "Falta elegir el puesto" }, { status: 400 });
 
-  // No puede haber dos cajas abiertas a la vez.
-  // Se pide una lista y no maybeSingle(): con maybeSingle, si por lo que fuera
-  // ya hubiera mas de una abierta, PostgREST devuelve error y data queda null,
-  // o sea que la guarda dejaria pasar justo el caso que tiene que frenar.
-  // Ante cualquier duda se falla cerrando, no abriendo.
+  const { data: puesto, error: errorPuesto } = await supabaseAdmin
+    .from("puestos")
+    .select("id, activo")
+    .eq("comercio_id", comercioId)
+    .eq("id", puestoId)
+    .maybeSingle();
+  if (errorPuesto) return NextResponse.json({ error: errorPuesto.message }, { status: 400 });
+  if (!puesto || !puesto.activo) {
+    return NextResponse.json({ error: "El puesto no existe o esta inactivo" }, { status: 400 });
+  }
+
+  // Guardas de la app: una caja abierta por puesto y una por cajero. Aunque estas
+  // verificaciones fallen, los indices unicos de 26_multi_caja.sql lo hacen
+  // cumplir en la base; aca se traduce a un mensaje claro.
+  // Se pide una lista y no maybeSingle(): ante cualquier duda se falla cerrando.
   const { data: abiertas, error: errorAbiertas } = await supabaseAdmin
     .from("caja")
-    .select("id")
+    .select("id, puesto_id, abierta_por")
     .eq("comercio_id", comercioId)
-    .eq("estado", "abierta")
-    .limit(2);
+    .eq("estado", "abierta");
 
   if (errorAbiertas) {
     return NextResponse.json(
@@ -41,8 +52,12 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-  if ((abiertas?.length ?? 0) > 0) {
-    return NextResponse.json({ error: "Ya hay una caja abierta" }, { status: 409 });
+  if ((abiertas ?? []).some((c) => c.puesto_id === puestoId)) {
+    return NextResponse.json({ error: "El puesto ya tiene una caja abierta" }, { status: 409 });
+  }
+  const usuarioId = body?.usuarioId ?? null;
+  if (usuarioId && (abiertas ?? []).some((c) => c.abierta_por === usuarioId)) {
+    return NextResponse.json({ error: "Ya tenes una caja abierta a tu nombre" }, { status: 409 });
   }
 
   const id = await generarIdLegible("caja", "caja", new Date().toISOString().slice(0, 10));
@@ -53,15 +68,22 @@ export async function POST(req: Request) {
       id,
       comercio_id: comercioId,
       estado: "abierta",
+      puesto_id: puestoId,
       monto_apertura: montoApertura,
-      abierta_por: body?.usuarioId ?? null,
+      abierta_por: usuarioId,
       abierta_por_nombre: body?.usuarioNombre ?? null,
       opened_at: new Date().toISOString(),
     })
-    .select()
+    .select("*, puestos(nombre)")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    // 23505 = unique_violation: otro puesto/cajero gano la carrera de apertura.
+    const msg = (error as any).code === "23505"
+      ? "El puesto o el cajero ya tienen una caja abierta"
+      : error.message;
+    return NextResponse.json({ error: msg }, { status: 409 });
+  }
   return NextResponse.json(data);
 }
 
@@ -124,7 +146,7 @@ export async function PATCH(req: Request) {
     })
     .eq("comercio_id", comercioId)
     .eq("id", cajaId)
-    .select()
+    .select("*, puestos(nombre)")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

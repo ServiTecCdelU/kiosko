@@ -45,10 +45,109 @@ export async function POST(req: Request) {
       return NextResponse.json({ caja: data ?? null });
     }
 
+    // Caja abierta del usuario logueado (su cajon). Multi-caja: cada cajero la suya.
+    case "cajaDelUsuario": {
+      const usuarioId = String(body?.usuarioId ?? "");
+      if (!usuarioId) return NextResponse.json({ caja: null });
+      const { data, error } = await supabaseAdmin
+        .from("caja")
+        .select("*, puestos(nombre)")
+        .eq("comercio_id", comercioId)
+        .eq("estado", "abierta")
+        .eq("abierta_por", usuarioId)
+        .order("opened_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ caja: data ?? null });
+    }
+
+    // Todas las cajas abiertas del comercio, con su puesto (encargado/admin y POS).
+    case "cajasAbiertas": {
+      const { data, error } = await supabaseAdmin
+        .from("caja")
+        .select("*, puestos(nombre)")
+        .eq("comercio_id", comercioId)
+        .eq("estado", "abierta")
+        .order("opened_at", { ascending: true });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ cajas: data ?? [] });
+    }
+
+    // Puestos activos + si tienen caja abierta (para el selector de apertura).
+    case "puestos": {
+      const [{ data: puestos, error: e1 }, { data: abiertas, error: e2 }] = await Promise.all([
+        supabaseAdmin
+          .from("puestos")
+          .select("*")
+          .eq("comercio_id", comercioId)
+          .order("nombre", { ascending: true }),
+        supabaseAdmin
+          .from("caja")
+          .select("id, puesto_id, abierta_por_nombre")
+          .eq("comercio_id", comercioId)
+          .eq("estado", "abierta"),
+      ]);
+      if (e1) return NextResponse.json({ error: e1.message }, { status: 400 });
+      if (e2) return NextResponse.json({ error: e2.message }, { status: 400 });
+      const porPuesto = new Map((abiertas ?? []).map((c: any) => [c.puesto_id, c]));
+      return NextResponse.json({
+        puestos: (puestos ?? []).map((p: any) => ({
+          ...p,
+          caja_abierta_id: porPuesto.get(p.id)?.id ?? null,
+          caja_abierta_por: porPuesto.get(p.id)?.abierta_por_nombre ?? null,
+        })),
+      });
+    }
+
+    // Consolidado del dia: cajas abiertas + cerradas desde `desdeIso` (inicio del
+    // dia local del cliente). Las abiertas llevan resumen calculado en vivo.
+    case "consolidadoDia": {
+      const desdeIso = String(body?.desdeIso ?? "");
+      const desde = desdeIso && !Number.isNaN(Date.parse(desdeIso))
+        ? desdeIso
+        : new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+
+      const [{ data: abiertas, error: e1 }, { data: cerradas, error: e2 }] = await Promise.all([
+        supabaseAdmin
+          .from("caja")
+          .select("*, puestos(nombre)")
+          .eq("comercio_id", comercioId)
+          .eq("estado", "abierta"),
+        supabaseAdmin
+          .from("caja")
+          .select("*, puestos(nombre)")
+          .eq("comercio_id", comercioId)
+          .eq("estado", "cerrada")
+          .gte("closed_at", desde)
+          .order("closed_at", { ascending: false }),
+      ]);
+      if (e1) return NextResponse.json({ error: e1.message }, { status: 400 });
+      if (e2) return NextResponse.json({ error: e2.message }, { status: 400 });
+
+      const conResumen = await Promise.all(
+        (abiertas ?? []).map(async (c: any) => {
+          const r = await calcularResumenCaja(c.id, comercioId);
+          return {
+            ...c,
+            total_efectivo: r.totalEfectivo,
+            total_transferencia: r.totalTransferencia,
+            total_mercadopago: r.totalMercadoPago,
+            total_ventas: r.totalVentas,
+            cantidad_ventas: r.cantidadVentas,
+            total_retiros: r.totalRetiros,
+            total_aportes: r.totalAportes,
+            total_gastos: r.totalGastos,
+          };
+        }),
+      );
+      return NextResponse.json({ cajas: [...conResumen, ...(cerradas ?? [])] });
+    }
+
     case "historialCajas": {
       const { data, error } = await supabaseAdmin
         .from("caja")
-        .select("*")
+        .select("*, puestos(nombre)")
         .eq("comercio_id", comercioId)
         .eq("estado", "cerrada")
         .order("closed_at", { ascending: false })

@@ -20,10 +20,13 @@ import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { metodoColorClass, metodoLabelConCuotas } from "@/lib/utils/metodo-pago";
 import { descargarCajaPdf } from "@/lib/utils/caja-pdf";
 import {
-  getCajaAbierta, getResumenCaja, abrirCaja, cerrarCaja, getCajaHistorial,
+  getResumenCaja, abrirCaja, cerrarCaja, getCajaHistorial,
   getMovimientosCaja, registrarMovimientoCaja, getVentasPorCajero,
-  type ResumenCaja, type VentasPorCajero,
+  getCajasAbiertas, getPuestos, getCajasDelDia,
+  type ResumenCaja, type VentasPorCajero, type PuestoConEstado,
 } from "@/services/caja-service";
+import { consolidarDia, type CajaDelDia } from "@/lib/consolidado";
+import { PuestosDialog } from "@/components/caja/puestos-dialog";
 import { getVentasDeCaja, anularVenta } from "@/services/sales-service";
 import { MovimientoDialog } from "@/components/caja/movimiento-dialog";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
@@ -54,21 +57,49 @@ export default function CajaPage() {
   const [ventaDetalle, setVentaDetalle] = useState<Sale | null>(null);
   const [ventaAnular, setVentaAnular] = useState<Sale | null>(null);
   const [descargandoId, setDescargandoId] = useState<string | null>(null);
+  // Multi-caja
+  const [puestos, setPuestos] = useState<PuestoConEstado[]>([]);
+  const [cajasAbiertas, setCajasAbiertas] = useState<Caja[]>([]);
+  const [cajaSeleccionadaId, setCajaSeleccionadaId] = useState<string | null>(null);
+  const [puestoApertura, setPuestoApertura] = useState("");
+  const [cajasDelDia, setCajasDelDia] = useState<CajaDelDia[]>([]);
+  const [puestosOpen, setPuestosOpen] = useState(false);
+  const [mostrarApertura, setMostrarApertura] = useState(false);
 
   const user = getCurrentUser();
   const esAdmin = user?.rol === "admin";
+  // Encargado y admin gestionan cualquier caja y anulan ventas; el cajero solo la suya.
+  const puedeGestionar = user?.rol !== "cajero";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const abierta = await getCajaAbierta();
-      setCaja(abierta);
-      if (abierta) {
+      const [listaPuestos, abiertas] = await Promise.all([getPuestos(), getCajasAbiertas()]);
+      setPuestos(listaPuestos);
+      setCajasAbiertas(abiertas);
+
+      // El cajero opera SU caja; encargado/admin, la seleccionada (o la propia,
+      // o la primera abierta si no eligio ninguna todavia).
+      const propia = user ? abiertas.find((c) => c.abiertaPor === user.id) : undefined;
+      let activa: Caja | null = null;
+      if (!puedeGestionar) {
+        activa = propia ?? null;
+      } else {
+        activa =
+          abiertas.find((c) => c.id === cajaSeleccionadaId) ??
+          propia ??
+          abiertas[0] ??
+          null;
+      }
+      setCaja(activa);
+      setCajaSeleccionadaId(activa?.id ?? null);
+
+      if (activa) {
         const [res, movs, vts, porCajero] = await Promise.all([
-          getResumenCaja(abierta.id),
-          getMovimientosCaja(abierta.id),
-          getVentasDeCaja(abierta.id),
-          getVentasPorCajero(abierta.id),
+          getResumenCaja(activa.id),
+          getMovimientosCaja(activa.id),
+          getVentasDeCaja(activa.id),
+          getVentasPorCajero(activa.id),
         ]);
         setResumen(res);
         setMovimientos(movs);
@@ -80,25 +111,42 @@ export default function CajaPage() {
         setVentas([]);
         setVentasPorCajero([]);
       }
-      setHistorial(await getCajaHistorial());
+
+      if (puedeGestionar) {
+        const [hist, dia] = await Promise.all([getCajaHistorial(), getCajasDelDia()]);
+        setHistorial(hist);
+        setCajasDelDia(dia);
+      }
     } catch {
       toast.error("No se pudo cargar la caja");
     } finally {
       setLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cajaSeleccionadaId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const puestosLibres = puestos.filter((p) => p.activo && !p.cajaAbiertaId);
+
   const handleAbrir = async () => {
     const monto = Number(montoApertura) || 0;
+    // Con un solo puesto libre no hace falta elegir: se abre ahi.
+    const puestoId = puestoApertura || (puestosLibres.length === 1 ? puestosLibres[0].id : "");
+    if (!puestoId) {
+      toast.error("Elegí en qué puesto abrir la caja");
+      return;
+    }
     setWorking(true);
     try {
-      await abrirCaja(monto, user?.id, user?.nombre);
-      toast.success("Caja abierta");
+      const abierta = await abrirCaja(monto, puestoId, user?.id, user?.nombre);
+      toast.success(`Caja abierta en ${abierta.puestoNombre ?? "el puesto"}`);
       setMontoApertura("");
+      setPuestoApertura("");
+      setMostrarApertura(false);
+      setCajaSeleccionadaId(abierta.id);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al abrir caja");
@@ -186,6 +234,7 @@ export default function CajaPage() {
         >
           Caja actual
         </button>
+        {puedeGestionar && (
         <button
           onClick={() => setTab("historial")}
           className={cn(
@@ -195,6 +244,7 @@ export default function CajaPage() {
         >
           <History className="h-3.5 w-3.5" /> Historial
         </button>
+        )}
       </div>
 
       {tab === "historial" ? (
@@ -211,12 +261,56 @@ export default function CajaPage() {
             <CobrosSinResolver />
           </div>
 
+          {/* Encargado/admin: una pastilla por caja abierta para cambiar de cajon */}
+          {!loading && puedeGestionar && (cajasAbiertas.length > 0 || esAdmin) && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {cajasAbiertas.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setMostrarApertura(false);
+                    setCajaSeleccionadaId(c.id);
+                  }}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                    c.id === caja?.id && !mostrarApertura
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {c.puestoNombre ?? "Caja"} · {c.abiertaPorNombre ?? "sin cajero"}
+                </button>
+              ))}
+              {puestosLibres.length > 0 && caja && (
+                <button
+                  onClick={() => setMostrarApertura((v) => !v)}
+                  className={cn(
+                    "rounded-full border border-dashed px-3 py-1.5 text-xs font-semibold transition-colors",
+                    mostrarApertura
+                      ? "border-primary text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {mostrarApertura ? "Cancelar apertura" : "+ Abrir otra caja"}
+                </button>
+              )}
+              {esAdmin && (
+                <button
+                  onClick={() => setPuestosOpen(true)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Puestos…
+                </button>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-40 w-full rounded-2xl" />
               <Skeleton className="h-64 w-full rounded-2xl" />
             </div>
-          ) : !caja ? (
+          ) : !caja || mostrarApertura ? (
             <Card className="mx-auto max-w-md rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -224,15 +318,40 @@ export default function CajaPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Ingresa el monto inicial en efectivo.</p>
-                <Input
-                  type="number" inputMode="decimal" placeholder="Monto de apertura"
-                  value={montoApertura} onChange={(e) => setMontoApertura(e.target.value)}
-                  className="rounded-xl"
-                />
-                <Button className="w-full rounded-2xl" disabled={working} onClick={handleAbrir}>
-                  {working ? "Abriendo..." : "Abrir caja"}
-                </Button>
+                {puestosLibres.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay puestos libres: todos tienen una caja abierta.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Elegí el puesto e ingresá el monto inicial en efectivo.
+                    </p>
+                    {puestosLibres.length > 1 && (
+                      <select
+                        value={puestoApertura}
+                        onChange={(e) => setPuestoApertura(e.target.value)}
+                        className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none"
+                      >
+                        <option value="">Elegir puesto…</option>
+                        {puestosLibres.map((p) => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    )}
+                    {puestosLibres.length === 1 && (
+                      <p className="text-sm font-medium">{puestosLibres[0].nombre}</p>
+                    )}
+                    <Input
+                      type="number" inputMode="decimal" placeholder="Monto de apertura"
+                      value={montoApertura} onChange={(e) => setMontoApertura(e.target.value)}
+                      className="rounded-xl"
+                    />
+                    <Button className="w-full rounded-2xl" disabled={working} onClick={handleAbrir}>
+                      {working ? "Abriendo..." : "Abrir caja"}
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -240,9 +359,11 @@ export default function CajaPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Badge className="bg-success text-success-foreground">
-                    <Wallet className="mr-1 h-3 w-3" /> Caja abierta
+                    <Wallet className="mr-1 h-3 w-3" /> {caja.puestoNombre ?? "Caja"} abierta
                   </Badge>
-                  <span className="text-sm text-muted-foreground">desde {formatDateTime(caja.openedAt)}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {caja.abiertaPorNombre ? `${caja.abiertaPorNombre} · ` : ""}desde {formatDateTime(caja.openedAt)}
+                  </span>
                 </div>
                 <Button variant="outline" size="sm" className="rounded-xl" onClick={handleDescargarPdf}>
                   <Download className="mr-2 h-4 w-4" /> Descargar PDF
@@ -437,14 +558,20 @@ export default function CajaPage() {
               )}
             </div>
           )}
+
+          {/* Consolidado del dia: todas las cajas (encargado/admin) */}
+          {!loading && puedeGestionar && cajasDelDia.length > 0 && (
+            <ConsolidadoDia cajas={cajasDelDia} />
+          )}
         </>
       )}
 
       <MovimientoDialog tipo={movTipo} onOpenChange={(o) => !o && setMovTipo(null)} onSubmit={handleMovimiento} />
+      <PuestosDialog open={puestosOpen} onOpenChange={setPuestosOpen} puestos={puestos} onChanged={load} />
       <SaleDetailDialog
         venta={ventaDetalle}
         onOpenChange={(o) => !o && setVentaDetalle(null)}
-        esAdmin={esAdmin}
+        esAdmin={puedeGestionar}
         onAnular={(v) => {
           setVentaDetalle(null);
           setVentaAnular(v);
@@ -452,6 +579,101 @@ export default function CajaPage() {
       />
       <AnularVentaDialog venta={ventaAnular} onOpenChange={(o) => !o && setVentaAnular(null)} onSubmit={handleAnular} />
     </AppShell>
+  );
+}
+
+function ConsolidadoDia({ cajas }: { cajas: CajaDelDia[] }) {
+  const { totales, porCajero } = consolidarDia(cajas);
+  return (
+    <div className="mt-4 space-y-4">
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">
+            Consolidado del día · {totales.cajasAbiertas} abierta{totales.cajasAbiertas === 1 ? "" : "s"} · {totales.cajasCerradas} cerrada{totales.cajasCerradas === 1 ? "" : "s"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <MiniStat
+              label="Efectivo" value={formatCurrency(totales.totalEfectivo)} icon={<Banknote className="h-3.5 w-3.5" />}
+              bgClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" iconBgClass="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+            />
+            <MiniStat
+              label="Transfer." value={formatCurrency(totales.totalTransferencia)} icon={<CreditCard className="h-3.5 w-3.5" />}
+              bgClass="bg-sky-500/10 text-sky-700 dark:text-sky-400" iconBgClass="bg-sky-500/15 text-sky-600 dark:text-sky-400"
+            />
+            <MiniStat
+              label="Mercado Pago" value={formatCurrency(totales.totalMercadoPago)} icon={<QrCode className="h-3.5 w-3.5" />}
+              bgClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400" iconBgClass="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400"
+            />
+            <MiniStat
+              label="Total del día" value={formatCurrency(totales.totalVentas)} icon={<TrendingUp className="h-3.5 w-3.5" />}
+              bgClass="bg-gradient-to-br from-money to-emerald-600 text-white" solid
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Puesto</TableHead>
+                  <TableHead className="hidden sm:table-cell">Cajero</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Ventas</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Diferencia</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cajas.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.puestoNombre}</TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+                      {c.cajeroNombre || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn(c.estado === "abierta" && "border-success/50 text-success")}>
+                        {c.estado}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{c.cantidadVentas}</TableCell>
+                    <TableCell className="cifra text-right font-medium">{formatCurrency(c.totalVentas)}</TableCell>
+                    <TableCell className={cn(
+                      "cifra text-right font-medium",
+                      c.diferencia == null ? "text-muted-foreground" : c.diferencia < 0 ? "text-destructive" : c.diferencia > 0 ? "text-warning" : "",
+                    )}>
+                      {c.diferencia == null ? "—" : formatCurrency(c.diferencia)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {porCajero.length > 0 && porCajero.some((p) => p.diferencia !== 0) && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Diferencias de arqueo por cajero
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {porCajero.map((p) => (
+                  <Badge
+                    key={p.cajeroNombre}
+                    variant="outline"
+                    className={cn(
+                      p.diferencia < 0 && "border-destructive/50 text-destructive",
+                      p.diferencia > 0 && "border-warning text-warning",
+                    )}
+                  >
+                    {p.cajeroNombre}: {formatCurrency(p.diferencia)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -501,6 +723,7 @@ function HistorialTab({
             <TableHeader>
               <TableRow>
                 <TableHead>Cierre</TableHead>
+                <TableHead className="hidden md:table-cell">Puesto</TableHead>
                 <TableHead className="text-right">Apertura</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">Efectivo</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">Transfer.</TableHead>
@@ -516,6 +739,7 @@ function HistorialTab({
                     <span className="sm:hidden">{c.closedAt ? fechaCorta(c.closedAt) : "-"}</span>
                     <span className="hidden sm:inline">{c.closedAt ? formatDateTime(c.closedAt) : "-"}</span>
                   </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{c.puestoNombre ?? "—"}</TableCell>
                   <TableCell className="cifra text-right">{formatCurrency(c.montoApertura)}</TableCell>
                   <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalEfectivo)}</TableCell>
                   <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalTransferencia)}</TableCell>

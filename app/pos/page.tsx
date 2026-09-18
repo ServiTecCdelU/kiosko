@@ -11,7 +11,7 @@ import { precioFinal, precioLinea, tieneOferta, comboLabel } from "@/lib/pricing
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
-import { getCajaAbierta } from "@/services/caja-service";
+import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
@@ -33,7 +33,7 @@ import { MercadoPagoQrDialog } from "@/components/pos/mercadopago-qr-dialog";
 import { MercadoPagoPointDialog } from "@/components/pos/mercadopago-point-dialog";
 import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
 import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
-import type { Product } from "@/lib/types";
+import type { Caja, Product } from "@/lib/types";
 
 export default function PosPage() {
   return (
@@ -50,6 +50,7 @@ function PosScreen() {
   const [searching, setSearching] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
+  const [cajasAbiertas, setCajasAbiertas] = useState<Caja[]>([]);
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
@@ -67,9 +68,21 @@ function PosScreen() {
 
   useEffect(() => {
     focusInput();
-    getCajaAbierta()
-      .then((c) => setCajaId(c?.id))
-      .catch(() => setCajaId(undefined));
+    // Multi-caja: el cajero vende en SU caja (la que abrio el). Encargado/admin
+    // sin caja propia: si hay una sola abierta se usa esa; con varias, elige.
+    getCajasAbiertas()
+      .then((cs) => {
+        setCajasAbiertas(cs);
+        const u = getCurrentUser();
+        const propia = u ? cs.find((c) => c.abiertaPor === u.id) : undefined;
+        if (propia) setCajaId(propia.id);
+        else if (u?.rol !== "cajero" && cs.length === 1) setCajaId(cs[0].id);
+        else setCajaId(undefined);
+      })
+      .catch(() => {
+        setCajasAbiertas([]);
+        setCajaId(undefined);
+      });
     (isOnline ? getFavoritos() : getFavoritosOffline())
       .then(setFavoritos)
       .catch(() => getFavoritosOffline().then(setFavoritos));
@@ -496,20 +509,41 @@ function PosScreen() {
               <Printer className="h-3.5 w-3.5" /> Reimprimir
             </button>
           )}
-          <span
-            className={cn(
-              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-              cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
-            )}
-          >
-            <span
+          {!cajaId && cajasAbiertas.length > 1 && getCurrentUser()?.rol !== "cajero" ? (
+            // Encargado/admin sin caja propia con varias abiertas: elige donde imputar.
+            <select
+              value=""
+              onChange={(e) => setCajaId(e.target.value || undefined)}
+              className="rounded-full border border-warning/50 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning outline-none"
+            >
+              <option value="">Elegir caja…</option>
+              {cajasAbiertas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.puestoNombre ?? c.id} · {c.abiertaPorNombre ?? "sin cajero"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Link
+              href={cajaId ? "#" : "/caja"}
+              onClick={(e) => cajaId && e.preventDefault()}
               className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                cajaId ? "bg-success animate-pulse-soft" : "bg-warning",
+                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
+                cajaId ? "bg-success/15 text-success" : "bg-warning/15 text-warning hover:bg-warning/25",
               )}
-            />
-            <ScanLine className="h-4 w-4" /> {cajaId ? "Caja abierta" : "Caja cerrada"}
-          </span>
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  cajaId ? "bg-success animate-pulse-soft" : "bg-warning",
+                )}
+              />
+              <ScanLine className="h-4 w-4" />
+              {cajaId
+                ? (cajasAbiertas.find((c) => c.id === cajaId)?.puestoNombre ?? "Caja abierta")
+                : "Caja cerrada · abrir"}
+            </Link>
+          )}
         </div>
       </header>
 

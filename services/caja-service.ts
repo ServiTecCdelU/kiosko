@@ -1,12 +1,15 @@
 // services/caja-service.ts — caja diaria (client, anon)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
-import type { Caja, CajaMovimiento, CajaMovTipo } from "@/lib/types";
+import type { Caja, CajaMovimiento, CajaMovTipo, Puesto } from "@/lib/types";
+import type { CajaDelDia } from "@/lib/consolidado";
 
 function mapCaja(d: Record<string, any>): Caja {
   return {
     id: d.id,
     estado: d.estado ?? "abierta",
+    puestoId: d.puesto_id ?? undefined,
+    puestoNombre: d.puestos?.nombre ?? undefined,
     montoApertura: Number(d.monto_apertura) || 0,
     montoCierre: d.monto_cierre != null ? Number(d.monto_cierre) : undefined,
     totalEfectivo: Number(d.total_efectivo) || 0,
@@ -54,6 +57,84 @@ export interface ResumenCaja {
 export async function getCajaAbierta(): Promise<Caja | null> {
   const { caja } = await consultar<{ caja: Record<string, any> | null }>("/api/consultas/caja", "cajaAbierta");
   return caja ? mapCaja(caja) : null;
+}
+
+/** La caja abierta del usuario logueado (su cajon), si tiene una. */
+export async function getCajaDelUsuario(usuarioId: string): Promise<Caja | null> {
+  const { caja } = await consultar<{ caja: Record<string, any> | null }>(
+    "/api/consultas/caja", "cajaDelUsuario", { usuarioId },
+  );
+  return caja ? mapCaja(caja) : null;
+}
+
+/** Todas las cajas abiertas del comercio (multi-caja: una por puesto). */
+export async function getCajasAbiertas(): Promise<Caja[]> {
+  const { cajas } = await consultar<{ cajas: Record<string, any>[] }>(
+    "/api/consultas/caja", "cajasAbiertas",
+  );
+  return cajas.map(mapCaja);
+}
+
+export interface PuestoConEstado extends Puesto {
+  cajaAbiertaId?: string;
+  cajaAbiertaPor?: string;
+}
+
+export async function getPuestos(): Promise<PuestoConEstado[]> {
+  const { puestos } = await consultar<{ puestos: Record<string, any>[] }>(
+    "/api/consultas/caja", "puestos",
+  );
+  return puestos.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    activo: !!p.activo,
+    createdAt: new Date(p.created_at),
+    cajaAbiertaId: p.caja_abierta_id ?? undefined,
+    cajaAbiertaPor: p.caja_abierta_por ?? undefined,
+  }));
+}
+
+/** Cajas del dia (abiertas con resumen en vivo + cerradas hoy) para el consolidado. */
+export async function getCajasDelDia(): Promise<CajaDelDia[]> {
+  const desdeIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const { cajas } = await consultar<{ cajas: Record<string, any>[] }>(
+    "/api/consultas/caja", "consolidadoDia", { desdeIso },
+  );
+  return cajas.map((d) => ({
+    id: d.id,
+    estado: d.estado === "cerrada" ? "cerrada" : "abierta",
+    puestoNombre: d.puestos?.nombre ?? "Sin puesto",
+    cajeroNombre: d.abierta_por_nombre ?? "",
+    totalEfectivo: Number(d.total_efectivo) || 0,
+    totalTransferencia: Number(d.total_transferencia) || 0,
+    totalMercadoPago: Number(d.total_mercadopago) || 0,
+    totalVentas: Number(d.total_ventas) || 0,
+    cantidadVentas: Number(d.cantidad_ventas) || 0,
+    diferencia: d.diferencia != null ? Number(d.diferencia) : undefined,
+  }));
+}
+
+export async function crearPuesto(nombre: string): Promise<void> {
+  const res = await fetch("/api/puestos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nombre, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el puesto");
+}
+
+export async function actualizarPuesto(
+  id: string,
+  cambios: { nombre?: string; activo?: boolean },
+): Promise<void> {
+  const res = await fetch("/api/puestos", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...cambios, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo actualizar el puesto");
 }
 
 export async function getMovimientosCaja(cajaId: string): Promise<CajaMovimiento[]> {
@@ -111,13 +192,14 @@ export async function getVentasPorCajero(cajaId: string): Promise<VentasPorCajer
 
 export async function abrirCaja(
   montoApertura: number,
+  puestoId: string,
   usuarioId?: string,
   usuarioNombre?: string,
 ): Promise<Caja> {
   const res = await fetch("/api/caja", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ montoApertura, usuarioId, usuarioNombre, comercioId: getComercioId() }),
+    body: JSON.stringify({ montoApertura, puestoId, usuarioId, usuarioNombre, comercioId: getComercioId() }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo abrir la caja");

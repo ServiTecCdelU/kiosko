@@ -116,9 +116,19 @@ export interface CuentaMov {
   fecha: Date;
 }
 
+/** Puesto fisico de cobro (Caja 1, Caja 2, ...). El cajon es del puesto. */
+export interface Puesto {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  createdAt: Date;
+}
+
 export interface Caja {
   id: string;
   estado: "abierta" | "cerrada";
+  puestoId?: string;
+  puestoNombre?: string;
   montoApertura: number;
   montoCierre?: number;
   totalEfectivo: number;
@@ -166,7 +176,7 @@ export interface SyncLog {
   finishedAt?: Date;
 }
 
-export type UserRol = "admin" | "cajero";
+export type UserRol = "admin" | "encargado" | "cajero";
 
 export interface Usuario {
   id: string;

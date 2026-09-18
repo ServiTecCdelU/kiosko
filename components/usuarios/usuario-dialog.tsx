@@ -92,7 +92,8 @@ export function UsuarioDialog({ usuario, open, onOpenChange, onSave }: UsuarioDi
               onChange={(e) => setRol(e.target.value as UserRol)}
               className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
             >
-              <option value="cajero">Cajero (solo Punto de Venta)</option>
+              <option value="cajero">Cajero (Punto de Venta y su caja)</option>
+              <option value="encargado">Encargado (todas las cajas, anula ventas)</option>
               <option value="admin">Administrador (acceso total)</option>
             </select>
           </div>

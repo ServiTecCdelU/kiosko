@@ -59,7 +59,8 @@ export default function VentasPage() {
   const [filtroMetodo, setFiltroMetodo] = useState<PaymentMethod | "todos">("todos");
 
   const user = getCurrentUser();
-  const esAdmin = user?.rol === "admin";
+  // Encargado tambien puede anular ventas (multi-caja); el cajero no.
+  const esAdmin = user?.rol !== "cajero";
 
   const load = useCallback(async (r: Rango) => {
     setLoading(true);
