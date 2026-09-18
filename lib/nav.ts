@@ -1,6 +1,6 @@
 // lib/nav.ts — items de navegacion del kiosko
 import type { LucideIcon } from "lucide-react";
-import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog } from "lucide-react";
+import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck } from "lucide-react";
 import type { UserRol } from "@/lib/types";
 
 export interface NavItem {
@@ -19,6 +19,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Ventas", href: "/ventas", icon: Receipt, roles: ["encargado"] },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Stock", href: "/stock", icon: Package },
+  { label: "Compras", href: "/compras", icon: Truck },
   { label: "Usuarios", href: "/usuarios", icon: UserCog },
   { label: "Reportes", href: "/reportes", icon: BarChart3 },
   { label: "Sincronizacion", href: "/sincronizacion", icon: RefreshCw },
