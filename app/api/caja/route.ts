@@ -3,6 +3,7 @@
 // PATCH -> cerrar caja (el arqueo se recalcula aca, no se confia en el cliente)
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { generarIdLegible } from "@/lib/server/ids";
 import { calcularResumenCaja } from "@/lib/server/caja";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const puestoId = String(body?.puestoId ?? "");
   const montoApertura = Number(body?.montoApertura);
   if (!Number.isFinite(montoApertura) || montoApertura < 0) {
@@ -95,7 +96,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const cajaId = String(body?.cajaId ?? "");
   const montoCierreContado = Number(body?.montoCierreContado);
 

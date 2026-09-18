@@ -2,6 +2,7 @@
 // Antes se insertaba desde el navegador con el anon key.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { generarIdLegible } from "@/lib/server/ids";
 
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "El limite de credito no puede ser negativo" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const id = await generarIdLegible("clientes", "cli", nombre);
 
   const { data, error } = await supabaseAdmin

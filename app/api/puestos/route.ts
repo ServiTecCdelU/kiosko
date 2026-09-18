@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const nombre = String(body?.nombre ?? "").trim();
   if (!nombre) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
 
@@ -46,7 +47,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const id = String(body?.id ?? "");
   if (!id) return NextResponse.json({ error: "Falta el puesto" }, { status: 400 });
 

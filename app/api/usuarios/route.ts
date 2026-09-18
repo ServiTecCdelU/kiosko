@@ -3,6 +3,7 @@
 // supabase/25_usuarios_crud.sql): nunca se guarda ni se loguea en texto plano en Node.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const input = body?.input;
   if (!input || typeof input !== "object") {
     return NextResponse.json({ error: "Faltan los datos del usuario" }, { status: 400 });

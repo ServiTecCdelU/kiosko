@@ -1,5 +1,6 @@
 // app/api/consultas/reportes/route.ts — reportes calculados en el servidor.
 import { NextResponse } from "next/server";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { calcularReporte } from "@/lib/server/reportes";
 
 export const runtime = "nodejs";
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
   const topN = Math.min(Math.max(Number(body?.topN) || 10, 1), 100);
 
   try {
-    const reporte = await calcularReporte(desde, hasta, topN, String(body?.comercioId ?? "comercio_1"));
+    const reporte = await calcularReporte(desde, hasta, topN, comercioIdDeSesion(req));
     return NextResponse.json(reporte);
   } catch (e) {
     return NextResponse.json(

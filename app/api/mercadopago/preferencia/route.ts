@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearPreferenciaMP } from "@/lib/server/mercadopago";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
 
   const saleInput = body?.saleInput;
   const total = Number(body?.total);
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
 
   if (!saleInput || !Array.isArray(saleInput.items) || saleInput.items.length === 0) {
     return NextResponse.json({ error: "El carrito esta vacio" }, { status: 400 });

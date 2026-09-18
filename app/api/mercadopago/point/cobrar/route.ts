@@ -1,6 +1,7 @@
 // app/api/mercadopago/point/cobrar/route.ts — envia el cobro al lector fisico Point
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearIntentoPagoPoint, cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   const saleInput = body?.saleInput;
   const total = Number(body?.total);
   const deviceId = String(body?.deviceId ?? "");
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
 
   if (!saleInput || !Array.isArray(saleInput.items) || saleInput.items.length === 0) {
     return NextResponse.json({ error: "El carrito esta vacio" }, { status: 400 });

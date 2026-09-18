@@ -2,6 +2,7 @@
 // El cliente parsea el Excel y manda las filas por lotes; las escrituras
 // ocurren aca con el service role.
 import { NextResponse } from "next/server";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { importarLote, type EstrategiaStock, type FilaImportacion } from "@/lib/server/importar-productos";
 
 export const runtime = "nodejs";
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   try {
     const resumen = await importarLote(
       filas as FilaImportacion[],
-      String(body?.comercioId ?? "comercio_1"),
+      comercioIdDeSesion(req),
       estrategia,
     );
     return NextResponse.json(resumen);

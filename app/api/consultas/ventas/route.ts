@@ -2,6 +2,7 @@
 // Conjunto cerrado de acciones: el cliente no elige tablas ni filtros.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const accion = String(body?.accion ?? "");
 
   switch (accion) {

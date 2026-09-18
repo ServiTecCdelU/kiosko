@@ -4,6 +4,7 @@
 // clave podia cambiar los precios de todo el catalogo.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const productId = String(body?.productId ?? "");
   const input = body?.input;
 
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const input = body?.input;
   if (!input || typeof input !== "object") {
     return NextResponse.json({ error: "Faltan los datos del producto" }, { status: 400 });
@@ -114,7 +115,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const comercioId = String(body?.comercioId ?? "comercio_1");
+  const comercioId = comercioIdDeSesion(req);
   const productId = String(body?.productId ?? "");
   const oferta = body?.oferta;
 

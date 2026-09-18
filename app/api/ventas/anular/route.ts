@@ -1,6 +1,7 @@
 // app/api/ventas/anular/route.ts — anulacion atomica de venta via RPC anular_venta_kiosko
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin.rpc("anular_venta_kiosko", {
     p_venta_id: ventaId,
-    p_comercio_id: String(body?.comercioId ?? "comercio_1"),
+    p_comercio_id: comercioIdDeSesion(req),
     p_usuario_id: body?.usuarioId ?? null,
     p_usuario_nombre: body?.usuarioNombre ?? null,
     p_motivo: body?.motivo ?? null,

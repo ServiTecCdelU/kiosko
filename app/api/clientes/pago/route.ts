@@ -3,6 +3,7 @@
 // cualquiera con esa clave podia borrar deudas.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     p_monto: monto,
     p_usuario: body?.usuario ?? null,
     p_referencia: body?.referencia ?? null,
-    p_comercio_id: String(body?.comercioId ?? "comercio_1"),
+    p_comercio_id: comercioIdDeSesion(req),
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

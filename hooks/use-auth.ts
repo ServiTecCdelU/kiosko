@@ -63,6 +63,8 @@ export function useAuth() {
   const logout = useCallback(() => {
     setCurrentUser(null);
     setUser(null);
+    // Borra la cookie de sesion firmada del servidor (fire-and-forget).
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   }, []);
 
   const rol: UserRol | null = user?.rol ?? null;

@@ -1,6 +1,7 @@
 // app/api/caja/movimiento/route.ts — retiro/aporte/gasto de caja via RPC registrar_movimiento_caja
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabaseAdmin.rpc("registrar_movimiento_caja", {
     p_caja_id: cajaId,
-    p_comercio_id: String(body?.comercioId ?? "comercio_1"),
+    p_comercio_id: comercioIdDeSesion(req),
     p_tipo: tipo,
     p_monto: monto,
     p_concepto: body?.concepto ?? "",

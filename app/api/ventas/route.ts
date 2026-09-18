@@ -1,5 +1,6 @@
 // app/api/ventas/route.ts — alta de venta atomica via RPC process_sale_kiosko
 import { NextResponse } from "next/server";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { procesarVenta } from "@/lib/server/procesar-venta";
 
 export const runtime = "nodejs";
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
       userId: body?.userId ?? null,
       userName: body?.userName ?? null,
       clienteId: body?.clienteId ?? null,
-      comercioId: String(body?.comercioId ?? "comercio_1"),
+      comercioId: comercioIdDeSesion(req),
       pagadorNombre: body?.pagadorNombre ?? null,
       cuotas: body?.cuotas ?? null,
       recargoPct: body?.recargoPct ?? null,
