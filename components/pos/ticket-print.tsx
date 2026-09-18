@@ -33,7 +33,7 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
 
   return (
     <div id="ticket-print" className="bg-white p-2 font-mono text-[11px] leading-tight text-black">
-      <p className="text-center text-sm font-bold">Demo</p>
+      <p className="text-center text-sm font-bold">Supermercado Patricia</p>
       <p className="text-center">Ticket no fiscal</p>
       <p className="text-center">{formatDateTime(ticket.createdAt)}</p>
       <p className="text-center">#{ticket.saleNumber}</p>

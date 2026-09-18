@@ -238,11 +238,29 @@ function PosScreen() {
     [addToCart, focusInput],
   );
 
+  const imprimirTicket = useCallback((ticket: TicketData) => {
+    // Fallback: si la Zebra RAW no responde, se imprime el ticket HTML por el navegador.
+    const fallbackNavegador = (motivo: string) => {
+      toast.error(`${motivo} — se abre la impresión del navegador`);
+      setTimeout(() => window.print(), 150);
+    };
+    fetch("/api/imprimir-ticket", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ticket),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Error al imprimir" }));
+        fallbackNavegador(error ?? "Error al imprimir el ticket");
+      }
+    }).catch(() => fallbackNavegador("No se pudo conectar con la impresora"));
+  }, []);
+
   const finalizarTicket = useCallback(
     (saleNumber: string, total: number, data: ConfirmData, userName?: string) => {
       const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
       if (saleNumber !== "PENDIENTE") toast.success(`Ticket #${saleNumber}${vuelto}`);
-      setLastTicket({
+      const ticket: TicketData = {
         saleNumber,
         createdAt: new Date(),
         items: cart.items.map((i) => {
@@ -263,14 +281,15 @@ function PosScreen() {
         pagadorNombre: data.pagadorNombre,
         cuotas: data.cuotas,
         recargoPct: data.recargoPct,
-      });
+      };
+      setLastTicket(ticket);
       cart.clear();
       setQuery("");
       setResults([]);
       focusInput();
-      setTimeout(() => window.print(), 150);
+      imprimirTicket(ticket);
     },
-    [cart, focusInput],
+    [cart, focusInput, imprimirTicket],
   );
 
   const handleAprobadoQR = useCallback(
@@ -471,7 +490,7 @@ function PosScreen() {
           )}
           {lastTicket && (
             <button
-              onClick={() => window.print()}
+              onClick={() => lastTicket && imprimirTicket(lastTicket)}
               className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <Printer className="h-3.5 w-3.5" /> Reimprimir
