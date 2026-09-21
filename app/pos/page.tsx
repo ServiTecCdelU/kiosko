@@ -13,6 +13,7 @@ import { searchProducts, findProductByCode, getFavoritos } from "@/services/prod
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
+import { parseCodigoBalanza } from "@/lib/barcode-balanza";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { getCurrentUser } from "@/hooks/use-auth";
@@ -196,14 +197,55 @@ function PosScreen() {
     [cart, pesoProduct],
   );
 
+  const buscarPorCodigo = useCallback(
+    (codigo: string): Promise<Product | null> =>
+      isOnline
+        ? findProductByCode(codigo).catch(() => buscarPorCodigoOffline(codigo))
+        : buscarPorCodigoOffline(codigo),
+    [isOnline],
+  );
+
+  // Etiqueta de balanza (EAN-13 prefijo 20-29): trae el PLU y el peso ya
+  // embebidos, asi que el producto pesable se agrega directo sin PesoDialog.
+  const procesarCodigoBalanza = useCallback(
+    async (codigo: string): Promise<boolean> => {
+      const balanza = parseCodigoBalanza(codigo);
+      if (!balanza) return false;
+      for (const c of balanza.codigosBusqueda) {
+        const p = await buscarPorCodigo(c);
+        if (!p) continue;
+        if (p.unidad !== "kg") {
+          // PLU apunta a un producto por unidad: se agrega normal y se avisa.
+          toast.warning(`${p.name} no está marcado como pesable`);
+          addToCart(p);
+          return true;
+        }
+        if (p.stockControlado && balanza.pesoKg > p.stock) {
+          toast.error(`Stock maximo (${p.stock}kg) para ${p.name}`);
+          return true;
+        }
+        cart.addProduct(p, balanza.pesoKg);
+        toast.success(`${p.name} · ${balanza.pesoKg.toFixed(3)} kg`);
+        return true;
+      }
+      toast.error(`Etiqueta de balanza sin producto: PLU ${balanza.plu}`);
+      return true;
+    },
+    [buscarPorCodigo, addToCart, cart],
+  );
+
   // Enter: el lector de codigo de barras "tipea" + Enter. Match exacto -> agrega directo.
   const handleEnter = useCallback(async () => {
     const value = query.trim();
     if (!value) return;
     try {
-      const found = isOnline
-        ? await findProductByCode(value).catch(() => buscarPorCodigoOffline(value))
-        : await buscarPorCodigoOffline(value);
+      if (await procesarCodigoBalanza(value)) {
+        setQuery("");
+        setResults([]);
+        focusInput();
+        return;
+      }
+      const found = await buscarPorCodigo(value);
       if (found) {
         addToCart(found);
         setQuery("");
@@ -220,15 +262,14 @@ function PosScreen() {
     } catch {
       toast.error("Error al buscar");
     }
-  }, [query, results, addToCart, focusInput, isOnline]);
+  }, [query, results, addToCart, focusInput, buscarPorCodigo, procesarCodigoBalanza]);
 
   const handleScanDetected = useCallback(
     async (codigo: string) => {
       setScannerOpen(false);
       try {
-        const found = isOnline
-          ? await findProductByCode(codigo).catch(() => buscarPorCodigoOffline(codigo))
-          : await buscarPorCodigoOffline(codigo);
+        if (await procesarCodigoBalanza(codigo)) return;
+        const found = await buscarPorCodigo(codigo);
         if (found) {
           addToCart(found);
           toast.success(`${found.name} agregado`);
@@ -239,7 +280,7 @@ function PosScreen() {
         toast.error("Error al buscar el código");
       }
     },
-    [addToCart, isOnline],
+    [addToCart, buscarPorCodigo, procesarCodigoBalanza],
   );
 
   const handleProductoCreado = useCallback(
