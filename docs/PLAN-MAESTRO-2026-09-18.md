@@ -85,6 +85,7 @@ una sola caja abierta por comercio y todo el efectivo se mezcla en un arqueo.
 | 4.3 | **Búsqueda con catálogo grande** | Índice trigram / búsqueda difusa en Postgres para miles de productos (súper). Medir primero. |
 | 4.4 | **Fidelización** (puntos por cliente) | Campos en `clientes`; la infraestructura de clientes ya existe. |
 | 4.5 | **Identidad visual premium** | Aplicar la dirección "Mostrador" del estudio de mercado (teal noche + lima dinero, motion sobrio). |
+| 4.6 | **Etiqueta de góndola imprimible** | Cuadrito por producto con precio en grande + código de barras (y nombre/unidad) para pegar en el estante. No requiere SQL: usa `price`/`codigoBarras` ya existentes. Reutiliza el layout ZPL de `lib/server/zpl.ts` para la Zebra, más una vista imprimible por navegador (hoja A4 en grilla) para quien no tenga térmica. Se agrega desde `/stock`, individual o por selección múltiple. |
 
 ### Fase 5 — SaaS (recién con 2+ comercios reales)
 
