@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/caja-service.ts — caja diaria (client, anon)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -115,7 +116,7 @@ export async function getCajasDelDia(): Promise<CajaDelDia[]> {
 }
 
 export async function crearPuesto(nombre: string): Promise<void> {
-  const res = await fetch("/api/puestos", {
+  const res = await fetch(apiUrl("/api/puestos"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nombre, comercioId: getComercioId() }),
@@ -128,7 +129,7 @@ export async function actualizarPuesto(
   id: string,
   cambios: { nombre?: string; activo?: boolean },
 ): Promise<void> {
-  const res = await fetch("/api/puestos", {
+  const res = await fetch(apiUrl("/api/puestos"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...cambios, comercioId: getComercioId() }),
@@ -154,7 +155,7 @@ export interface RegistrarMovimientoInput {
 }
 
 export async function registrarMovimientoCaja(input: RegistrarMovimientoInput): Promise<void> {
-  const res = await fetch("/api/caja/movimiento", {
+  const res = await fetch(apiUrl("/api/caja/movimiento"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, comercioId: getComercioId() }),
@@ -196,7 +197,7 @@ export async function abrirCaja(
   usuarioId?: string,
   usuarioNombre?: string,
 ): Promise<Caja> {
-  const res = await fetch("/api/caja", {
+  const res = await fetch(apiUrl("/api/caja"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ montoApertura, puestoId, usuarioId, usuarioNombre, comercioId: getComercioId() }),
@@ -217,7 +218,7 @@ export async function cerrarCaja(
   usuarioId?: string,
   notas?: string,
 ): Promise<Caja> {
-  const res = await fetch("/api/caja", {
+  const res = await fetch(apiUrl("/api/caja"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cajaId, montoCierreContado, usuarioId, notas, comercioId: getComercioId() }),

@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/sales-service.ts — alta de ventas (client helper hacia /api/ventas)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -45,7 +46,7 @@ export class NetworkUnavailableError extends Error {
 export async function createSale(input: CreateSaleInput): Promise<ProcessSaleResult> {
   let res: Response;
   try {
-    res = await fetch("/api/ventas", {
+    res = await fetch(apiUrl("/api/ventas"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...input, comercioId: getComercioId() }),
@@ -120,7 +121,7 @@ export interface AnularVentaResult {
 }
 
 export async function anularVenta(input: AnularVentaInput): Promise<AnularVentaResult> {
-  const res = await fetch("/api/ventas/anular", {
+  const res = await fetch(apiUrl("/api/ventas/anular"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, comercioId: getComercioId() }),
@@ -142,7 +143,7 @@ export interface DevolverVentaInput {
 }
 
 export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolucionId: string; total: number }> {
-  const res = await fetch("/api/ventas/devolver", {
+  const res = await fetch(apiUrl("/api/ventas/devolver"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, comercioId: getComercioId() }),

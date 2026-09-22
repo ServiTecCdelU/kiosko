@@ -1,4 +1,5 @@
 "use client";
+import { apiUrl } from "@/lib/utils/api-url"
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -62,7 +63,7 @@ function SincronizacionContent() {
     setSyncing(true);
     toast.loading("Sincronizando catalogo...", { id: "sync" });
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
+      const res = await fetch(apiUrl("/api/sync"), { method: "POST" });
       const data: SyncResult = await res.json();
       if (data.estado === "error") {
         toast.error(data.error ?? "Error de sincronizacion", { id: "sync" });
@@ -101,7 +102,7 @@ function SincronizacionContent() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card className="rounded-2xl">
+        <Card className="card-premium rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Package className="h-4 w-4" /> Productos en el kiosko
@@ -115,7 +116,7 @@ function SincronizacionContent() {
             )}
           </CardContent>
         </Card>
-        <Card className="rounded-2xl">
+        <Card className="card-premium rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Ultima sincronizacion</CardTitle>
           </CardHeader>
@@ -134,7 +135,7 @@ function SincronizacionContent() {
         </Card>
       </div>
 
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">Historial</CardTitle>
         </CardHeader>

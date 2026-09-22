@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/import-service.ts — importación masiva de productos desde lista de precios (Excel)
 import * as XLSX from "xlsx-js-style";
 import { getComercioId } from "@/hooks/use-auth";
@@ -249,7 +250,7 @@ export async function importProducts(
   const TAMANIO_LOTE = 200;
   for (let i = 0; i < usable.length; i += TAMANIO_LOTE) {
     const lote = usable.slice(i, i + TAMANIO_LOTE);
-    const res = await fetch("/api/productos/importar", {
+    const res = await fetch(apiUrl("/api/productos/importar"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

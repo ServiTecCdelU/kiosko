@@ -1,4 +1,5 @@
 "use client";
+import { apiUrl } from "@/lib/utils/api-url"
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
@@ -298,7 +299,7 @@ function PosScreen() {
       toast.error(`${motivo} — se abre la impresión del navegador`);
       setTimeout(() => window.print(), 150);
     };
-    fetch("/api/imprimir-ticket", {
+    fetch(apiUrl("/api/imprimir-ticket"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(ticket),

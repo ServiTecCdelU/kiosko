@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/clientes-service.ts — clientes y cuenta corriente (client, anon)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -71,7 +72,7 @@ export interface CrearClienteInput {
 export async function crearCliente(input: CrearClienteInput): Promise<Cliente> {
   const nombre = input.nombre.trim();
   if (!nombre) throw new Error("El nombre es obligatorio");
-  const res = await fetch("/api/clientes", {
+  const res = await fetch(apiUrl("/api/clientes"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, nombre, comercioId: getComercioId() }),
@@ -101,7 +102,7 @@ export async function registrarPago(
   usuario?: string,
   referencia?: string,
 ): Promise<PagoResult> {
-  const res = await fetch("/api/clientes/pago", {
+  const res = await fetch(apiUrl("/api/clientes/pago"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clienteId, monto, usuario, referencia, comercioId: getComercioId() }),

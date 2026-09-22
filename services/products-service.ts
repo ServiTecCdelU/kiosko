@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/products-service.ts — lectura del catalogo (client, anon)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -100,7 +101,7 @@ export interface UpdateProductInput {
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
-  const res = await fetch("/api/productos", {
+  const res = await fetch(apiUrl("/api/productos"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ productId, input, comercioId: getComercioId() }),
@@ -127,7 +128,7 @@ export async function logCambioPrecio(
   valorNuevo: number,
   usuarioNombre?: string,
 ): Promise<void> {
-  const res = await fetch("/api/productos/auditoria", {
+  const res = await fetch(apiUrl("/api/productos/auditoria"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -231,7 +232,7 @@ export interface SetOfertaInput {
 
 /** Marca/actualiza la oferta de catálogo de un producto (descuento propio, incluye combos). */
 export async function setOferta(productId: string, oferta: SetOfertaInput): Promise<void> {
-  const res = await fetch("/api/productos", {
+  const res = await fetch(apiUrl("/api/productos"), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ productId, oferta, comercioId: getComercioId() }),
@@ -260,7 +261,7 @@ export interface CreateProductInput {
 }
 
 export async function createProduct(input: CreateProductInput): Promise<string> {
-  const res = await fetch("/api/productos", {
+  const res = await fetch(apiUrl("/api/productos"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ input, comercioId: getComercioId() }),

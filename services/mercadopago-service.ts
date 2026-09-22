@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/mercadopago-service.ts — cobro con QR y con lector Point (client helper)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -10,7 +11,7 @@ export interface CobroQR {
 }
 
 export async function crearCobroQR(saleInput: CreateSaleInput, total: number): Promise<CobroQR> {
-  const res = await fetch("/api/mercadopago/preferencia", {
+  const res = await fetch(apiUrl("/api/mercadopago/preferencia"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ saleInput, total, comercioId: getComercioId() }),
@@ -43,7 +44,7 @@ export interface DispositivoMP {
 }
 
 export async function listarDispositivosMP(): Promise<DispositivoMP[]> {
-  const res = await fetch("/api/mercadopago/dispositivos");
+  const res = await fetch(apiUrl("/api/mercadopago/dispositivos"));
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudieron listar los lectores Point");
   return data.dispositivos as DispositivoMP[];
@@ -67,7 +68,7 @@ export interface CobroPoint {
 }
 
 export async function cobrarConPoint(saleInput: CreateSaleInput, total: number, deviceId: string): Promise<CobroPoint> {
-  const res = await fetch("/api/mercadopago/point/cobrar", {
+  const res = await fetch(apiUrl("/api/mercadopago/point/cobrar"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ saleInput, total, deviceId, comercioId: getComercioId() }),
@@ -88,7 +89,7 @@ export class ErrorCancelacionPoint extends Error {
 }
 
 export async function cancelarCobroPoint(externalReference: string): Promise<void> {
-  const res = await fetch("/api/mercadopago/point/cancelar", {
+  const res = await fetch(apiUrl("/api/mercadopago/point/cancelar"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ externalReference }),
@@ -124,7 +125,7 @@ export async function listarCobrosSinResolver(): Promise<CobroSinResolver[]> {
 }
 
 export async function resolverCobro(id: string, nota?: string): Promise<void> {
-  const res = await fetch("/api/mercadopago/resolver", {
+  const res = await fetch(apiUrl("/api/mercadopago/resolver"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, nota, comercioId: getComercioId() }),

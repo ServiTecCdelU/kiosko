@@ -1,9 +1,10 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/auth-service.ts — login por PIN (client helper)
 import { setCurrentUser, DEFAULT_COMERCIO_ID } from "@/hooks/use-auth";
 import type { Usuario } from "@/lib/types";
 
 export async function login(pin: string): Promise<Usuario> {
-  const res = await fetch("/api/auth/login", {
+  const res = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pin }),

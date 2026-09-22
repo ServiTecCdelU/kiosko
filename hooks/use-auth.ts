@@ -1,4 +1,5 @@
 "use client";
+import { apiUrl } from "@/lib/utils/api-url"
 
 import { useState, useEffect, useCallback } from "react";
 import type { Usuario, UserRol } from "@/lib/types";
@@ -64,7 +65,7 @@ export function useAuth() {
     setCurrentUser(null);
     setUser(null);
     // Borra la cookie de sesion firmada del servidor (fire-and-forget).
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    fetch(apiUrl("/api/auth/logout"), { method: "POST" }).catch(() => {});
   }, []);
 
   const rol: UserRol | null = user?.rol ?? null;

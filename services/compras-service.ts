@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/compras-service.ts — proveedores y recepcion de mercaderia (client)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -73,7 +74,7 @@ export async function getProveedores(): Promise<Proveedor[]> {
 export async function crearProveedor(input: {
   nombre: string; telefono?: string; notas?: string;
 }): Promise<void> {
-  const res = await fetch("/api/proveedores", {
+  const res = await fetch(apiUrl("/api/proveedores"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, comercioId: getComercioId() }),
@@ -86,7 +87,7 @@ export async function actualizarProveedor(
   id: string,
   cambios: { nombre?: string; telefono?: string; notas?: string; activo?: boolean },
 ): Promise<void> {
-  const res = await fetch("/api/proveedores", {
+  const res = await fetch(apiUrl("/api/proveedores"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...cambios, comercioId: getComercioId() }),
@@ -107,7 +108,7 @@ export interface RecibirCompraInput {
 }
 
 export async function recibirCompra(input: RecibirCompraInput): Promise<{ compraId: string; total: number }> {
-  const res = await fetch("/api/compras", {
+  const res = await fetch(apiUrl("/api/compras"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, comercioId: getComercioId() }),
@@ -118,7 +119,7 @@ export async function recibirCompra(input: RecibirCompraInput): Promise<{ compra
 }
 
 export async function anularCompra(compraId: string, usuarioId?: string): Promise<void> {
-  const res = await fetch("/api/compras/anular", {
+  const res = await fetch(apiUrl("/api/compras/anular"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ compraId, usuarioId, comercioId: getComercioId() }),

@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/utils/api-url"
 // services/usuarios-service.ts — administracion de usuarios (client, service role via API)
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
@@ -28,7 +29,7 @@ export interface CrearUsuarioInput {
 }
 
 export async function crearUsuario(input: CrearUsuarioInput): Promise<void> {
-  const res = await fetch("/api/usuarios", {
+  const res = await fetch(apiUrl("/api/usuarios"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ input, comercioId: getComercioId() }),
@@ -47,7 +48,7 @@ export interface ActualizarUsuarioInput {
 }
 
 export async function actualizarUsuario(id: string, input: ActualizarUsuarioInput): Promise<void> {
-  const res = await fetch("/api/usuarios", {
+  const res = await fetch(apiUrl("/api/usuarios"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usuarioId: id, input, comercioId: getComercioId() }),
