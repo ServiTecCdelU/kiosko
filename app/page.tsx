@@ -13,15 +13,20 @@ import {
   TrendingUp,
   AlertTriangle,
   Users,
+  CalendarClock,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
 import { getReporte } from "@/services/reportes-service";
-import { getCajaAbierta } from "@/services/caja-service";
-import { getProductsPage } from "@/services/products-service";
-import { formatCurrency, formatTime } from "@/lib/utils/format";
+import { getCajasAbiertas } from "@/services/caja-service";
+import { getProductsPage, getVencimientosProximos } from "@/services/products-service";
+import { formatCurrency } from "@/lib/utils/format";
 import type { Caja, UserRol } from "@/lib/types";
+
+// Cuanto esperar entre actualizaciones automaticas del dashboard (mobile: el
+// dueño lo abre para "ver rápido cómo va el día", no lo deja fijo en pantalla).
+const REFRESH_MS = 60_000;
 
 const ICONS: Record<string, typeof ShoppingCart> = {
   "/pos": ShoppingCart,
@@ -213,12 +218,14 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
   const [loading, setLoading] = useState(true);
   const [ventasHoy, setVentasHoy] = useState(0);
   const [cantHoy, setCantHoy] = useState(0);
-  const [caja, setCaja] = useState<Caja | null>(null);
+  const [cajas, setCajas] = useState<Caja[]>([]);
   const [stockBajo, setStockBajo] = useState<number | null>(null);
+  const [vencimientos, setVencimientos] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+
+    const cargar = async () => {
       const hasta = new Date();
       const desde = new Date();
       desde.setHours(0, 0, 0, 0);
@@ -230,8 +237,9 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
             setCantHoy(r.resumen.cantidad);
           })
           .catch(() => {}),
-        getCajaAbierta()
-          .then((c) => alive && setCaja(c))
+        // Multi-caja: cuantas cajas hay abiertas ahora mismo, no solo "la ultima".
+        getCajasAbiertas()
+          .then((cs) => alive && setCajas(cs))
           .catch(() => {}),
       ];
       if (showStock) {
@@ -239,20 +247,35 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
           getProductsPage({ soloStockBajo: true, pageSize: 1 })
             .then((r) => alive && setStockBajo(r.total))
             .catch(() => {}),
+          getVencimientosProximos(7)
+            .then((ps) => alive && setVencimientos(ps.length))
+            .catch(() => {}),
         );
       }
       await Promise.allSettled(tasks);
       if (alive) setLoading(false);
-    })();
+    };
+
+    cargar();
+    const interval = setInterval(cargar, REFRESH_MS);
+    // El dueño mira el celular unos segundos y lo vuelve a prender mas tarde:
+    // refrescar al volver a la pestaña da datos frescos sin esperar el intervalo.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") cargar();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       alive = false;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [showStock]);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {Array.from({ length: showStock ? 3 : 2 }).map((_, i) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: showStock ? 4 : 2 }).map((_, i) => (
           <div key={i} className="h-28 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
         ))}
       </div>
@@ -260,7 +283,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* Ventas de hoy — protagonista */}
       <div className="card-premium relative overflow-hidden rounded-2xl p-5">
         <div
@@ -276,31 +299,27 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
         </p>
       </div>
 
-      {/* Caja */}
-      <Link
-        href="/caja"
-        className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5"
-      >
+      {/* Cajas abiertas ahora — multi-caja: cuenta y quien atiende cada una */}
+      <Link href="/caja" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
         <div className="eyebrow flex items-center gap-1.5">
-          <Wallet className="h-4 w-4 text-primary" /> Caja
+          <Wallet className="h-4 w-4 text-primary" /> Cajas abiertas
         </div>
         <div className="mt-2 flex items-center gap-2">
           <span
-            className={`h-2.5 w-2.5 rounded-full ${caja ? "bg-success animate-pulse-soft" : "bg-muted-foreground/40"}`}
+            className={`h-2.5 w-2.5 rounded-full ${cajas.length > 0 ? "bg-success animate-pulse-soft" : "bg-muted-foreground/40"}`}
           />
-          <span className="text-xl font-bold">{caja ? "Abierta" : "Cerrada"}</span>
+          <span className="text-3xl font-bold">{cajas.length}</span>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {caja ? `desde ${formatTime(caja.openedAt)}` : "Tocá para abrir"}
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {cajas.length === 0
+            ? "Tocá para abrir"
+            : cajas.map((c) => c.abiertaPorNombre ?? c.puestoNombre ?? "—").join(" · ")}
         </p>
       </Link>
 
       {/* Stock bajo (solo admin) */}
       {showStock && (
-        <Link
-          href="/stock"
-          className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5"
-        >
+        <Link href="/stock" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
           <div className="eyebrow flex items-center gap-1.5">
             <AlertTriangle className={`h-4 w-4 ${stockBajo && stockBajo > 0 ? "text-warning" : "text-primary"}`} />
             Stock bajo
@@ -312,6 +331,24 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {stockBajo && stockBajo > 0 ? "productos para reponer" : "todo en orden"}
+          </p>
+        </Link>
+      )}
+
+      {/* Vencimientos proximos (solo admin) */}
+      {showStock && (
+        <Link href="/stock" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
+          <div className="eyebrow flex items-center gap-1.5">
+            <CalendarClock className={`h-4 w-4 ${vencimientos && vencimientos > 0 ? "text-warning" : "text-primary"}`} />
+            Vencen esta semana
+          </div>
+          <p
+            className={`cifra-hero mt-2 text-4xl sm:text-[2.75rem] ${vencimientos && vencimientos > 0 ? "text-warning" : "text-foreground"}`}
+          >
+            {vencimientos ?? "—"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {vencimientos && vencimientos > 0 ? "productos a revisar" : "sin vencimientos cerca"}
           </p>
         </Link>
       )}
