@@ -69,6 +69,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ ventas: data ?? [] });
     }
 
+    // Devoluciones ya registradas de una venta: para saber cuanto queda
+    // pendiente por item antes de abrir el dialogo de devolucion.
+    case "devolucionesDeVenta": {
+      const ventaId = String(body?.ventaId ?? "");
+      if (!ventaId) return NextResponse.json({ error: "Falta la venta" }, { status: 400 });
+      const [{ data: devoluciones, error: e1 }, { data: items, error: e2 }] = await Promise.all([
+        supabaseAdmin
+          .from("devoluciones")
+          .select("*")
+          .eq("comercio_id", comercioId)
+          .eq("venta_id", ventaId)
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("devolucion_items")
+          .select("*, devoluciones!inner(venta_id)")
+          .eq("comercio_id", comercioId)
+          .eq("devoluciones.venta_id", ventaId),
+      ]);
+      if (e1) return NextResponse.json({ error: e1.message }, { status: 400 });
+      if (e2) return NextResponse.json({ error: e2.message }, { status: 400 });
+      return NextResponse.json({ devoluciones: devoluciones ?? [], items: items ?? [] });
+    }
+
     case "movimientosStock": {
       const productoId = String(body?.productoId ?? "");
       if (!productoId) return NextResponse.json({ error: "Falta el producto" }, { status: 400 });

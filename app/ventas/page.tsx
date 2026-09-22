@@ -17,9 +17,11 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { metodoLabel, metodoColorClass, metodoLabelConCuotas } from "@/lib/utils/metodo-pago";
-import { getVentasDeRango, anularVenta } from "@/services/sales-service";
+import { getVentasDeRango, anularVenta, devolverVenta } from "@/services/sales-service";
+import { getCajaDelUsuario } from "@/services/caja-service";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
 import { SaleDetailDialog } from "@/components/ventas/sale-detail-dialog";
+import { DevolucionDialog } from "@/components/ventas/devolucion-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import type { Sale, PaymentMethod } from "@/lib/types";
 
@@ -54,6 +56,8 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(true);
   const [ventaDetalle, setVentaDetalle] = useState<Sale | null>(null);
   const [ventaAnular, setVentaAnular] = useState<Sale | null>(null);
+  const [ventaDevolver, setVentaDevolver] = useState<Sale | null>(null);
+  const [tieneCajaHoy, setTieneCajaHoy] = useState(false);
   const [mostrarResumen, setMostrarResumen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroMetodo, setFiltroMetodo] = useState<PaymentMethod | "todos">("todos");
@@ -78,6 +82,14 @@ export default function VentasPage() {
     load(rango);
   }, [rango, load]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    getCajaDelUsuario(user.id)
+      .then((c) => setTieneCajaHoy(!!c))
+      .catch(() => setTieneCajaHoy(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleAnular = async (motivo: string) => {
     if (!ventaAnular) return;
     try {
@@ -87,6 +99,22 @@ export default function VentasPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al anular la venta");
     }
+  };
+
+  const handleDevolver = async (input: {
+    items: { productoId: string; cantidad: number }[];
+    motivo: string;
+    reembolso: "efectivo" | "ninguno";
+  }) => {
+    if (!ventaDevolver) return;
+    const r = await devolverVenta({
+      ventaId: ventaDevolver.id,
+      ...input,
+      usuarioId: user?.id,
+      usuarioNombre: user?.nombre,
+    });
+    toast.success(`Devolución registrada · ${formatCurrency(r.total)} · stock actualizado`);
+    await load(rango);
   };
 
   const ventasFiltradas = useMemo(() => {
@@ -282,8 +310,18 @@ export default function VentasPage() {
           setVentaDetalle(null);
           setVentaAnular(v);
         }}
+        onDevolver={(v) => {
+          setVentaDetalle(null);
+          setVentaDevolver(v);
+        }}
       />
       <AnularVentaDialog venta={ventaAnular} onOpenChange={(o) => !o && setVentaAnular(null)} onSubmit={handleAnular} />
+      <DevolucionDialog
+        venta={ventaDevolver}
+        tieneCajaHoy={tieneCajaHoy}
+        onOpenChange={(o) => !o && setVentaDevolver(null)}
+        onSubmit={handleDevolver}
+      />
     </AppShell>
   );
 }

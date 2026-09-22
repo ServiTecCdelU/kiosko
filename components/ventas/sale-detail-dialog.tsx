@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Receipt } from "lucide-react";
+import { Ban, Receipt, Undo2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -15,9 +15,11 @@ interface SaleDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   esAdmin: boolean;
   onAnular: (venta: Sale) => void;
+  /** Devolver funciona aunque la caja de esta venta ya haya cerrado. */
+  onDevolver?: (venta: Sale) => void;
 }
 
-export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular }: SaleDetailDialogProps) {
+export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular, onDevolver }: SaleDetailDialogProps) {
   if (!venta) return null;
 
   return (
@@ -90,11 +92,18 @@ export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular }: Sal
           </div>
         </div>
 
-        {esAdmin && venta.estado !== "anulada" && (
-          <DialogFooter>
-            <Button variant="destructive" className="w-full rounded-xl sm:w-auto" onClick={() => onAnular(venta)}>
-              Anular venta
-            </Button>
+        {venta.estado !== "anulada" && (esAdmin || onDevolver) && (
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            {onDevolver && (
+              <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => onDevolver(venta)}>
+                <Undo2 className="mr-2 h-4 w-4" /> Devolver
+              </Button>
+            )}
+            {esAdmin && (
+              <Button variant="destructive" className="w-full rounded-xl sm:w-auto" onClick={() => onAnular(venta)}>
+                Anular venta
+              </Button>
+            )}
           </DialogFooter>
         )}
       </DialogContent>

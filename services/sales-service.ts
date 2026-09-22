@@ -129,3 +129,37 @@ export async function anularVenta(input: AnularVentaInput): Promise<AnularVentaR
   if (!res.ok) throw new Error(data?.error ?? "No se pudo anular la venta");
   return data as AnularVentaResult;
 }
+
+export type ReembolsoTipo = "efectivo" | "ninguno";
+
+export interface DevolverVentaInput {
+  ventaId: string;
+  items: { productoId: string; cantidad: number }[];
+  motivo?: string;
+  reembolso: ReembolsoTipo;
+  usuarioId?: string;
+  usuarioNombre?: string;
+}
+
+export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolucionId: string; total: number }> {
+  const res = await fetch("/api/ventas/devolver", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la devolución");
+  return { devolucionId: data.devolucionId, total: Number(data.total) || 0 };
+}
+
+/** Cuanto de cada item de la venta ya fue devuelto (para topear el dialogo). */
+export async function getDevueltoPorProducto(ventaId: string): Promise<Record<string, number>> {
+  const { items } = await consultar<{ items: Record<string, any>[] }>(
+    "/api/consultas/ventas", "devolucionesDeVenta", { ventaId },
+  );
+  const porProducto: Record<string, number> = {};
+  for (const i of items) {
+    porProducto[i.producto_id] = (porProducto[i.producto_id] ?? 0) + (Number(i.cantidad) || 0);
+  }
+  return porProducto;
+}
