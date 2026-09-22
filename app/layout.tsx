@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   title: "MultiComercioPanel - ServiTec",
   description: "Tu programa no impone las reglas: Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. La solución de gestión ideal para cualquier rubro.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
   openGraph: {
     title: "MultiComercioPanel - ServiTec",
     description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Gestión integral para cualquier rubro.",
