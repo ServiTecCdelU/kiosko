@@ -296,18 +296,76 @@
   width: 80mm;
 }
 
+/* Etiquetas de gondola: mismo criterio, fuera de pantalla hasta imprimir.
+   El @page de A4 NO se define aca (rompería el @page de 80mm del ticket, que
+   es global al documento): se inyecta un <style> temporal justo antes de
+   window.print() — ver handleImprimirEtiquetas en app/stock/page.tsx. */
+#etiquetas-print {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+}
+
 @media print {
   body * {
     visibility: hidden;
   }
   #ticket-print,
-  #ticket-print * {
+  #ticket-print *,
+  #etiquetas-print,
+  #etiquetas-print * {
     visibility: visible;
   }
   #ticket-print {
     position: absolute;
     left: 0;
     top: 0;
+  }
+  #etiquetas-print {
+    position: static;
+  }
+  #etiquetas-print .etiquetas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4mm;
+  }
+  #etiquetas-print .etiqueta {
+    display: flex;
+    height: 32mm;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1mm;
+    overflow: hidden;
+    border: 1px dashed #999;
+    border-radius: 4px;
+    padding: 3mm;
+    text-align: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  #etiquetas-print .etiqueta-nombre {
+    max-height: 2.2em;
+    overflow: hidden;
+    color: #000;
+    font-size: 9pt;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  #etiquetas-print .etiqueta-precio {
+    color: #000;
+    font-size: 20pt;
+    font-weight: 800;
+    line-height: 1;
+  }
+  #etiquetas-print .etiqueta-unidad {
+    font-size: 10pt;
+    font-weight: 500;
+  }
+  #etiquetas-print .etiqueta-codigo {
+    color: #000;
+    font-size: 7pt;
+    letter-spacing: 0.05em;
   }
   @page {
     size: 80mm auto;

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers, PackagePlus,
+  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { OfertaDialog } from "@/components/stock/oferta-dialog";
 import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
+import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
@@ -54,6 +55,8 @@ export default function StockPage() {
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [vencimientos, setVencimientos] = useState<Product[]>([]);
   const [reposicion, setReposicion] = useState<ReposicionItem[]>([]);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -63,6 +66,14 @@ export default function StockPage() {
   useEffect(() => {
     setPage(0);
   }, [debounced, quickFilter, categoria]);
+
+  // La seleccion solo tiene los datos de los productos de la pagina actual
+  // (`products`): si se arrastrara entre paginas, al imprimir se perderian en
+  // silencio los seleccionados de una pagina anterior. Mas simple y predecible:
+  // seleccionar y imprimir dentro de la misma vista.
+  useEffect(() => {
+    setSeleccionados(new Set());
+  }, [page, debounced, quickFilter, categoria]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -198,6 +209,42 @@ export default function StockPage() {
     [reposicion],
   );
 
+  const idsPagina = products.map((p) => p.id);
+  const todosSeleccionados = idsPagina.length > 0 && idsPagina.every((id) => seleccionados.has(id));
+
+  const toggleTodos = () => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (todosSeleccionados) idsPagina.forEach((id) => next.delete(id));
+      else idsPagina.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const toggleUno = (id: string) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion
+  // actual. El @page A4 se inyecta solo para este print job: no se define en
+  // globals.css porque pisaria el @page de 80mm del ticket termico.
+  const imprimirEtiquetas = (productos: Product[]) => {
+    if (productos.length === 0) return;
+    setProductosEtiqueta(productos);
+    setTimeout(() => {
+      const style = document.createElement("style");
+      style.textContent = "@page { size: A4; margin: 10mm; }";
+      document.head.appendChild(style);
+      window.print();
+      document.head.removeChild(style);
+    }, 150);
+  };
+
   return (
     <AppShell title="Stock">
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -302,6 +349,25 @@ export default function StockPage() {
         </Button>
       </div>
 
+      {seleccionados.size > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-2.5">
+          <span className="text-sm font-medium">
+            {seleccionados.size} producto{seleccionados.size > 1 ? "s" : ""} seleccionado{seleccionados.size > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm" className="rounded-xl"
+              onClick={() => imprimirEtiquetas(products.filter((p) => seleccionados.has(p.id)))}
+            >
+              <Printer className="mr-1.5 h-3.5 w-3.5" /> Imprimir etiquetas
+            </Button>
+            <Button size="sm" variant="ghost" className="rounded-xl" onClick={() => setSeleccionados(new Set())}>
+              <X className="mr-1 h-3.5 w-3.5" /> Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="card-premium rounded-2xl">
         {loading ? (
           <div className="space-y-2 p-4">
@@ -314,6 +380,15 @@ export default function StockPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <input
+                      type="checkbox"
+                      checked={todosSeleccionados}
+                      onChange={toggleTodos}
+                      className="h-4 w-4 accent-primary"
+                      aria-label="Seleccionar todos los de esta pagina"
+                    />
+                  </TableHead>
                   <TableHead>Cód. barra</TableHead>
                   <TableHead>Código</TableHead>
                   <TableHead>Producto</TableHead>
@@ -332,6 +407,15 @@ export default function StockPage() {
                   const bajo = p.stockControlado && !sinStock && p.stock <= p.stockMinimo;
                   return (
                     <TableRow key={p.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.has(p.id)}
+                          onChange={() => toggleUno(p.id)}
+                          className="h-4 w-4 accent-primary"
+                          aria-label={`Seleccionar ${p.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.codigoBarras || "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.codigo || "—"}</TableCell>
                       <TableCell>
@@ -411,6 +495,13 @@ export default function StockPage() {
                           <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openEdit(p)}>
                             <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
                           </Button>
+                          <Button
+                            size="sm" variant="outline" className="rounded-xl"
+                            onClick={() => imprimirEtiquetas([p])}
+                            title="Imprimir etiqueta de gondola"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -448,6 +539,7 @@ export default function StockPage() {
         onOpenChange={setNuevoOpen}
         onCreated={() => refreshAll()}
       />
+      <EtiquetasPrint productos={productosEtiqueta} />
     </AppShell>
   );
 }
