@@ -208,7 +208,7 @@ export default function VentasPage() {
             />
           </div>
 
-          <Card className="rounded-2xl">
+          <Card className="card-premium rounded-2xl">
             <CardHeader className="gap-3">
               <CardTitle className="text-base">Desglose de ventas</CardTitle>
               <div className="flex flex-col gap-2 sm:flex-row">

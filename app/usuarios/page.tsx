@@ -74,7 +74,7 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
-      <div className="rounded-2xl border bg-card">
+      <div className="card-premium rounded-2xl">
         {loading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}

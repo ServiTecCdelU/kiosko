@@ -311,7 +311,7 @@ export default function CajaPage() {
               <Skeleton className="h-64 w-full rounded-2xl" />
             </div>
           ) : !caja || mostrarApertura ? (
-            <Card className="mx-auto max-w-md rounded-2xl">
+            <Card className="card-premium mx-auto max-w-md rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <LockOpen className="h-5 w-5 text-primary" /> Abrir caja
@@ -443,7 +443,7 @@ export default function CajaPage() {
               </div>
 
               {movimientos.length > 0 && (
-                <Card className="rounded-2xl">
+                <Card className="card-premium rounded-2xl">
                   <CardHeader>
                     <CardTitle className="text-base">Movimientos de caja</CardTitle>
                   </CardHeader>
@@ -486,7 +486,7 @@ export default function CajaPage() {
               )}
 
               {ventasPorCajero.length > 1 && (
-                <Card className="rounded-2xl">
+                <Card className="card-premium rounded-2xl">
                   <CardHeader>
                     <CardTitle className="text-base">Vendido por cajero</CardTitle>
                   </CardHeader>
@@ -517,7 +517,7 @@ export default function CajaPage() {
 
               {/* Las ventas anuladas no se muestran aca: no suman ni corresponden al arqueo del dia. */}
               {ventasVigentes.length > 0 && (
-                <Card className="rounded-2xl">
+                <Card className="card-premium rounded-2xl">
                   <CardHeader>
                     <CardTitle className="text-base">Ventas de esta caja</CardTitle>
                   </CardHeader>
@@ -586,7 +586,7 @@ function ConsolidadoDia({ cajas }: { cajas: CajaDelDia[] }) {
   const { totales, porCajero } = consolidarDia(cajas);
   return (
     <div className="mt-4 space-y-4">
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">
             Consolidado del día · {totales.cajasAbiertas} abierta{totales.cajasAbiertas === 1 ? "" : "s"} · {totales.cajasCerradas} cerrada{totales.cajasCerradas === 1 ? "" : "s"}
@@ -704,7 +704,7 @@ function HistorialTab({
 }) {
   if (historial.length === 0) {
     return (
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
           Todavía no hay cierres anteriores
         </CardContent>
@@ -713,7 +713,7 @@ function HistorialTab({
   }
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="card-premium rounded-2xl">
       <CardHeader>
         <CardTitle className="text-base">Cierres anteriores</CardTitle>
       </CardHeader>

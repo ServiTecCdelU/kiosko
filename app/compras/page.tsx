@@ -194,7 +194,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
 
   if (proveedores.length === 0) {
     return (
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
           Primero cargá un proveedor en la pestaña Proveedores
         </CardContent>
@@ -204,7 +204,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
 
   return (
     <div className="space-y-4">
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Truck className="h-4 w-4 text-primary" /> Nueva recepción
@@ -402,13 +402,13 @@ function HistorialTab({ proveedores }: { proveedores: Proveedor[] }) {
       {loading ? (
         <Skeleton className="h-64 w-full rounded-2xl" />
       ) : compras.length === 0 ? (
-        <Card className="rounded-2xl">
+        <Card className="card-premium rounded-2xl">
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             Sin compras registradas
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-2xl">
+        <Card className="card-premium rounded-2xl">
           <CardContent className="px-0 sm:px-6">
             <div className="overflow-x-auto">
               <Table>
@@ -541,7 +541,7 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
         </Button>
       </div>
 
-      <Card className="rounded-2xl">
+      <Card className="card-premium rounded-2xl">
         <CardContent className="px-0 sm:px-6">
           {proveedores.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">Sin proveedores</p>
