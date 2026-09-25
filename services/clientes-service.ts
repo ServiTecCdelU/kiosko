@@ -12,6 +12,7 @@ function mapCliente(d: Record<string, any>): Cliente {
     documento: d.documento ?? undefined,
     limiteCredito: Number(d.limite_credito) || 0,
     saldo: Number(d.saldo) || 0,
+    puntos: Number(d.puntos) || 0,
     notas: d.notas ?? undefined,
     activo: d.activo ?? true,
     createdAt: d.created_at ? new Date(d.created_at) : new Date(),
@@ -110,6 +111,29 @@ export async function registrarPago(
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");
   return data as PagoResult;
+}
+
+export interface CanjeResult {
+  clienteId: string;
+  puntosAnterior: number;
+  puntosNuevo: number;
+}
+
+/** Descuenta puntos del cliente a cambio de un beneficio aplicado a mano (via API route). */
+export async function canjearPuntos(
+  clienteId: string,
+  puntos: number,
+  usuario?: string,
+  motivo?: string,
+): Promise<CanjeResult> {
+  const res = await fetch(apiUrl("/api/clientes/canjear-puntos"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clienteId, puntos, usuario, motivo, comercioId: getComercioId() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo canjear los puntos");
+  return data as CanjeResult;
 }
 
 // ── Deudores ──────────────────────────────────────────────────────

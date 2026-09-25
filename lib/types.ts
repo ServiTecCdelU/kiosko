@@ -95,6 +95,7 @@ export interface Cliente {
   documento?: string;
   limiteCredito: number;
   saldo: number; // deuda actual (positivo = debe)
+  puntos: number; // programa de fidelidad, se ganan con cualquier venta asociada
   notas?: string;
   activo: boolean;
   createdAt: Date;

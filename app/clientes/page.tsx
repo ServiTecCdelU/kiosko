@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Search, Plus, Users, Wallet } from "lucide-react";
+import { Search, Plus, Users, Wallet, Star } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Listado */}
-      <div className="rounded-2xl border bg-card">
+      <div className="card-premium rounded-2xl">
         {loading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -108,6 +108,7 @@ export default function ClientesPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead className="text-right">Puntos</TableHead>
                   <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -120,6 +121,16 @@ export default function ClientesPage() {
                       <span className={cn("cifra font-semibold", c.saldo > 0 ? "text-warning" : "text-muted-foreground")}>
                         {formatCurrency(c.saldo)}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {c.puntos > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-money">
+                          <Star className="h-3.5 w-3.5" />
+                          <span className="cifra font-semibold">{c.puntos}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="outline" className="rounded-xl" onClick={() => abrirDetalle(c.id)}>

@@ -6,7 +6,7 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode, Radio, Tag, ChevronDown } from "lucide-react";
+import { Trash2, Plus, Minus, Banknote, CreditCard, Coins, NotebookPen, ShoppingCart, QrCode, Radio, Tag, ChevronDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -70,6 +70,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const [mixtoParte2Metodo, setMixtoParte2Metodo] = useState<MixtoMetodo>("transferencia");
   const [mixtoMontoParte1, setMixtoMontoParte1] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  // Cliente para sumar puntos de fidelidad en medios de pago distintos a
+  // fiado (fiado ya identifica al cliente por su propio flujo de cuenta corriente).
+  const [clienteFidelizacion, setClienteFidelizacion] = useState<Cliente | null>(null);
+  const [mostrarFidelizacion, setMostrarFidelizacion] = useState(false);
   const [pagadorNombre, setPagadorNombre] = useState("");
   const [cuotas, setCuotas] = useState("1");
   const [recargoPct, setRecargoPct] = useState("");
@@ -84,6 +88,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       setMixtoParte2Metodo("transferencia");
       setMixtoMontoParte1("");
       setCliente(null);
+      setClienteFidelizacion(null);
+      setMostrarFidelizacion(false);
       setPagadorNombre("");
       setCuotas("1");
       setRecargoPct("");
@@ -145,19 +151,22 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const handleConfirm = () => {
     if (disabled) return;
     const discount = descuentoMonto > 0 ? descuentoMonto : undefined;
+    // Fiado ya manda su propio cliente (identifica la cuenta corriente); en
+    // los demas medios de pago, el cliente es opcional y solo suma puntos.
+    const clienteIdFidelizacion = clienteFidelizacion?.id;
     if (method === "transferencia") {
-      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount });
+      onConfirm({ paymentMethod: "transferencia", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount, clienteId: clienteIdFidelizacion });
     } else if (method === "debito") {
-      onConfirm({ paymentMethod: "debito", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount });
+      onConfirm({ paymentMethod: "debito", cashAmount: 0, changeAmount: 0, transferAmount: total, pagadorNombre, discount, clienteId: clienteIdFidelizacion });
     } else if (method === "credito") {
       onConfirm({
         paymentMethod: "credito", cashAmount: 0, changeAmount: 0, transferAmount: totalConRecargo,
-        pagadorNombre, cuotas: cuotasNum, recargoPct: recargoPctNum, discount,
+        pagadorNombre, cuotas: cuotasNum, recargoPct: recargoPctNum, discount, clienteId: clienteIdFidelizacion,
       });
     } else if (method === "mixto") {
       onConfirm({
         paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion,
-        pagadorNombre, discount,
+        pagadorNombre, discount, clienteId: clienteIdFidelizacion,
         ...(mixtoTieneCredito ? { cuotas: cuotasNum, recargoPct: recargoPctNum, creditoMonto: creditoBaseMixto } : {}),
       });
     } else if (method === "fiado") {
@@ -167,7 +176,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
     } else if (method === "mercadopago_point") {
       onConfirm({ paymentMethod: "mercadopago_point", cashAmount: 0, changeAmount: 0, transferAmount: total, discount });
     } else {
-      onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0, discount });
+      onConfirm({ paymentMethod: "efectivo", cashAmount: pagaConNum, changeAmount: vuelto, transferAmount: 0, discount, clienteId: clienteIdFidelizacion });
     }
   };
 
@@ -356,6 +365,21 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         )}
 
         {method === "fiado" && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
+
+        {method !== "fiado" && (
+          <div className="mb-3">
+            {!mostrarFidelizacion && !clienteFidelizacion ? (
+              <button
+                onClick={() => setMostrarFidelizacion(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                <Star className="h-3.5 w-3.5" /> Cliente (opcional, suma puntos)
+              </button>
+            ) : (
+              <ClienteSelector cliente={clienteFidelizacion} onSelect={setClienteFidelizacion} />
+            )}
+          </div>
+        )}
 
         {method === "fiado" && cliente && (
           <div

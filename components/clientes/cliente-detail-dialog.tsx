@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Phone, Contact, NotebookPen, Banknote, ShoppingCart } from "lucide-react";
+import { Phone, Contact, NotebookPen, Banknote, ShoppingCart, Star } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
-import { getCliente, getMovimientos, registrarPago } from "@/services/clientes-service";
+import { getCliente, getMovimientos, registrarPago, canjearPuntos } from "@/services/clientes-service";
 import { getCurrentUser } from "@/hooks/use-auth";
 import type { Cliente, CuentaMov } from "@/lib/types";
 
@@ -33,6 +33,8 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
   const [loading, setLoading] = useState(true);
   const [monto, setMonto] = useState("");
   const [working, setWorking] = useState(false);
+  const [puntosCanje, setPuntosCanje] = useState("");
+  const [canjeando, setCanjeando] = useState(false);
 
   const load = useCallback(async () => {
     if (!clienteId) return;
@@ -51,6 +53,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
   useEffect(() => {
     if (open && clienteId) {
       setMonto("");
+      setPuntosCanje("");
       load();
     }
   }, [open, clienteId, load]);
@@ -77,6 +80,32 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
     }
   };
 
+  const handleCanje = async () => {
+    if (!cliente) return;
+    const n = Number(puntosCanje) || 0;
+    if (n <= 0) {
+      toast.error("Ingresá una cantidad de puntos mayor a cero");
+      return;
+    }
+    if (n > cliente.puntos) {
+      toast.error(`El cliente solo tiene ${cliente.puntos} puntos disponibles`);
+      return;
+    }
+    setCanjeando(true);
+    try {
+      const user = getCurrentUser();
+      const res = await canjearPuntos(cliente.id, n, user?.nombre);
+      toast.success(`Canje registrado · quedan ${res.puntosNuevo} puntos`);
+      setPuntosCanje("");
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo canjear los puntos");
+    } finally {
+      setCanjeando(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl sm:max-w-lg">
@@ -100,6 +129,29 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
                 {cliente.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{cliente.telefono}</span>}
                 {cliente.documento && <span className="flex items-center gap-1"><Contact className="h-3 w-3" />{cliente.documento}</span>}
                 {cliente.limiteCredito > 0 && <span>Límite: {formatCurrency(cliente.limiteCredito)}</span>}
+              </div>
+            </div>
+
+            {/* Puntos de fidelidad */}
+            <div className="rounded-2xl border bg-card p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+                <Star className="h-4 w-4 text-money" /> Puntos
+              </p>
+              <p className="cifra mb-3 text-3xl font-bold text-money">{cliente.puntos}</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number" inputMode="numeric" min={1} placeholder="Puntos a canjear"
+                  value={puntosCanje} onChange={(e) => setPuntosCanje(e.target.value)}
+                  className="rounded-xl"
+                />
+                {cliente.puntos > 0 && (
+                  <Button variant="outline" className="rounded-xl" onClick={() => setPuntosCanje(String(cliente.puntos))}>
+                    Todo
+                  </Button>
+                )}
+                <Button className="rounded-xl" disabled={canjeando || !puntosCanje} onClick={handleCanje}>
+                  {canjeando ? "..." : "Canjear"}
+                </Button>
               </div>
             </div>
 
