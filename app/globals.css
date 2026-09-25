@@ -372,3 +372,44 @@
     margin: 0;
   }
 }
+
+/* Landing pública (Comercio Platform): tema oscuro azul aislado del sistema */
+.landing-theme {
+  color-scheme: dark;
+  --background: #060c1a;
+  --foreground: #e6edf8;
+  --card: #0b1529;
+  --card-foreground: #e6edf8;
+  --popover: #0b1529;
+  --popover-foreground: #e6edf8;
+  --primary: #3b8bff;
+  --primary-foreground: #ffffff;
+  --secondary: #101d36;
+  --secondary-foreground: #e6edf8;
+  --muted: #0e1a31;
+  --muted-foreground: #8d9dba;
+  --accent: #38bdf8;
+  --accent-foreground: #04203a;
+  --border: rgb(148 180 255 / 0.1);
+  --input: rgb(148 180 255 / 0.16);
+  --ring: #3b8bff;
+  scroll-behavior: smooth;
+}
+html:has(.landing-theme) {
+  scroll-behavior: smooth;
+}
+[data-animate] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+[data-animate].visible {
+  opacity: 1;
+  transform: none;
+}
+.stagger > [data-animate]:nth-child(2) { transition-delay: 80ms; }
+.stagger > [data-animate]:nth-child(3) { transition-delay: 160ms; }
+.stagger > [data-animate]:nth-child(4) { transition-delay: 240ms; }
+@media (prefers-reduced-motion: reduce) {
+  [data-animate] { opacity: 1; transform: none; transition: none; }
+}
