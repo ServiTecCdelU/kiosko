@@ -185,5 +185,9 @@ export interface Usuario {
   rol: UserRol;
   comercioId: string;
   activo: boolean;
+  /** Login de Google (solo admin). */
+  email?: string;
+  /** Dato de contacto, nunca se usa para iniciar sesion. */
+  telefono?: string;
   createdAt: Date;
 }

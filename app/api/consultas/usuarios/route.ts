@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     case "listar": {
       const { data, error } = await supabaseAdmin
         .from("usuarios")
-        .select("id, comercio_id, nombre, rol, activo, created_at")
+        .select("id, comercio_id, nombre, email, telefono, rol, activo, created_at")
         .eq("comercio_id", comercioId)
         .order("created_at", { ascending: true });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });

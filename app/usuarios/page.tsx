@@ -52,25 +52,29 @@ export default function UsuariosPage() {
     try {
       if (selected) {
         await actualizarUsuario(selected.id, {
-          nombre: input.nombre, rol: input.rol, activo: input.activo, pin: input.pin,
+          nombre: input.nombre, rol: input.rol, activo: input.activo,
+          email: input.email, telefono: input.telefono, pin: input.pin,
         });
-        toast.success("Usuario actualizado");
+        toast.success("Empleado actualizado");
       } else {
-        await crearUsuario({ nombre: input.nombre, rol: input.rol, pin: input.pin ?? "" });
-        toast.success("Usuario creado");
+        await crearUsuario({
+          nombre: input.nombre, rol: input.rol,
+          email: input.email, telefono: input.telefono, pin: input.pin,
+        });
+        toast.success("Empleado creado");
       }
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al guardar el usuario");
+      toast.error(e instanceof Error ? e.message : "Error al guardar el empleado");
       throw e;
     }
   };
 
   return (
-    <AppShell title="Usuarios">
+    <AppShell title="Empleados">
       <div className="mb-4 flex items-center justify-end">
         <Button className="rounded-2xl" onClick={openNuevo}>
-          <UserPlus className="mr-2 h-4 w-4" /> Nuevo usuario
+          <UserPlus className="mr-2 h-4 w-4" /> Nuevo empleado
         </Button>
       </div>
 
@@ -86,6 +90,7 @@ export default function UsuariosPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead className="hidden sm:table-cell">Contacto</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acción</TableHead>
@@ -95,6 +100,9 @@ export default function UsuariosPage() {
               {usuarios.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.nombre}</TableCell>
+                  <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
+                    {u.email || u.telefono || "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={cn(
                       u.rol === "admin" && "border-primary text-primary",

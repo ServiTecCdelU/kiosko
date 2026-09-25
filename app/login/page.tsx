@@ -1,19 +1,52 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Store, Delete, Loader2 } from "lucide-react";
+import { Store, Delete, Loader2, Chrome } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { login } from "@/services/auth-service";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
 const PIN_LENGTH = 4;
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pin, setPin] = useState("");
   const [working, setWorking] = useState(false);
+  const [entrandoGoogle, setEntrandoGoogle] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("error") === "no_autorizado") {
+      toast.error("Esa cuenta de Google no está dada de alta como administrador. Pedile al admin que te agregue en Empleados.");
+    }
+  }, [searchParams]);
+
+  const entrarConGoogle = useCallback(async () => {
+    setEntrandoGoogle(true);
+    try {
+      const { error } = await getSupabaseBrowser().auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) throw error;
+      // signInWithOAuth redirige el navegador entero: si llega hasta aca es
+      // porque fallo antes de redirigir.
+    } catch {
+      toast.error("No se pudo iniciar sesión con Google");
+      setEntrandoGoogle(false);
+    }
+  }, []);
 
   const submit = useCallback(
     async (value: string) => {
@@ -94,6 +127,19 @@ export default function LoginPage() {
       </div>
 
       {working && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+
+      <div className="flex w-full max-w-[260px] items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> admin <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <button
+        onClick={entrarConGoogle}
+        disabled={entrandoGoogle}
+        className="flex w-full max-w-[260px] items-center justify-center gap-2 rounded-2xl border bg-card py-3 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+      >
+        {entrandoGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Chrome className="h-4 w-4" />}
+        Entrar con Google
+      </button>
     </main>
   );
 }
