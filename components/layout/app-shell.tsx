@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
 import { useAuth, AUTH_DISABLED } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { AvisoPagoBanner } from "@/components/layout/aviso-pago-banner";
 
 interface AppShellProps {
   title?: string;
@@ -138,6 +139,7 @@ export function AppShell({ title, children }: AppShellProps) {
       </header>
 
       <main className="bg-mesh flex-1 overflow-y-auto bg-muted/20">
+        <AvisoPagoBanner rol={rol} />
         {title && (
           <div className="glass sticky top-0 z-10 border-b border-border/60 px-4 py-3.5 sm:px-6">
             <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>

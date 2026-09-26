@@ -6,7 +6,7 @@
 // comercio; esta pantalla no pertenece a ninguno.
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Building2, LogOut, Loader2, Chrome, Plus, Package, Receipt, Users } from "lucide-react";
+import { Building2, LogOut, Loader2, Chrome, Plus, Package, Receipt, Users, CircleDollarSign, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,15 @@ import { formatDate } from "@/lib/utils/format";
 import { useSuperadmin } from "@/hooks/use-superadmin";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { apiUrl } from "@/lib/utils/api-url";
+
+// Solo para el badge visual: mismo criterio que lib/aviso-pago.ts pero sin
+// cruzar el import server->client (esa lib vive en lib/server para las
+// rutas API, ahi la logica si importa para la seguridad del aviso).
+function anioMesArgentinaCliente(fecha: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit",
+  }).format(new Date(fecha));
+}
 
 interface ComercioUso {
   productos: number;
@@ -139,6 +148,22 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
     }
   };
 
+  const marcarPago = async (id: string) => {
+    try {
+      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "marcarPago", id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error);
+      toast.success("Pago del mes registrado");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo registrar el pago");
+    }
+  };
+
   return (
     <main className="bg-mesh min-h-screen bg-muted/20">
       <div className="glass sticky top-0 z-10 flex items-center justify-between border-b border-border/60 px-4 py-3.5 sm:px-6">
@@ -170,7 +195,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {comercios.map((c) => (
-              <ComercioCard key={c.id} comercio={c} onCambiar={cambiarCampo} />
+              <ComercioCard key={c.id} comercio={c} onCambiar={cambiarCampo} onMarcarPago={marcarPago} />
             ))}
           </div>
         )}
@@ -182,11 +207,15 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
 }
 
 function ComercioCard({
-  comercio, onCambiar,
+  comercio, onCambiar, onMarcarPago,
 }: {
   comercio: Comercio;
   onCambiar: (id: string, cambios: Record<string, unknown>) => Promise<void>;
+  onMarcarPago: (id: string) => Promise<void>;
 }) {
+  const anioMesActual = anioMesArgentinaCliente(new Date().toISOString());
+  const pagoAlDia = !!comercio.suscripcion_hasta && anioMesArgentinaCliente(comercio.suscripcion_hasta) === anioMesActual;
+
   return (
     <div className="card-premium rounded-2xl p-5">
       <div className="mb-3 flex items-start justify-between gap-2">
@@ -248,11 +277,21 @@ function ComercioCard({
           Prueba hasta {formatDate(comercio.trial_hasta)}
         </p>
       )}
-      {comercio.suscripcion_hasta && (
-        <p className="text-xs text-muted-foreground">
-          Suscripción hasta {formatDate(comercio.suscripcion_hasta)}
-        </p>
-      )}
+
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+        <Badge
+          variant="outline"
+          className={cn(pagoAlDia ? "border-success/50 text-success" : "border-warning text-warning")}
+        >
+          {pagoAlDia ? <Check className="mr-1 h-3 w-3" /> : <CircleDollarSign className="mr-1 h-3 w-3" />}
+          {pagoAlDia ? "Pago al día" : "Pago pendiente este mes"}
+        </Badge>
+        {!pagoAlDia && (
+          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => onMarcarPago(comercio.id)}>
+            Marcar pago del mes
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

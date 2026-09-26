@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { esSuperadmin } from "@/lib/server/sesion";
+import { hoyArgentina } from "@/lib/server/fecha-argentina";
+import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,6 +83,30 @@ export async function POST(req: Request) {
       const msg = (error as any).code === "23505" ? "Ya existe un comercio con ese slug" : error.message;
       return NextResponse.json({ error: msg }, { status: 400 });
     }
+    return NextResponse.json({ comercio: data });
+  }
+
+  if (accion === "marcarPago") {
+    const id = String(body?.id ?? "");
+    if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+
+    // Marca el pago del ciclo actual (dia 1 al 10): guarda el limite del
+    // ciclo en curso (dia 10, fin del dia en horario argentino) en
+    // suscripcion_hasta. El aviso (app/api/pago-mensual) compara el mes de
+    // esta fecha contra el mes actual para saber "ya pago este mes".
+    const { anio, mes } = hoyArgentina();
+    // Argentina es UTC-3 todo el año (sin horario de verano): el dia 10 a
+    // las 23:59:59 -03:00 equivale al dia 11 a las 02:59:59 UTC.
+    const limiteUtc = new Date(Date.UTC(anio, mes - 1, DIA_LIMITE_PAGO + 1, 2, 59, 59));
+
+    const { data, error } = await supabaseAdmin
+      .from("comercios")
+      .update({ suscripcion_hasta: limiteUtc.toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ comercio: data });
   }
 
