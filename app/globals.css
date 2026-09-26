@@ -306,6 +306,15 @@
   top: 0;
 }
 
+/* Carteles de oferta A4 (components/stock/cartel-oferta.tsx): mismo criterio.
+   El @page A4 sin margen se inyecta al imprimir — ver imprimirCarteles en
+   app/stock/page.tsx. */
+#cartel-print {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -313,8 +322,26 @@
   #ticket-print,
   #ticket-print *,
   #etiquetas-print,
-  #etiquetas-print * {
+  #etiquetas-print *,
+  #cartel-print,
+  #cartel-print * {
     visibility: visible;
+  }
+  #cartel-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  /* 1em = 5mm: el cartel (40em x 56.5em) ocupa 200 x 282.5 mm de la hoja */
+  #cartel-print .cartel-hoja {
+    font-size: 5mm;
+    padding: 5mm;
+    page-break-after: always;
+    break-after: page;
+  }
+  #cartel-print .cartel-hoja:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
   #ticket-print {
     position: absolute;
@@ -331,7 +358,7 @@
   }
   #etiquetas-print .etiqueta {
     display: flex;
-    height: 32mm;
+    height: 36mm;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -361,6 +388,21 @@
   #etiquetas-print .etiqueta-unidad {
     font-size: 10pt;
     font-weight: 500;
+  }
+  #etiquetas-print .etiqueta-oferta {
+    border-radius: 3px;
+    background: #d7141a;
+    padding: 0.5mm 2mm;
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 900;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #etiquetas-print .etiqueta-antes {
+    color: #555;
+    font-size: 8pt;
+    text-decoration: line-through;
   }
   #etiquetas-print .etiqueta-codigo {
     color: #000;

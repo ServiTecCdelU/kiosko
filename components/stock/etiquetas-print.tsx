@@ -5,6 +5,8 @@
 // app/globals.css).
 import { formatCurrency } from "@/lib/utils/format";
 import { BarcodeEAN13 } from "@/components/stock/barcode-svg";
+import { precioFinal, tieneOferta } from "@/lib/pricing";
+import { etiquetaOferta } from "@/lib/oferta-analisis";
 import type { Product } from "@/lib/types";
 
 export function EtiquetasPrint({ productos }: { productos: Product[] }) {
@@ -13,23 +15,31 @@ export function EtiquetasPrint({ productos }: { productos: Product[] }) {
   return (
     <div id="etiquetas-print">
       <div className="etiquetas-grid">
-        {productos.map((p) => (
-          <div key={p.id} className="etiqueta">
-            <p className="etiqueta-nombre">{p.name}</p>
-            <p className="etiqueta-precio">
-              {formatCurrency(p.price)}
-              {p.unidad === "kg" && <span className="etiqueta-unidad"> /kg</span>}
-            </p>
-            {p.codigoBarras ? (
-              <>
-                <BarcodeEAN13 codigo={p.codigoBarras} height={30} />
-                <p className="etiqueta-codigo">{p.codigoBarras}</p>
-              </>
-            ) : p.codigo ? (
-              <p className="etiqueta-codigo">Cod. {p.codigo}</p>
-            ) : null}
-          </div>
-        ))}
+        {productos.map((p) => {
+          const oferta = etiquetaOferta(p);
+          const esCombo = p.ofertaTipo === "combo";
+          return (
+            <div key={p.id} className="etiqueta">
+              {oferta && <p className="etiqueta-oferta">OFERTA {oferta}</p>}
+              <p className="etiqueta-nombre">{p.name}</p>
+              {tieneOferta(p) && !esCombo && (
+                <p className="etiqueta-antes">{formatCurrency(p.price)}</p>
+              )}
+              <p className="etiqueta-precio">
+                {formatCurrency(esCombo ? p.price : precioFinal(p))}
+                {p.unidad === "kg" ? <span className="etiqueta-unidad"> /kg</span> : esCombo && <span className="etiqueta-unidad"> c/u</span>}
+              </p>
+              {p.codigoBarras ? (
+                <>
+                  <BarcodeEAN13 codigo={p.codigoBarras} height={30} />
+                  <p className="etiqueta-codigo">{p.codigoBarras}</p>
+                </>
+              ) : p.codigo ? (
+                <p className="etiqueta-codigo">Cod. {p.codigo}</p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

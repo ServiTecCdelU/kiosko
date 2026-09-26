@@ -9,7 +9,22 @@ import { comercioIdDeSesion } from "@/lib/server/sesion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TIPOS_OFERTA = ["descuento", "precio_fijo", "combo"];
+// Deben coincidir con el CHECK de productos.oferta_tipo (08_ofertas.sql + 13_combos.sql)
+// y con OfertaTipo en lib/types.ts.
+const TIPOS_OFERTA = ["monto", "porcentaje", "combo"];
+
+function errorOferta(oferta: any): string | null {
+  if (!oferta.activa) return null;
+  if (!TIPOS_OFERTA.includes(String(oferta.tipo))) return "Tipo de oferta invalido";
+  const valor = Number(oferta.valor);
+  if (!Number.isFinite(valor) || valor <= 0) return "El valor de la oferta debe ser mayor a 0";
+  if (oferta.tipo === "porcentaje" && valor >= 100) return "El descuento debe ser menor al 100%";
+  if (oferta.tipo === "combo") {
+    const cantidad = Number(oferta.cantidad);
+    if (!Number.isInteger(cantidad) || cantidad < 2) return "El combo necesita 2 o mas unidades";
+  }
+  return null;
+}
 
 export async function PATCH(req: Request) {
   let body: any;
@@ -123,9 +138,8 @@ export async function PUT(req: Request) {
   if (!oferta || typeof oferta !== "object") {
     return NextResponse.json({ error: "Faltan los datos de la oferta" }, { status: 400 });
   }
-  if (oferta.activa && !TIPOS_OFERTA.includes(String(oferta.tipo))) {
-    return NextResponse.json({ error: "Tipo de oferta invalido" }, { status: 400 });
-  }
+  const invalida = errorOferta(oferta);
+  if (invalida) return NextResponse.json({ error: invalida }, { status: 400 });
 
   const { error } = await supabaseAdmin
     .from("productos")
@@ -133,7 +147,7 @@ export async function PUT(req: Request) {
       oferta_activa: !!oferta.activa,
       oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
       oferta_valor: oferta.activa ? Number(oferta.valor) || 0 : 0,
-      oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? oferta.cantidad ?? null : null,
+      oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? Number(oferta.cantidad) : null,
     })
     .eq("comercio_id", comercioId)
     .eq("id", productId);

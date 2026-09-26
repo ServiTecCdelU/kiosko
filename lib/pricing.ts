@@ -59,11 +59,32 @@ export function precioLinea(p: ConOferta, cantidad: number): number {
   return round2(precioFinal(p) * cantidad);
 }
 
-/** Etiqueta corta para mostrar el combo en la UI (ej: "3x$1000" o "2x1"). */
+const numeroAR = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+/** "$1.500" — formato corto (sin espacio) para etiquetas y carteles. */
+export function pesos(n: number): string {
+  return `$${numeroAR.format(Math.round(n * 100) / 100)}`;
+}
+
+/**
+ * Etiqueta corta para mostrar el combo en la UI. Reconoce las promos clasicas:
+ * "2x1", "3x2", "4x3" (N unidades al precio de M enteras) y "-50% en la 2da".
+ * Si no encaja en ninguna, "3x$2.500".
+ */
 export function comboLabel(p: ConOferta): string | null {
   if (!tieneOferta(p) || p.ofertaTipo !== "combo") return null;
   const n = Number(p.ofertaCantidad) || 0;
   const valor = Number(p.ofertaValor) || 0;
-  if (n === 2 && Math.abs(valor - p.price) < 0.01) return "2x1";
-  return `${n}x$${valor}`;
+  if (p.price > 0) {
+    const pagas = valor / p.price;
+    const m = Math.round(pagas);
+    if (m >= 1 && m < n && Math.abs(valor - m * p.price) < 0.01) return `${n}x${m}`;
+    if (n === 2) {
+      const pct = Math.round((2 - pagas) * 100);
+      if (pct > 0 && pct < 100 && Math.abs(valor - p.price * (2 - pct / 100)) < 0.01) {
+        return `-${pct}% en la 2da`;
+      }
+    }
+  }
+  return `${n}x${pesos(valor)}`;
 }

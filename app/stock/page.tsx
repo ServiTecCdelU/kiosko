@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown,
+  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown, Megaphone,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
+import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
@@ -60,6 +61,7 @@ export default function StockPage() {
   const [precioAbierto, setPrecioAbierto] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
+  const [carteles, setCarteles] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -173,6 +175,7 @@ export default function StockPage() {
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar la oferta");
+      throw e;
     }
   };
 
@@ -263,20 +266,42 @@ export default function StockPage() {
     });
   };
 
-  // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion
-  // actual. El @page A4 se inyecta solo para este print job: no se define en
-  // globals.css porque pisaria el @page de 80mm del ticket termico.
-  const imprimirEtiquetas = (productos: Product[]) => {
-    if (productos.length === 0) return;
-    setProductosEtiqueta(productos);
+  // Imprime en A4 lo que se acaba de poner en pantalla (etiquetas o carteles).
+  // El @page se inyecta solo para este print job: no se define en globals.css
+  // porque pisaria el @page de 80mm del ticket termico. Despues se limpia el
+  // estado para que el proximo print no arrastre lo anterior.
+  const imprimirA4 = (margen: string, limpiar: () => void) => {
     setTimeout(() => {
       const style = document.createElement("style");
-      style.textContent = "@page { size: A4; margin: 10mm; }";
+      style.textContent = `@page { size: A4; margin: ${margen}; }`;
       document.head.appendChild(style);
       window.print();
       document.head.removeChild(style);
+      limpiar();
     }, 150);
   };
+
+  // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion actual.
+  const imprimirEtiquetas = (productos: Product[]) => {
+    if (productos.length === 0) return;
+    setCarteles({ productos: [], comercio: "" });
+    setProductosEtiqueta(productos);
+    imprimirA4("10mm", () => setProductosEtiqueta([]));
+  };
+
+  // Un cartel de oferta A4 por producto (solo los que tienen oferta vigente).
+  const imprimirCarteles = (productos: Product[], comercio = "") => {
+    const conOferta = productos.filter(tieneOferta);
+    if (conOferta.length === 0) {
+      toast.info("Ninguno de los productos seleccionados tiene oferta");
+      return;
+    }
+    setProductosEtiqueta([]);
+    setCarteles({ productos: conOferta, comercio });
+    imprimirA4("0", () => setCarteles({ productos: [], comercio: "" }));
+  };
+
+  const seleccionConOferta = products.filter((p) => seleccionados.has(p.id) && tieneOferta(p)).length;
 
   return (
     <AppShell title="Stock">
@@ -472,6 +497,14 @@ export default function StockPage() {
             >
               <Printer className="mr-1.5 h-3.5 w-3.5" /> Imprimir etiquetas
             </Button>
+            {seleccionConOferta > 0 && (
+              <Button
+                size="sm" variant="outline" className="rounded-xl border-money/50 text-money"
+                onClick={() => imprimirCarteles(products.filter((p) => seleccionados.has(p.id)))}
+              >
+                <Megaphone className="mr-1.5 h-3.5 w-3.5" /> Carteles de oferta ({seleccionConOferta})
+              </Button>
+            )}
             <Button size="sm" variant="ghost" className="rounded-xl" onClick={() => setSeleccionados(new Set())}>
               <X className="mr-1 h-3.5 w-3.5" /> Cancelar
             </Button>
@@ -643,7 +676,13 @@ export default function StockPage() {
         onSave={handleSaveProduct}
         onAjustarStock={handleAjuste}
       />
-      <OfertaDialog product={ofertaProduct} open={ofertaOpen} onOpenChange={setOfertaOpen} onSubmit={handleOferta} />
+      <OfertaDialog
+        product={ofertaProduct}
+        open={ofertaOpen}
+        onOpenChange={setOfertaOpen}
+        onSubmit={handleOferta}
+        onImprimirCartel={(p, comercio) => imprimirCarteles([p], comercio)}
+      />
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
       <NuevoProductoDialog
         open={nuevoOpen}
@@ -651,6 +690,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <EtiquetasPrint productos={productosEtiqueta} />
+      <CartelOfertaPrint productos={carteles.productos} comercio={carteles.comercio} />
     </AppShell>
   );
 }

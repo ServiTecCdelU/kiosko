@@ -110,6 +110,6 @@ describe("comboLabel", () => {
 
   test("el resto se muestra como NxPRECIO", () => {
     const p = { ...base, ofertaActiva: true, ofertaTipo: "combo" as const, ofertaValor: 2500, ofertaCantidad: 3 };
-    assert.equal(comboLabel(p), "3x$2500");
+    assert.equal(comboLabel(p), "3x$2.500");
   });
 });
