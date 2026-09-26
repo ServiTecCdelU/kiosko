@@ -22,13 +22,20 @@ export interface Sesion {
   rol: string;
   /** epoch ms de expiracion */
   exp: number;
+  /** Superadmin del SaaS (panel /superadmin): no pertenece a ningun comercio,
+   * comercioId queda en un sentinel no vacio solo para no romper la
+   * validacion de abajo. Ver app/api/superadmin/*. */
+  superadmin?: boolean;
+  nombre?: string;
 }
 
 function firmar(payload: string): string {
   return createHmac("sha256", secreto()).update(payload).digest("base64url");
 }
 
-export function crearCookieSesion(datos: { usuarioId: string; comercioId: string; rol: string }): string {
+export function crearCookieSesion(datos: {
+  usuarioId: string; comercioId: string; rol: string; superadmin?: boolean; nombre?: string;
+}): string {
   const sesion: Sesion = { ...datos, exp: Date.now() + DURACION_MS };
   const payload = Buffer.from(JSON.stringify(sesion)).toString("base64url");
   const valor = `${payload}.${firmar(payload)}`;
@@ -74,4 +81,9 @@ export function getSesion(req: Request): Sesion | null {
  */
 export function comercioIdDeSesion(req: Request): string {
   return getSesion(req)?.comercioId ?? "comercio_1";
+}
+
+/** true solo si la cookie es de un superadmin valido (panel /superadmin). */
+export function esSuperadmin(req: Request): boolean {
+  return getSesion(req)?.superadmin === true;
 }

@@ -37,6 +37,26 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${origin}/login?error=no_autorizado`);
   }
 
+  // Superadmin del SaaS (cruza todos los comercios): se chequea primero,
+  // es una tabla aparte de `usuarios` sin comercio_id.
+  const { data: superadmin } = await supabaseAdmin
+    .from("superadmins")
+    .select("email, nombre")
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (superadmin) {
+    const res = NextResponse.redirect(`${origin}/superadmin/completando`);
+    res.headers.append(
+      "Set-Cookie",
+      crearCookieSesion({
+        usuarioId: superadmin.email, comercioId: "__superadmin__", rol: "superadmin",
+        superadmin: true, nombre: superadmin.nombre ?? superadmin.email,
+      }),
+    );
+    return res;
+  }
+
   const { data: usuario, error: errorUsuario } = await supabaseAdmin
     .from("usuarios")
     .select("id, nombre, rol, comercio_id, activo")
