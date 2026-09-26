@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown,
+  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ export default function StockPage() {
   const [reposicion, setReposicion] = useState<ReposicionItem[]>([]);
   const [cambiosPrecio, setCambiosPrecio] = useState<CambioPrecioReciente[]>([]);
   const [seleccionadosPrecio, setSeleccionadosPrecio] = useState<Set<string>>(new Set());
+  const [precioAbierto, setPrecioAbierto] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
 
@@ -250,6 +251,18 @@ export default function StockPage() {
     });
   };
 
+  const idsPrecio = cambiosPrecio.map((c) => c.producto.id);
+  const todosSeleccionadosPrecio = idsPrecio.length > 0 && idsPrecio.every((id) => seleccionadosPrecio.has(id));
+
+  const toggleTodosPrecio = () => {
+    setSeleccionadosPrecio((prev) => {
+      const next = new Set(prev);
+      if (todosSeleccionadosPrecio) idsPrecio.forEach((id) => next.delete(id));
+      else idsPrecio.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
   // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion
   // actual. El @page A4 se inyecta solo para este print job: no se define en
   // globals.css porque pisaria el @page de 80mm del ticket termico.
@@ -342,7 +355,10 @@ export default function StockPage() {
 
       {cambiosPrecio.length > 0 && (
         <div className="card-premium mb-4 rounded-2xl p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <button
+            onClick={() => setPrecioAbierto((v) => !v)}
+            className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+          >
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Tag className="h-4 w-4" />
@@ -354,18 +370,33 @@ export default function StockPage() {
                 </p>
               </div>
             </div>
-            <Button
-              size="sm" className="rounded-xl"
-              disabled={seleccionadosPrecio.size === 0}
-              onClick={() => imprimirEtiquetas(cambiosPrecio.filter((c) => seleccionadosPrecio.has(c.producto.id)).map((c) => c.producto))}
-            >
-              <Printer className="mr-1.5 h-3.5 w-3.5" />
-              Imprimir {seleccionadosPrecio.size > 0 ? `(${seleccionadosPrecio.size})` : "seleccionados"}
-            </Button>
-          </div>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", precioAbierto && "rotate-180")} />
+          </button>
 
-          <ul className="divide-y divide-border/60">
-            {cambiosPrecio.map((c) => {
+          {precioAbierto && (
+            <>
+              <div className="mb-1 mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={todosSeleccionadosPrecio}
+                    onChange={toggleTodosPrecio}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Seleccionar todos
+                </label>
+                <Button
+                  size="sm" className="rounded-xl"
+                  disabled={seleccionadosPrecio.size === 0}
+                  onClick={() => imprimirEtiquetas(cambiosPrecio.filter((c) => seleccionadosPrecio.has(c.producto.id)).map((c) => c.producto))}
+                >
+                  <Printer className="mr-1.5 h-3.5 w-3.5" />
+                  Imprimir {seleccionadosPrecio.size > 0 ? `(${seleccionadosPrecio.size})` : "seleccionados"}
+                </Button>
+              </div>
+
+              <ul className="divide-y divide-border/60">
+                {cambiosPrecio.map((c) => {
               const subio = c.producto.price > c.precioAnterior;
               return (
                 <li key={c.producto.id} className="flex items-center gap-3 py-2">
@@ -394,7 +425,9 @@ export default function StockPage() {
                 </li>
               );
             })}
-          </ul>
+              </ul>
+            </>
+          )}
         </div>
       )}
 
