@@ -39,10 +39,11 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAuth.auth.getUser(accessToken);
   const email = data?.user?.email?.toLowerCase();
   if (error || !email) {
-    console.error("[google-verify] getUser fallo:", error?.message, "data:", JSON.stringify(data));
-    return NextResponse.json({ error: "no_autorizado" }, { status: 401 });
+    return NextResponse.json(
+      { error: "no_autorizado", detail: `getUser: ${error?.message ?? "sin email en el token"}` },
+      { status: 401 },
+    );
   }
-  console.log("[google-verify] email verificado:", email);
 
   // Superadmin del SaaS (cruza todos los comercios): se chequea primero.
   const { data: superadmin, error: errorSuperadmin } = await supabaseAdmin
@@ -50,11 +51,6 @@ export async function POST(req: Request) {
     .select("email, nombre")
     .ilike("email", email)
     .maybeSingle();
-
-  if (errorSuperadmin) {
-    console.error("[google-verify] error consultando superadmins:", errorSuperadmin.message);
-  }
-  console.log("[google-verify] superadmin encontrado:", !!superadmin);
 
   if (superadmin) {
     const res = NextResponse.json({ redirectTo: "/superadmin/completando" });
@@ -77,7 +73,10 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (errorUsuario || !usuario) {
-    return NextResponse.json({ error: "no_autorizado" }, { status: 401 });
+    return NextResponse.json(
+      { error: "no_autorizado", detail: `email=${email} superadminErr=${errorSuperadmin?.message ?? "-"} usuarioErr=${errorUsuario?.message ?? "-"}` },
+      { status: 401 },
+    );
   }
 
   const res = NextResponse.json({ redirectTo: "/auth/completando" });

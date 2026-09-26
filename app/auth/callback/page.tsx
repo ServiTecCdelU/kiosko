@@ -20,7 +20,10 @@ export default function AuthCallbackPage() {
       try {
         const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
         const accessToken = hash.get("access_token");
-        if (!accessToken) throw new Error();
+        if (!accessToken) {
+          router.replace("/login?error=no_autorizado&detail=" + encodeURIComponent("sin access_token en el hash de la URL"));
+          return;
+        }
 
         const res = await fetch("/api/auth/google-verify", {
           method: "POST",
@@ -28,11 +31,14 @@ export default function AuthCallbackPage() {
           body: JSON.stringify({ accessToken }),
         });
         const body = await res.json();
-        if (!res.ok || !body.redirectTo) throw new Error();
+        if (!res.ok || !body.redirectTo) {
+          router.replace("/login?error=no_autorizado&detail=" + encodeURIComponent(body?.detail ?? "sin detalle"));
+          return;
+        }
 
         router.replace(body.redirectTo);
       } catch {
-        router.replace("/login?error=no_autorizado");
+        router.replace("/login?error=no_autorizado&detail=" + encodeURIComponent("excepcion en el callback"));
       }
     })();
   }, [router]);

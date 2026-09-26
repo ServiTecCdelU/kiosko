@@ -29,7 +29,12 @@ function LoginContent() {
 
   useEffect(() => {
     if (searchParams.get("error") === "no_autorizado") {
-      toast.error("Esa cuenta de Google no está dada de alta como administrador. Pedile al admin que te agregue en Empleados.");
+      const detail = searchParams.get("detail");
+      toast.error(
+        "Esa cuenta de Google no está dada de alta como administrador. Pedile al admin que te agregue en Empleados."
+        + (detail ? ` [debug: ${detail}]` : ""),
+        { duration: 20000 },
+      );
     }
   }, [searchParams]);
 
