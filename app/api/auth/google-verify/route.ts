@@ -39,15 +39,22 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAuth.auth.getUser(accessToken);
   const email = data?.user?.email?.toLowerCase();
   if (error || !email) {
+    console.error("[google-verify] getUser fallo:", error?.message, "data:", JSON.stringify(data));
     return NextResponse.json({ error: "no_autorizado" }, { status: 401 });
   }
+  console.log("[google-verify] email verificado:", email);
 
   // Superadmin del SaaS (cruza todos los comercios): se chequea primero.
-  const { data: superadmin } = await supabaseAdmin
+  const { data: superadmin, error: errorSuperadmin } = await supabaseAdmin
     .from("superadmins")
     .select("email, nombre")
     .ilike("email", email)
     .maybeSingle();
+
+  if (errorSuperadmin) {
+    console.error("[google-verify] error consultando superadmins:", errorSuperadmin.message);
+  }
+  console.log("[google-verify] superadmin encontrado:", !!superadmin);
 
   if (superadmin) {
     const res = NextResponse.json({ redirectTo: "/superadmin/completando" });
