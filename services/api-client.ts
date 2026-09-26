@@ -5,13 +5,14 @@
 // nunca manda nombres de tabla ni filtros libres, solo el nombre de una accion
 // conocida y sus parametros.
 import { getComercioId } from "@/hooks/use-auth";
+import { apiUrl } from "@/lib/utils/api-url";
 
 export async function consultar<T>(
   ruta: string,
   accion: string,
   params: Record<string, unknown> = {},
 ): Promise<T> {
-  const res = await fetch(ruta, {
+  const res = await fetch(apiUrl(ruta), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ accion, comercioId: getComercioId(), ...params }),
