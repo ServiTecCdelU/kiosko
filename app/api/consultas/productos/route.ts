@@ -224,6 +224,56 @@ export async function POST(req: Request) {
       return NextResponse.json({ producto: porCodigo.data ?? null });
     }
 
+    // Productos con cambio de precio reciente (subas y bajas) que probablemente
+    // necesitan reimprimir la etiqueta de gondola. Un solo registro por
+    // producto (el cambio mas reciente dentro de la ventana).
+    case "cambiosPrecioRecientes": {
+      const dias = acotar(body?.dias, 7, 90);
+      const desde = new Date();
+      desde.setDate(desde.getDate() - dias);
+
+      const { data: cambios, error: errorCambios } = await supabaseAdmin
+        .from("producto_auditoria")
+        .select("producto_id, valor_anterior, valor_nuevo, fecha")
+        .eq("comercio_id", comercioId)
+        .eq("campo", "price")
+        .gte("fecha", desde.toISOString())
+        .order("fecha", { ascending: false })
+        .limit(500);
+      if (errorCambios) return NextResponse.json({ error: errorCambios.message }, { status: 400 });
+      if (!cambios || cambios.length === 0) return NextResponse.json({ items: [] });
+
+      // Nos quedamos con el cambio mas reciente de cada producto (vienen
+      // ordenados desc, asi que el primero que aparece por id es el ultimo).
+      const masRecientePorProducto = new Map<string, { valor_anterior: string; fecha: string }>();
+      for (const c of cambios) {
+        if (!masRecientePorProducto.has(c.producto_id)) {
+          masRecientePorProducto.set(c.producto_id, { valor_anterior: c.valor_anterior, fecha: c.fecha });
+        }
+      }
+
+      const ids = Array.from(masRecientePorProducto.keys());
+      const { data: productos, error: errorProductos } = await supabaseAdmin
+        .from("productos")
+        .select("*")
+        .eq("comercio_id", comercioId)
+        .eq("disabled", false)
+        .in("id", ids);
+      if (errorProductos) return NextResponse.json({ error: errorProductos.message }, { status: 400 });
+
+      const items = (productos ?? []).map((p: any) => {
+        const cambio = masRecientePorProducto.get(p.id)!;
+        return {
+          producto: p,
+          precio_anterior: Number(cambio.valor_anterior) || 0,
+          fecha_cambio: cambio.fecha,
+        };
+      });
+      items.sort((a, b) => new Date(b.fecha_cambio).getTime() - new Date(a.fecha_cambio).getTime());
+
+      return NextResponse.json({ items });
+    }
+
     case "mayoresAumentos": {
       const dias = acotar(body?.dias, 30, 365);
       const limit = acotar(body?.limit, 15, 100);

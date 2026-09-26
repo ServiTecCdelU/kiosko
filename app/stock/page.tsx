@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X,
+  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct, getVencimientosProximos,
-  logCambioPrecio, getReposicionPredictiva,
-  type SetOfertaInput, type StockStats, type UpdateProductInput, type ReposicionItem,
+  logCambioPrecio, getReposicionPredictiva, getCambiosPrecioRecientes,
+  type SetOfertaInput, type StockStats, type UpdateProductInput, type ReposicionItem, type CambioPrecioReciente,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
@@ -55,6 +55,8 @@ export default function StockPage() {
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [vencimientos, setVencimientos] = useState<Product[]>([]);
   const [reposicion, setReposicion] = useState<ReposicionItem[]>([]);
+  const [cambiosPrecio, setCambiosPrecio] = useState<CambioPrecioReciente[]>([]);
+  const [seleccionadosPrecio, setSeleccionadosPrecio] = useState<Set<string>>(new Set());
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
 
@@ -107,6 +109,14 @@ export default function StockPage() {
     }
   }, []);
 
+  const loadCambiosPrecio = useCallback(async () => {
+    try {
+      setCambiosPrecio(await getCambiosPrecioRecientes(7));
+    } catch {
+      // no crítico
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -137,11 +147,12 @@ export default function StockPage() {
     loadCategorias();
     loadVencimientos();
     loadReposicion();
-  }, [loadStats, loadCategorias, loadVencimientos, loadReposicion]);
+    loadCambiosPrecio();
+  }, [loadStats, loadCategorias, loadVencimientos, loadReposicion, loadCambiosPrecio]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([load(), loadStats(), loadCategorias(), loadVencimientos()]);
-  }, [load, loadStats, loadCategorias, loadVencimientos]);
+    await Promise.all([load(), loadStats(), loadCategorias(), loadVencimientos(), loadCambiosPrecio()]);
+  }, [load, loadStats, loadCategorias, loadVencimientos, loadCambiosPrecio]);
 
   const openEdit = (p: Product) => {
     setSelected(p);
@@ -223,6 +234,15 @@ export default function StockPage() {
 
   const toggleUno = (id: string) => {
     setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleUnoPrecio = (id: string) => {
+    setSeleccionadosPrecio((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -317,6 +337,64 @@ export default function StockPage() {
             {reposicionUrgente.slice(0, 3).map((r) => `${r.nombre} (${r.diasRestantes}d)`).join(", ")}
             {reposicionUrgente.length > 3 && ` y ${reposicionUrgente.length - 3} más`}
           </span>
+        </div>
+      )}
+
+      {cambiosPrecio.length > 0 && (
+        <div className="card-premium mb-4 rounded-2xl p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Tag className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="font-semibold">Cambiaron de precio</p>
+                <p className="text-xs text-muted-foreground">
+                  {cambiosPrecio.length} producto{cambiosPrecio.length > 1 ? "s" : ""} en los últimos 7 días · reimprimí el cartel de góndola
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm" className="rounded-xl"
+              disabled={seleccionadosPrecio.size === 0}
+              onClick={() => imprimirEtiquetas(cambiosPrecio.filter((c) => seleccionadosPrecio.has(c.producto.id)).map((c) => c.producto))}
+            >
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+              Imprimir {seleccionadosPrecio.size > 0 ? `(${seleccionadosPrecio.size})` : "seleccionados"}
+            </Button>
+          </div>
+
+          <ul className="divide-y divide-border/60">
+            {cambiosPrecio.map((c) => {
+              const subio = c.producto.price > c.precioAnterior;
+              return (
+                <li key={c.producto.id} className="flex items-center gap-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={seleccionadosPrecio.has(c.producto.id)}
+                    onChange={() => toggleUnoPrecio(c.producto.id)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                    aria-label={`Seleccionar ${c.producto.name}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm">{c.producto.name}</span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-sm">
+                    <span className="cifra text-muted-foreground line-through">{formatCurrency(c.precioAnterior)}</span>
+                    {subio ? <TrendingUp className="h-3.5 w-3.5 text-destructive" /> : <TrendingDown className="h-3.5 w-3.5 text-success" />}
+                    <span className={cn("cifra font-semibold", subio ? "text-destructive" : "text-success")}>
+                      {formatCurrency(c.producto.price)}
+                    </span>
+                  </span>
+                  <Button
+                    size="sm" variant="ghost" className="h-7 shrink-0 rounded-lg px-2"
+                    onClick={() => imprimirEtiquetas([c.producto])}
+                    title="Imprimir etiqueta de este producto"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 

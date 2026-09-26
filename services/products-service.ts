@@ -181,6 +181,24 @@ export async function getMayoresAumentos(dias = 30, limit = 15): Promise<Aumento
   return aumentos.map((a) => ({ ...a, fecha: new Date(a.fecha) }));
 }
 
+export interface CambioPrecioReciente {
+  producto: Product;
+  precioAnterior: number;
+  fechaCambio: Date;
+}
+
+/** Productos con precio modificado en los ultimos N dias: candidatos a re-etiquetar en la gondola. */
+export async function getCambiosPrecioRecientes(dias = 7): Promise<CambioPrecioReciente[]> {
+  const { items } = await consultar<{
+    items: { producto: Record<string, any>; precio_anterior: number; fecha_cambio: string }[];
+  }>("/api/consultas/productos", "cambiosPrecioRecientes", { dias });
+  return items.map((i) => ({
+    producto: mapRow(i.producto),
+    precioAnterior: Number(i.precio_anterior) || 0,
+    fechaCambio: new Date(i.fecha_cambio),
+  }));
+}
+
 export async function getFavoritos(): Promise<Product[]> {
   const { productos } = await consultar<{ productos: Record<string, any>[] }>("/api/consultas/productos", "favoritos");
   return productos.map(mapRow);
