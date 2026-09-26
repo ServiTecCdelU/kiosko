@@ -109,6 +109,16 @@ describe("textoCompartirOferta", () => {
     assert.match(t, /Despensa Rosa/);
   });
 
+  test("incluye la vigencia", () => {
+    const t = textoCompartirOferta({ name: "Yerba", price: 1000, ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 20, ofertaHasta: "2026-10-05" });
+    assert.match(t, /Válido hasta el 5\/10/);
+  });
+
+  test("una oferta programada igual se describe completa", () => {
+    const a = analizarOferta({ price: 1000, ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 20, ofertaDesde: "2099-01-01" });
+    assert.equal(a.precioUnitario, 800);
+  });
+
   test("un combo muestra el total del combo", () => {
     const t = textoCompartirOferta({ name: "Gaseosa", price: 1000, ofertaActiva: true, ofertaTipo: "combo", ofertaValor: 2000, ofertaCantidad: 3 });
     assert.match(t, /3x2/);

@@ -22,6 +22,24 @@ describe("tieneOferta", () => {
   });
 });
 
+describe("tieneOferta con vigencia", () => {
+  const p = { ...base, ofertaActiva: true, ofertaTipo: "porcentaje" as const, ofertaValor: 10, ofertaDesde: "2026-10-03", ofertaHasta: "2026-10-04" };
+
+  test("solo se cobra dentro de las fechas", () => {
+    assert.equal(tieneOferta(p, "2026-10-02"), false);
+    assert.equal(tieneOferta(p, "2026-10-03"), true);
+    assert.equal(tieneOferta(p, "2026-10-05"), false);
+  });
+
+  test("sin fechas se cobra siempre", () => {
+    assert.equal(tieneOferta({ ...p, ofertaDesde: null, ofertaHasta: null }, "2030-01-01"), true);
+  });
+
+  test("una oferta vencida cobra precio de lista", () => {
+    assert.equal(precioFinal({ ...p, ofertaDesde: null, ofertaHasta: "2020-01-01" }), 1000);
+  });
+});
+
 describe("precioFinal", () => {
   test("aplica el porcentaje de descuento", () => {
     const p = { ...base, ofertaActiva: true, ofertaTipo: "porcentaje" as const, ofertaValor: 20 };

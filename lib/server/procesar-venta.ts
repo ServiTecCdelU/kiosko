@@ -40,7 +40,9 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
   const ids = rawItems.map((i) => String(i.productId)).filter(Boolean);
   const { data: prods, error: prodErr } = await supabaseAdmin
     .from("productos")
-    .select("id,name,price,oferta_activa,oferta_tipo,oferta_valor,oferta_cantidad")
+    // "*" y no una lista: oferta_desde/oferta_hasta (34_oferta_vigencia.sql) pueden
+    // no existir todavia en la base, y pedirlas por nombre romperia todas las ventas.
+    .select("*")
     .eq("comercio_id", comercioId)
     .in("id", ids);
   if (prodErr) throw new Error(prodErr.message);
@@ -58,6 +60,8 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
             ofertaTipo: db.oferta_tipo,
             ofertaValor: db.oferta_valor,
             ofertaCantidad: db.oferta_cantidad,
+            ofertaDesde: db.oferta_desde ?? null,
+            ofertaHasta: db.oferta_hasta ?? null,
           },
           quantity,
         )

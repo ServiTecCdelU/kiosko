@@ -14,9 +14,11 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { analizarOferta, plantillasOferta, precioRedondo, type PlantillaOferta } from "@/lib/oferta-analisis";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
+import { errorVigencia, estadoVigencia } from "@/lib/oferta-vigencia";
 import { CartelOferta } from "@/components/stock/cartel-oferta";
 import { OfertaRentabilidad } from "@/components/stock/oferta-rentabilidad";
 import { OfertaPublicada, useNombreComercio } from "@/components/stock/oferta-publicada";
+import { OfertaVigenciaPicker } from "@/components/stock/oferta-vigencia-picker";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { SetOfertaInput } from "@/services/products-service";
 
@@ -45,6 +47,8 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
   const [valor, setValor] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [plantilla, setPlantilla] = useState<string | null>(null);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const [publicada, setPublicada] = useState<Product | null>(null);
   const [working, setWorking] = useState(false);
   const [comercio] = useNombreComercio();
@@ -56,6 +60,8 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
       setModo(product.ofertaTipo ?? "porcentaje");
       setValor(product.ofertaValor ? String(product.ofertaValor) : "");
       setCantidad(product.ofertaCantidad ? String(product.ofertaCantidad) : "");
+      setDesde(product.ofertaDesde ?? "");
+      setHasta(product.ofertaHasta ?? "");
       setPlantilla(null);
       setPublicada(null);
     }
@@ -71,8 +77,10 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
       ofertaTipo: tipo,
       ofertaValor: modo === "final" ? Math.round((product.price - num) * 100) / 100 : num,
       ofertaCantidad: modo === "combo" ? Number(cantidad) || undefined : undefined,
+      ofertaDesde: desde || undefined,
+      ofertaHasta: hasta || undefined,
     };
-  }, [product, activa, modo, valor, cantidad]);
+  }, [product, activa, modo, valor, cantidad, desde, hasta]);
 
   if (!product || !borrador) return null;
 
@@ -92,6 +100,10 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
       : modo === "monto" && num >= product.price ? "El descuento no puede superar el precio"
       : modo === "final" && num >= product.price ? `Tiene que ser menor a ${formatCurrency(product.price)}`
       : null;
+  const errorFechas = !activa ? null
+    : errorVigencia(desde || null, hasta || null)
+      ?? (estadoVigencia(desde || null, hasta || null) === "vencida" ? "Las fechas de vigencia ya pasaron" : null);
+  const bloqueado = !!error || !!errorFechas;
 
   const dias = product.fechaVencimiento ? diasHastaVencimiento(product.fechaVencimiento) : null;
   const sugeridoVenc = dias != null ? sugerirDescuentoVencimiento(dias) : null;
@@ -118,7 +130,10 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
   };
 
   const guardar = async () => {
-    if (error) return;
+    if (bloqueado) return;
+    // La vigencia solo viaja si se usa (o hay que borrarla): asi nada toca
+    // oferta_desde/oferta_hasta mientras 34_oferta_vigencia.sql no este corrido.
+    const usaFechas = !!(desde || hasta || product.ofertaDesde || product.ofertaHasta);
     setWorking(true);
     try {
       await onSubmit({
@@ -126,6 +141,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
         tipo: borrador.ofertaTipo,
         valor: borrador.ofertaValor,
         cantidad: modo === "combo" ? cant : undefined,
+        ...(usaFechas ? { desde: desde || null, hasta: hasta || null } : {}),
       });
       if (activa) setPublicada(borrador);
       else onOpenChange(false);
@@ -272,6 +288,13 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
                       stock={product.stock}
                       stockControlado={product.stockControlado}
                     />}
+
+                    <OfertaVigenciaPicker
+                      desde={desde}
+                      hasta={hasta}
+                      onChange={(d, h) => { setDesde(d); setHasta(h); }}
+                    />
+                    {errorFechas && <p className="text-xs text-destructive">{errorFechas}</p>}
                   </>
                 )}
 
@@ -296,7 +319,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
               <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button className="rounded-xl" disabled={working || !!error} onClick={guardar}>
+              <Button className="rounded-xl" disabled={working || bloqueado} onClick={guardar}>
                 {working ? "Guardando..." : activa ? "Publicar oferta" : "Guardar"}
               </Button>
             </DialogFooter>

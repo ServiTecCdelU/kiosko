@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CartelOferta } from "@/components/stock/cartel-oferta";
 import { textoCompartirOferta } from "@/lib/oferta-analisis";
+import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import type { Product } from "@/lib/types";
 
 const COMERCIO_KEY = "kiosko:cartel-comercio";
@@ -43,6 +44,7 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
   const [comercio, setComercio] = useNombreComercio();
   const [copiado, setCopiado] = useState(false);
   const texto = textoCompartirOferta(producto, comercio.trim() || undefined);
+  const programada = estadoVigencia(producto.ofertaDesde, producto.ofertaHasta) === "programada";
 
   const copiar = async () => {
     try {
@@ -64,8 +66,12 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
         <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-money text-money-foreground shadow-lg shadow-money/30">
           <Check className="h-6 w-6" strokeWidth={3} />
         </span>
-        <p className="text-lg font-bold">¡Oferta publicada!</p>
-        <p className="text-sm text-muted-foreground">Ya se cobra así en el POS. Ahora contale a tus clientes.</p>
+        <p className="text-lg font-bold">{programada ? "¡Oferta programada!" : "¡Oferta publicada!"}</p>
+        <p className="text-sm text-muted-foreground">
+          {programada
+            ? `El POS la empieza a cobrar sola (${textoVigencia(producto.ofertaDesde, producto.ofertaHasta).toLowerCase()}). Ya podés imprimir el cartel.`
+            : "Ya se cobra así en el POS. Ahora contale a tus clientes."}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[auto_1fr] md:items-start">

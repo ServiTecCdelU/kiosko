@@ -2,6 +2,7 @@
 // Puro (sin React ni Supabase): lo usa el estudio de ofertas y se testea con node:test.
 import type { OfertaTipo } from "@/lib/types";
 import { type ConOferta, tieneOferta, precioFinal, comboLabel, pesos } from "./pricing.ts";
+import { textoVigencia } from "./oferta-vigencia.ts";
 
 export interface ConCosto extends ConOferta {
   /** Costo de compra (precio_base). Sin costo no se pueden calcular margenes. */
@@ -28,13 +29,20 @@ export interface AnalisisOferta {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// El analisis, la etiqueta y el cartel describen la oferta tal como quedo
+// armada, este vigente hoy o no: el cartel del finde se imprime el jueves.
+function sinFechas<T extends ConOferta>(p: T): T {
+  return { ...p, ofertaDesde: null, ofertaHasta: null };
+}
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 function margenPct(precio: number, costo: number): number {
   return precio > 0 ? round1(((precio - costo) / precio) * 100) : 0;
 }
 
-export function analizarOferta(p: ConCosto): AnalisisOferta {
+export function analizarOferta(producto: ConCosto): AnalisisOferta {
+  const p = sinFechas(producto);
   const valida = tieneOferta(p);
   const esCombo = valida && p.ofertaTipo === "combo";
   const unidades = esCombo ? Number(p.ofertaCantidad) : 1;
@@ -71,7 +79,8 @@ export function analizarOferta(p: ConCosto): AnalisisOferta {
 }
 
 /** Texto corto de la oferta para badges, etiquetas y carteles: "-20%", "-$200", "3x2"... */
-export function etiquetaOferta(p: ConOferta): string | null {
+export function etiquetaOferta(producto: ConOferta): string | null {
+  const p = sinFechas(producto);
   if (!tieneOferta(p)) return null;
   if (p.ofertaTipo === "combo") return comboLabel(p);
   const valor = Number(p.ofertaValor);
@@ -140,6 +149,6 @@ export function textoCompartirOferta(p: ConNombre, comercio?: string): string {
         ];
   if (a.ahorroTotal > 0) lineas.push(`💰 Ahorrás ${pesos(a.ahorroTotal)}`);
   if (comercio) lineas.push(`📍 ${comercio}`);
-  lineas.push("¡Hasta agotar stock!");
+  lineas.push(`⏰ ${textoVigencia(p.ofertaDesde, p.ofertaHasta)}`);
   return lineas.join("\n");
 }

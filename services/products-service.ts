@@ -28,6 +28,8 @@ export function mapRow(d: Record<string, any>): Product {
     ofertaTipo: d.oferta_tipo ?? undefined,
     ofertaValor: Number(d.oferta_valor) || 0,
     ofertaCantidad: d.oferta_cantidad != null ? Number(d.oferta_cantidad) : undefined,
+    ofertaDesde: d.oferta_desde ? String(d.oferta_desde).slice(0, 10) : undefined,
+    ofertaHasta: d.oferta_hasta ? String(d.oferta_hasta).slice(0, 10) : undefined,
     syncedAt: d.synced_at ? new Date(d.synced_at) : undefined,
     createdAt: d.created_at ? new Date(d.created_at) : new Date(),
     updatedAt: d.updated_at ? new Date(d.updated_at) : new Date(),
@@ -246,6 +248,12 @@ export interface SetOfertaInput {
   tipo?: OfertaTipo;
   valor?: number;
   cantidad?: number;
+  /**
+   * Vigencia "YYYY-MM-DD" (null = sin limite). Se omite si no hay fechas ni
+   * antes ni ahora, asi nada escribe esas columnas hasta usarlas.
+   */
+  desde?: string | null;
+  hasta?: string | null;
 }
 
 /** Marca/actualiza la oferta de catálogo de un producto (descuento propio, incluye combos). */

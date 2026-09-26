@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { errorVigencia } from "@/lib/oferta-vigencia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ function errorOferta(oferta: any): string | null {
     const cantidad = Number(oferta.cantidad);
     if (!Number.isInteger(cantidad) || cantidad < 2) return "El combo necesita 2 o mas unidades";
   }
-  return null;
+  return errorVigencia(oferta.desde, oferta.hasta);
 }
 
 export async function PATCH(req: Request) {
@@ -141,17 +142,30 @@ export async function PUT(req: Request) {
   const invalida = errorOferta(oferta);
   if (invalida) return NextResponse.json({ error: invalida }, { status: 400 });
 
+  const cambios: Record<string, unknown> = {
+    oferta_activa: !!oferta.activa,
+    oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
+    oferta_valor: oferta.activa ? Number(oferta.valor) || 0 : 0,
+    oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? Number(oferta.cantidad) : null,
+  };
+  // La vigencia solo se escribe si el cliente la manda (ver SetOfertaInput)
+  if ("desde" in oferta || "hasta" in oferta) {
+    cambios.oferta_desde = oferta.activa ? oferta.desde || null : null;
+    cambios.oferta_hasta = oferta.activa ? oferta.hasta || null : null;
+  }
+
   const { error } = await supabaseAdmin
     .from("productos")
-    .update({
-      oferta_activa: !!oferta.activa,
-      oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
-      oferta_valor: oferta.activa ? Number(oferta.valor) || 0 : 0,
-      oferta_cantidad: oferta.activa && oferta.tipo === "combo" ? Number(oferta.cantidad) : null,
-    })
+    .update(cambios)
     .eq("comercio_id", comercioId)
     .eq("id", productId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    const faltaMigracion = /oferta_(desde|hasta)/.test(error.message);
+    return NextResponse.json(
+      { error: faltaMigracion ? "Falta correr supabase/34_oferta_vigencia.sql para usar fechas de vigencia" : error.message },
+      { status: 400 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

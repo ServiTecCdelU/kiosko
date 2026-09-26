@@ -28,7 +28,8 @@ import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal, tieneOferta, comboLabel } from "@/lib/pricing";
+import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
+import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
@@ -36,6 +37,10 @@ import type { Product } from "@/lib/types";
 const PAGE_SIZE = 30;
 
 type QuickFilter = "todos" | "stockBajo" | "agotados" | "revisar";
+
+function conCartel(p: Product): boolean {
+  return ofertaConfigurada(p) && estadoVigencia(p.ofertaDesde, p.ofertaHasta) !== "vencida";
+}
 
 export default function StockPage() {
   const [search, setSearch] = useState("");
@@ -289,9 +294,10 @@ export default function StockPage() {
     imprimirA4("10mm", () => setProductosEtiqueta([]));
   };
 
-  // Un cartel de oferta A4 por producto (solo los que tienen oferta vigente).
+  // Un cartel de oferta A4 por producto: vigentes y programadas (el cartel del
+  // finde se imprime antes). Las vencidas no.
   const imprimirCarteles = (productos: Product[], comercio = "") => {
-    const conOferta = productos.filter(tieneOferta);
+    const conOferta = productos.filter(conCartel);
     if (conOferta.length === 0) {
       toast.info("Ninguno de los productos seleccionados tiene oferta");
       return;
@@ -301,7 +307,7 @@ export default function StockPage() {
     imprimirA4("0", () => setCarteles({ productos: [], comercio: "" }));
   };
 
-  const seleccionConOferta = products.filter((p) => seleccionados.has(p.id) && tieneOferta(p)).length;
+  const seleccionConOferta = products.filter((p) => seleccionados.has(p.id) && conCartel(p)).length;
 
   return (
     <AppShell title="Stock">
@@ -588,6 +594,15 @@ export default function StockPage() {
                             <span className="inline-flex items-center gap-1 font-semibold text-money">
                               <Tag className="h-3 w-3" />
                               {formatCurrency(precioFinal(p))}
+                            </span>
+                          </span>
+                        ) : ofertaConfigurada(p) ? (
+                          <span className="flex flex-col items-end leading-tight">
+                            {formatCurrency(p.price)}
+                            <span className="text-[11px] text-muted-foreground" title={textoVigencia(p.ofertaDesde, p.ofertaHasta)}>
+                              {estadoVigencia(p.ofertaDesde, p.ofertaHasta) === "programada"
+                                ? `oferta desde ${p.ofertaDesde?.slice(8, 10)}/${p.ofertaDesde?.slice(5, 7)}`
+                                : "oferta vencida"}
                             </span>
                           </span>
                         ) : (

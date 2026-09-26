@@ -6,6 +6,7 @@
 import type { CSSProperties } from "react";
 import { pesos } from "@/lib/pricing";
 import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
+import { textoVigencia } from "@/lib/oferta-vigencia";
 import type { Product } from "@/lib/types";
 
 const ROJO = "#d7141a";
@@ -101,7 +102,9 @@ export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
 
       <div style={{ borderTop: `0.15em dashed ${ROJO}`, padding: "0.9em 2em", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "1.4em", fontWeight: 600 }}>
         <span>{comercio || " "}</span>
-        <span style={{ color: "#555" }}>Válido hasta agotar stock</span>
+        <span style={{ color: producto.ofertaHasta ? ROJO : "#555", fontWeight: producto.ofertaHasta ? 800 : 600 }}>
+          {textoVigencia(producto.ofertaDesde, producto.ofertaHasta)}
+        </span>
       </div>
     </div>
   );

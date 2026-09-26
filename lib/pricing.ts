@@ -1,6 +1,7 @@
 // lib/pricing.ts — cálculo del precio efectivo con oferta de catálogo.
 // Puro (sin React): se usa en el cliente (POS/stock) y en el server (/api/ventas).
 import type { OfertaTipo } from "@/lib/types";
+import { ofertaVigente } from "./oferta-vigencia.ts";
 
 export interface ConOferta {
   price: number;
@@ -8,19 +9,27 @@ export interface ConOferta {
   ofertaTipo?: OfertaTipo | null;
   ofertaValor?: number | null;
   ofertaCantidad?: number | null;
+  /** Vigencia "YYYY-MM-DD" inclusive (34_oferta_vigencia.sql); null = sin limite. */
+  ofertaDesde?: string | null;
+  ofertaHasta?: string | null;
 }
 
 function round2(n: number): number {
   return Math.max(0, Math.round(n * 100) / 100);
 }
 
-/** ¿El producto tiene una oferta válida y activa? */
-export function tieneOferta(p: ConOferta): boolean {
+/** ¿La oferta esta bien armada y activa, sin mirar las fechas? (para carteles programados) */
+export function ofertaConfigurada(p: ConOferta): boolean {
   if (!p.ofertaActiva || !p.ofertaTipo) return false;
   if (p.ofertaTipo === "combo") {
     return Number(p.ofertaCantidad) > 1 && Number(p.ofertaValor) > 0;
   }
   return Number(p.ofertaValor) > 0;
+}
+
+/** ¿Se cobra la oferta hoy? Configurada y dentro de su vigencia (hora de Argentina). */
+export function tieneOferta(p: ConOferta, hoy?: string): boolean {
+  return ofertaConfigurada(p) && ofertaVigente(p.ofertaDesde, p.ofertaHasta, hoy);
 }
 
 /**

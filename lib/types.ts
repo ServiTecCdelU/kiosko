@@ -26,6 +26,9 @@ export interface Product {
   ofertaTipo?: OfertaTipo;
   ofertaValor: number;
   ofertaCantidad?: number;
+  /** Vigencia "YYYY-MM-DD" inclusive; sin fecha = sin limite. */
+  ofertaDesde?: string;
+  ofertaHasta?: string;
   syncedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
