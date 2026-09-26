@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/format";
 import { useSuperadmin } from "@/hooks/use-superadmin";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { apiUrl } from "@/lib/utils/api-url";
 
 interface ComercioUso {
   productos: number;
@@ -53,7 +54,7 @@ export default function SuperadminPage() {
     try {
       const { error } = await getSupabaseBrowser().auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo: `${window.location.origin}${apiUrl("/auth/callback")}` },
       });
       if (error) throw error;
     } catch {

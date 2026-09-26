@@ -7,6 +7,7 @@ import { Store, Delete, Loader2, Chrome } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { login } from "@/services/auth-service";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { apiUrl } from "@/lib/utils/api-url";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
 const PIN_LENGTH = 4;
@@ -37,7 +38,7 @@ function LoginContent() {
     try {
       const { error } = await getSupabaseBrowser().auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo: `${window.location.origin}${apiUrl("/auth/callback")}` },
       });
       if (error) throw error;
       // signInWithOAuth redirige el navegador entero: si llega hasta aca es
