@@ -1,15 +1,16 @@
 "use client";
 
 // app/auth/callback/page.tsx — vuelta del login con Google (Supabase Auth).
-// Tiene que ser una pagina de CLIENTE, no una ruta de servidor: el
-// code_verifier del flujo PKCE lo guardo signInWithOAuth en el localStorage
-// del navegador, y solo el navegador puede completar el intercambio con ese
-// dato. El servidor (app/api/auth/google-verify) solo re-verifica el token
-// resultante y emite la cookie de sesion.
+// El cliente de supabase-js usa flowType "implicit" por defecto: Supabase
+// Auth vuelve con el access_token en el FRAGMENTO de la URL (#access_token=...),
+// no en un ?code= de query string. El fragmento nunca llega al servidor (los
+// navegadores no lo mandan en la request), asi que tiene que leerlo el
+// navegador — de ahi que esto sea una pagina de cliente, no una ruta de
+// servidor. app/api/auth/google-verify re-verifica el token server-side y
+// emite la cookie de sesion.
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -17,11 +18,9 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     (async () => {
       try {
-        const code = new URL(window.location.href).searchParams.get("code");
-        if (!code) throw new Error();
-        const { data, error } = await getSupabaseBrowser().auth.exchangeCodeForSession(code);
-        const accessToken = data?.session?.access_token;
-        if (error || !accessToken) throw new Error();
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const accessToken = hash.get("access_token");
+        if (!accessToken) throw new Error();
 
         const res = await fetch("/api/auth/google-verify", {
           method: "POST",
