@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Receipt, TrendingUp, Banknote, CreditCard, NotebookPen, ChevronDown, Search, X } from "lucide-react";
+import { Receipt, TrendingUp, Banknote, CreditCard, NotebookPen, ChevronDown, Search, X, FileSpreadsheet, FileText } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -23,6 +24,8 @@ import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
 import { SaleDetailDialog } from "@/components/ventas/sale-detail-dialog";
 import { DevolucionDialog } from "@/components/ventas/devolucion-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { descargarVentasPdf } from "@/lib/utils/ventas-pdf";
+import { descargarVentasExcel } from "@/lib/utils/ventas-excel";
 import type { Sale, PaymentMethod } from "@/lib/types";
 
 const METODOS_FILTRO: PaymentMethod[] = [
@@ -61,6 +64,7 @@ export default function VentasPage() {
   const [mostrarResumen, setMostrarResumen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroMetodo, setFiltroMetodo] = useState<PaymentMethod | "todos">("todos");
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
 
   const user = getCurrentUser();
   // Encargado tambien puede anular ventas (multi-caja); el cajero no.
@@ -80,6 +84,7 @@ export default function VentasPage() {
 
   useEffect(() => {
     load(rango);
+    setSeleccionadas(new Set());
   }, [rango, load]);
 
   useEffect(() => {
@@ -132,6 +137,45 @@ export default function VentasPage() {
   const hayFiltrosActivos = busqueda.trim().length > 0 || filtroMetodo !== "todos";
 
   const vigentes = useMemo(() => ventasFiltradas.filter((v) => v.estado !== "anulada"), [ventasFiltradas]);
+
+  const idsFiltradas = ventasFiltradas.map((v) => v.id);
+  const todasSeleccionadas = idsFiltradas.length > 0 && idsFiltradas.every((id) => seleccionadas.has(id));
+
+  const toggleTodas = () => {
+    setSeleccionadas((prev) => {
+      if (todasSeleccionadas) return new Set();
+      return new Set(idsFiltradas);
+    });
+  };
+
+  const toggleUna = (id: string) => {
+    setSeleccionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const ventasParaExportar = seleccionadas.size > 0
+    ? ventas.filter((v) => seleccionadas.has(v.id))
+    : ventasFiltradas;
+
+  const exportarExcel = () => {
+    if (ventasParaExportar.length === 0) {
+      toast.error("No hay ventas para exportar");
+      return;
+    }
+    descargarVentasExcel(ventasParaExportar);
+  };
+
+  const exportarPdf = () => {
+    if (ventasParaExportar.length === 0) {
+      toast.error("No hay ventas para exportar");
+      return;
+    }
+    descargarVentasPdf(ventasParaExportar);
+  };
 
   const resumen = useMemo(() => {
     let total = 0, efectivo = 0, transferencia = 0, tarjeta = 0, mercadopago = 0, fiado = 0;
@@ -242,6 +286,27 @@ export default function VentasPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={todasSeleccionadas}
+                    onChange={toggleTodas}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Seleccionar todas
+                </label>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="rounded-xl" onClick={exportarExcel}>
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                    Excel {seleccionadas.size > 0 ? `(${seleccionadas.size})` : ""}
+                  </Button>
+                  <Button size="sm" variant="outline" className="rounded-xl" onClick={exportarPdf}>
+                    <FileText className="mr-1.5 h-3.5 w-3.5" />
+                    PDF {seleccionadas.size > 0 ? `(${seleccionadas.size})` : ""}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="px-0 sm:px-6">
               {ventasFiltradas.length === 0 ? (
@@ -253,6 +318,7 @@ export default function VentasPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-8"></TableHead>
                         <TableHead>Fecha</TableHead>
                         <TableHead className="hidden lg:table-cell">Ticket</TableHead>
                         <TableHead>Items</TableHead>
@@ -269,6 +335,15 @@ export default function VentasPage() {
                           onClick={() => setVentaDetalle(v)}
                           className={cn("cursor-pointer hover:bg-muted/50", v.estado === "anulada" && "opacity-50")}
                         >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={seleccionadas.has(v.id)}
+                              onChange={() => toggleUna(v.id)}
+                              className="h-4 w-4 accent-primary"
+                              aria-label={`Seleccionar venta ${v.saleNumber ?? v.id}`}
+                            />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap text-sm">
                             <span className="lg:hidden">{fechaCorta(v.createdAt)}</span>
                             <span className="hidden lg:inline">{formatDateTime(v.createdAt)}</span>
