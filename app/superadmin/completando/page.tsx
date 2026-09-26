@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { setSuperadminActual } from "@/hooks/use-superadmin";
+import { apiUrl } from "@/lib/utils/api-url";
 
 export default function CompletandoSuperadminPage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function CompletandoSuperadminPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/superadmin/session");
+        const res = await fetch(apiUrl("/api/superadmin/session"));
         if (!res.ok) throw new Error();
         const user = await res.json();
         setSuperadminActual(user);

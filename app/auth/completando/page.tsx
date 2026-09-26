@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { setCurrentUser } from "@/hooks/use-auth";
+import { apiUrl } from "@/lib/utils/api-url";
 
 export default function CompletandoLoginPage() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function CompletandoLoginPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/auth/session");
+        const res = await fetch(apiUrl("/api/auth/session"));
         if (!res.ok) throw new Error();
         const user = await res.json();
         setCurrentUser(user);

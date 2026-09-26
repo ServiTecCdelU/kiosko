@@ -104,7 +104,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/superadmin/comercios", {
+      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accion: "listar" }),
@@ -125,7 +125,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
 
   const cambiarCampo = async (id: string, cambios: Record<string, unknown>) => {
     try {
-      const res = await fetch("/api/superadmin/comercios", {
+      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...cambios }),
@@ -279,7 +279,7 @@ function NuevoComercioDialog({
     if (!nombre.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/superadmin/comercios", {
+      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

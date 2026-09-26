@@ -11,6 +11,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { apiUrl } from "@/lib/utils/api-url";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        const res = await fetch("/api/auth/google-verify", {
+        const res = await fetch(apiUrl("/api/auth/google-verify"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ accessToken }),

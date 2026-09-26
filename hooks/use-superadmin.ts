@@ -4,6 +4,7 @@
 // cliente. Separado de hooks/use-auth.ts a proposito: ese es el estado del
 // admin/cajero de UN comercio; el superadmin no pertenece a ninguno.
 import { useState, useEffect, useCallback } from "react";
+import { apiUrl } from "@/lib/utils/api-url";
 
 const STORAGE_KEY = "kiosko_superadmin";
 
@@ -40,7 +41,7 @@ export function useSuperadmin() {
   const logout = useCallback(() => {
     setSuperadminActual(null);
     setUser(null);
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    fetch(apiUrl("/api/auth/logout"), { method: "POST" }).catch(() => {});
   }, []);
 
   return { user, ready, logout };
