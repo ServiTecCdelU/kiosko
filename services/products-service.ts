@@ -5,6 +5,7 @@ import { getComercioId } from "@/hooks/use-auth";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { ResultadoOferta } from "@/lib/oferta-resultados";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
+import type { RegistroOferta } from "@/lib/oferta-historial";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -274,6 +275,30 @@ export async function getOfertasSugeridas(): Promise<OfertaSugerida[]> {
     "/api/consultas/productos", "sugerenciasOfertas",
   );
   return items.map((i) => ({ producto: mapRow(i.producto), sugerencia: i.sugerencia }));
+}
+
+export interface OfertaTerminada extends RegistroOferta {
+  id: string;
+  desde?: string;
+  hasta?: string;
+  finalizadaAt: Date;
+}
+
+/** Ofertas que ya terminaron, con como vendieron (mas recientes primero). */
+export async function getHistorialOfertas(): Promise<OfertaTerminada[]> {
+  const { registros } = await consultar<{ registros: Record<string, any>[] }>("/api/consultas/productos", "historialOfertas");
+  return registros.map((r) => ({
+    id: r.id,
+    productoNombre: r.producto_nombre ?? "",
+    tipo: r.tipo,
+    valor: Number(r.valor) || 0,
+    cantidad: r.cantidad != null ? Number(r.cantidad) : null,
+    variacionPct: r.variacion_pct != null ? Number(r.variacion_pct) : null,
+    facturadoDurante: r.facturado_durante != null ? Number(r.facturado_durante) : null,
+    desde: r.desde ?? undefined,
+    hasta: r.hasta ?? undefined,
+    finalizadaAt: new Date(r.finalizada_at),
+  }));
 }
 
 export interface SetOfertaInput {

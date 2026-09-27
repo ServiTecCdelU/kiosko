@@ -133,3 +133,50 @@ export async function sugerenciasOfertas(comercioId: string): Promise<{
   items.sort((a, b) => b.sugerencia.capital - a.sugerencia.capital);
   return { items: items.slice(0, MAX_SUGERENCIAS) };
 }
+
+/**
+ * Guarda en ofertas_historial como le fue a una oferta que termina (se finaliza,
+ * se reemplaza por otra o se limpia al vencer). `previo` es la fila del producto
+ * ANTES del cambio. Solo registra ofertas que llegaron a correr al menos un dia.
+ */
+export async function registrarFinDeOferta(comercioId: string, previo: Record<string, any>): Promise<void> {
+  const hoy = hoyArgentinaISO();
+  const desde: string | null = typeof previo.oferta_desde === "string" ? previo.oferta_desde.slice(0, 10) : null;
+  const hastaGuardado: string | null = typeof previo.oferta_hasta === "string" ? previo.oferta_hasta.slice(0, 10) : null;
+  if (desde && desde > hoy) return; // programada que nunca arranco
+  const fin = hastaGuardado && hastaGuardado < hoy ? hastaGuardado : hoy;
+
+  // Sin fecha de inicio no hay contra que comparar: se guarda sin metricas
+  const resultado = desde ? resultadoOferta(await ventasDesde(comercioId, sumarDias(desde, -DIAS_BASE)), previo.id, desde, fin) : null;
+
+  const { error } = await supabaseAdmin.from("ofertas_historial").insert({
+    comercio_id: comercioId,
+    producto_id: previo.id,
+    producto_nombre: previo.name ?? "",
+    tipo: previo.oferta_tipo,
+    valor: Number(previo.oferta_valor) || 0,
+    cantidad: previo.oferta_cantidad ?? null,
+    desde,
+    hasta: fin,
+    unidades_durante: resultado?.unidadesDurante ?? null,
+    facturado_durante: resultado?.facturadoDurante ?? null,
+    por_dia_antes: resultado?.porDiaAntes ?? null,
+    por_dia_durante: resultado?.porDiaDurante ?? null,
+    variacion_pct: resultado?.variacionPct ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+const LIMITE_HISTORIAL = 300;
+
+/** Ofertas terminadas, de la mas reciente a la mas vieja. */
+export async function historialOfertas(comercioId: string): Promise<Record<string, any>[]> {
+  const { data, error } = await supabaseAdmin
+    .from("ofertas_historial")
+    .select("*")
+    .eq("comercio_id", comercioId)
+    .order("finalizada_at", { ascending: false })
+    .limit(LIMITE_HISTORIAL);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

@@ -32,6 +32,7 @@ import {
 import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
 import { CentroOfertas } from "@/components/stock/centro-ofertas";
 import { OfertasRecomendadas } from "@/components/stock/ofertas-recomendadas";
+import { RankingOfertas } from "@/components/stock/ranking-ofertas";
 import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
@@ -437,8 +438,13 @@ export default function StockPage() {
         onEditar={(p) => openOferta(p)}
         onImprimirCarteles={imprimirCarteles}
         onImprimirFolleto={imprimirFolleto}
-        onCambio={load}
+        onCambio={() => {
+          setOfertasVersion((v) => v + 1);
+          load();
+        }}
       />
+
+      <RankingOfertas version={ofertasVersion} />
 
       {cambiosPrecio.length > 0 && (
         <div className="card-premium mb-4 rounded-2xl p-5">

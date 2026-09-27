@@ -5,7 +5,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { errorVigencia } from "@/lib/oferta-vigencia";
+import { errorVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
+import { registrarFinDeOferta } from "@/lib/server/ofertas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,6 +143,17 @@ export async function PUT(req: Request) {
   const invalida = errorOferta(oferta);
   if (invalida) return NextResponse.json({ error: invalida }, { status: 400 });
 
+  // Como estaba antes: si la oferta vigente termina o se cambia, va al historial
+  const { data: previo, error: errPrevio } = await supabaseAdmin
+    .from("productos")
+    .select("*")
+    .eq("comercio_id", comercioId)
+    .eq("id", productId)
+    .maybeSingle();
+  if (errPrevio) return NextResponse.json({ error: errPrevio.message }, { status: 400 });
+  if (!previo) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+  const termina = ofertaTermina(previo, oferta);
+
   const cambios: Record<string, unknown> = {
     oferta_activa: !!oferta.activa,
     oferta_tipo: oferta.activa ? oferta.tipo ?? null : null,
@@ -152,6 +164,12 @@ export async function PUT(req: Request) {
   if ("desde" in oferta || "hasta" in oferta) {
     cambios.oferta_desde = oferta.activa ? oferta.desde || null : null;
     cambios.oferta_hasta = oferta.activa ? oferta.hasta || null : null;
+  }
+  // Una promo distinta es una oferta nueva: se mide desde hoy (o desde su inicio
+  // programado), no desde que arranco la anterior
+  if (termina && oferta.activa) {
+    const hoy = hoyArgentinaISO();
+    cambios.oferta_desde = oferta.desde && oferta.desde > hoy ? oferta.desde : hoy;
   }
 
   const { error } = await supabaseAdmin
@@ -167,5 +185,25 @@ export async function PUT(req: Request) {
       { status: 400 },
     );
   }
+
+  if (termina) {
+    try {
+      await registrarFinDeOferta(comercioId, previo);
+    } catch (e) {
+      // La oferta ya se guardo: que falle el historial no la tiene que deshacer
+      console.error("[ofertas_historial] no se pudo registrar", productId, e);
+    }
+  }
   return NextResponse.json({ ok: true });
+}
+
+/** ¿El cambio termina la oferta que tenia el producto? (se apaga o pasa a otra promo) */
+function ofertaTermina(previo: Record<string, any>, oferta: any): boolean {
+  if (!previo.oferta_activa || !previo.oferta_tipo) return false;
+  if (!oferta.activa) return true;
+  return (
+    previo.oferta_tipo !== oferta.tipo ||
+    Number(previo.oferta_valor) !== Number(oferta.valor) ||
+    (oferta.tipo === "combo" && Number(previo.oferta_cantidad) !== Number(oferta.cantidad))
+  );
 }

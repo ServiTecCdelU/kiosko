@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { ofertasConResultados, sugerenciasOfertas } from "@/lib/server/ofertas";
+import { historialOfertas, ofertasConResultados, sugerenciasOfertas } from "@/lib/server/ofertas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -334,6 +334,14 @@ export async function POST(req: Request) {
         return NextResponse.json(await sugerenciasOfertas(comercioId));
       } catch (e) {
         return NextResponse.json({ error: e instanceof Error ? e.message : "Error al calcular sugerencias" }, { status: 400 });
+      }
+    }
+
+    case "historialOfertas": {
+      try {
+        return NextResponse.json({ registros: await historialOfertas(comercioId) });
+      } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Error al leer el historial" }, { status: 400 });
       }
     }
 
