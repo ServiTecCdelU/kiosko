@@ -196,6 +196,12 @@ export default function StockPage() {
     }
   };
 
+  const verCambiosPrecio = () => {
+    setPrecioAbierto(true);
+    // Espera al render para que la tarjeta ya este desplegada
+    setTimeout(() => document.getElementById("cambios-precio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
   const openOferta = (p: Product, plantilla?: string) => {
     setPlantillaInicial(plantilla);
     setOfertaProduct(p);
@@ -380,9 +386,13 @@ export default function StockPage() {
       <Recomendaciones
         vencimientos={vencimientos}
         reposicion={reposicion}
+        cambiosPrecio={cambiosPrecio}
         version={ofertasVersion}
         onCrear={(p, plantilla) => openOferta(p, plantilla)}
         onAplicarVencimiento={aplicarOfertaVencimiento}
+        onEditarOferta={(p) => openOferta(p)}
+        onEditarProducto={openEdit}
+        onVerCambiosPrecio={verCambiosPrecio}
       />
 
       <CentroOfertas
@@ -399,7 +409,7 @@ export default function StockPage() {
       <RankingOfertas version={ofertasVersion} />
 
       {cambiosPrecio.length > 0 && (
-        <div className="card-premium mb-4 rounded-2xl p-5">
+        <div id="cambios-precio" className="card-premium mb-4 scroll-mt-4 rounded-2xl p-5">
           <button
             onClick={() => setPrecioAbierto((v) => !v)}
             className="flex w-full flex-wrap items-center justify-between gap-2 text-left"

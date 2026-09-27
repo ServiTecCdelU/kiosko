@@ -4,28 +4,42 @@
 // reponer lo que se acaba. Cada recomendación trae su acción lista.
 // Las sugerencias de oferta se pueden descartar por 14 días (se recuerda en este navegador).
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, ChevronDown, Lightbulb, PackagePlus, Sparkles, X, Snowflake } from "lucide-react";
+import {
+  CalendarClock, ChevronDown, CircleDollarSign, Lightbulb, PackagePlus, Pencil, Snowflake, Sparkles, Tag,
+  TimerReset, TrendingDown, X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { getOfertasSugeridas, type OfertaSugerida, type ReposicionItem } from "@/services/products-service";
+import {
+  getCatalogoCompleto, getOfertas, getOfertasSugeridas,
+  type CambioPrecioReciente, type OfertaConResultado, type OfertaSugerida, type ReposicionItem,
+} from "@/services/products-service";
 import { diasHastaVencimiento, sugerirDescuentoVencimiento } from "@/lib/oferta-vencimiento";
-import { tieneOferta } from "@/lib/pricing";
+import { comboLabel, pesos, tieneOferta } from "@/lib/pricing";
+import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
+import { ofertasFlojas, ofertasPorTerminar, productosSinCosto } from "@/lib/recomendaciones";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 import type { Product } from "@/lib/types";
 
 interface RecomendacionesProps {
   vencimientos: Product[];
   reposicion: ReposicionItem[];
+  cambiosPrecio: CambioPrecioReciente[];
   /** Cambia cuando se guarda una oferta, para sacar de la lista lo que ya se ofertó. */
   version: number;
   onCrear: (producto: Product, plantillaId: string) => void;
   onAplicarVencimiento: (producto: Product, descuento: number) => Promise<void>;
+  /** Abre la oferta de un producto para renovarla o cambiarla. */
+  onEditarOferta: (producto: Product) => void;
+  onEditarProducto: (producto: Product) => void;
+  onVerCambiosPrecio: () => void;
 }
 
 const DESCARTADAS_KEY = "kiosko:ofertas-descartadas";
 const DIAS_DESCARTE = 14;
 const DIAS_REPOSICION_URGENTE = 5;
+const MAX_SIN_COSTO = 5;
 
 function leerDescartadas(): Record<string, number> {
   try {
@@ -42,6 +56,17 @@ function motivoTexto(s: SugerenciaOferta): string {
   if (s.motivo === "sin-ventas") return "No se vendió en el último mes";
   if (s.motivo === "estancado") return `Stock para ${s.diasDeStock} días · vende ${ritmo}/día`;
   return `Margen alto y rota poco (${ritmo}/día)`;
+}
+
+function textoPromo(p: Product): string {
+  const combo = comboLabel(p);
+  if (combo) return combo;
+  return p.ofertaTipo === "porcentaje" ? `-${p.ofertaValor}%` : `-${pesos(p.ofertaValor)}`;
+}
+
+function textoFin(dias: number): string {
+  if (dias === 0) return "termina hoy";
+  return dias === 1 ? "termina mañana" : `termina en ${dias} días`;
 }
 
 function textoVence(dias: number): string {
@@ -64,17 +89,22 @@ function Seccion({ icono: Icono, titulo, cantidad, tono, children }: {
   );
 }
 
-export function Recomendaciones({ vencimientos, reposicion, version, onCrear, onAplicarVencimiento }: RecomendacionesProps) {
+export function Recomendaciones({
+  vencimientos, reposicion, cambiosPrecio, version, onCrear, onAplicarVencimiento,
+  onEditarOferta, onEditarProducto, onVerCambiosPrecio,
+}: RecomendacionesProps) {
   const [sugeridas, setSugeridas] = useState<OfertaSugerida[]>([]);
   const [descartadas, setDescartadas] = useState<Record<string, number>>({});
+  const [ofertas, setOfertas] = useState<OfertaConResultado[]>([]);
+  const [sinCosto, setSinCosto] = useState<Product[]>([]);
   const [abierto, setAbierto] = useState(false);
 
+  // Todo es un extra: si una consulta falla, esa seccion simplemente no aparece
   const cargar = useCallback(async () => {
-    try {
-      setSugeridas(await getOfertasSugeridas());
-    } catch {
-      setSugeridas([]); // es un extra: si falla, no se muestra
-    }
+    const [sug, ofs, cat] = await Promise.allSettled([getOfertasSugeridas(), getOfertas(true), getCatalogoCompleto()]);
+    setSugeridas(sug.status === "fulfilled" ? sug.value : []);
+    setOfertas(ofs.status === "fulfilled" ? ofs.value : []);
+    setSinCosto(cat.status === "fulfilled" ? productosSinCosto(cat.value) : []);
   }, []);
 
   useEffect(() => { setDescartadas(leerDescartadas()); }, []);
@@ -95,7 +125,12 @@ export function Recomendaciones({ vencimientos, reposicion, version, onCrear, on
     [reposicion],
   );
 
-  const total = quietas.length + porVencer.length + aReponer.length;
+  const hoy = hoyArgentinaISO();
+  const porTerminar = useMemo(() => ofertasPorTerminar(ofertas.map((o) => o.producto), hoy), [ofertas, hoy]);
+  const flojas = useMemo(() => ofertasFlojas(ofertas, hoy), [ofertas, hoy]);
+
+  const total = quietas.length + porVencer.length + aReponer.length + porTerminar.length + flojas.length
+    + cambiosPrecio.length + sinCosto.length;
   if (total === 0) return null;
 
   const capitalQuieto = quietas.reduce((s, i) => s + i.sugerencia.capital, 0);
@@ -103,6 +138,10 @@ export function Recomendaciones({ vencimientos, reposicion, version, onCrear, on
     porVencer.length > 0 && `${porVencer.length} por vencer`,
     quietas.length > 0 && `${quietas.length} quieto${quietas.length > 1 ? "s" : ""} (${formatCurrency(capitalQuieto)})`,
     aReponer.length > 0 && `${aReponer.length} por agotarse`,
+    porTerminar.length > 0 && `${porTerminar.length} oferta${porTerminar.length > 1 ? "s" : ""} por terminar`,
+    flojas.length > 0 && `${flojas.length} promo${flojas.length > 1 ? "s" : ""} floja${flojas.length > 1 ? "s" : ""}`,
+    cambiosPrecio.length > 0 && `${cambiosPrecio.length} cartel${cambiosPrecio.length > 1 ? "es" : ""} por reimprimir`,
+    sinCosto.length > 0 && `${sinCosto.length} sin costo`,
   ].filter(Boolean).join(" · ");
 
   const descartar = (id: string) => {
@@ -155,6 +194,40 @@ export function Recomendaciones({ vencimientos, reposicion, version, onCrear, on
             </Seccion>
           )}
 
+          {porTerminar.length > 0 && (
+            <Seccion icono={TimerReset} titulo="Ofertas por terminar" cantidad={porTerminar.length} tono="text-warning">
+              {porTerminar.map(({ producto: p, dias }) => (
+                <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{textoPromo(p)} · {textoFin(dias)}</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl" onClick={() => onEditarOferta(p)}>
+                    Renovar
+                  </Button>
+                </li>
+              ))}
+            </Seccion>
+          )}
+
+          {flojas.length > 0 && (
+            <Seccion icono={TrendingDown} titulo="Promos que no venden" cantidad={flojas.length} tono="text-destructive">
+              {flojas.map(({ producto: p, resultado: r }) => (
+                <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {textoPromo(p)} · las ventas bajaron {Math.abs(r.variacionPct ?? 0)}% desde que arrancó
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl" onClick={() => onEditarOferta(p)}>
+                    Cambiar promo
+                  </Button>
+                </li>
+              ))}
+            </Seccion>
+          )}
+
           {quietas.length > 0 && (
             <Seccion icono={Snowflake} titulo="Mercadería quieta" cantidad={quietas.length} tono="text-sky-500">
               {quietas.map(({ producto: p, sugerencia: s }) => (
@@ -202,6 +275,40 @@ export function Recomendaciones({ vencimientos, reposicion, version, onCrear, on
                   </span>
                 </li>
               ))}
+            </Seccion>
+          )}
+
+          {cambiosPrecio.length > 0 && (
+            <Seccion icono={Tag} titulo="Precios que cambiaron" cantidad={cambiosPrecio.length} tono="text-primary">
+              <li className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                <p className="min-w-0 flex-1 text-sm">
+                  {cambiosPrecio.slice(0, 3).map((c) => c.producto.name).join(", ")}
+                  {cambiosPrecio.length > 3 && ` y ${cambiosPrecio.length - 3} más`}
+                  <span className="block text-xs text-muted-foreground">Reimprimí el cartel de góndola</span>
+                </p>
+                <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl" onClick={onVerCambiosPrecio}>
+                  Ver carteles
+                </Button>
+              </li>
+            </Seccion>
+          )}
+
+          {sinCosto.length > 0 && (
+            <Seccion icono={CircleDollarSign} titulo="Sin costo cargado" cantidad={sinCosto.length} tono="text-muted-foreground">
+              {sinCosto.slice(0, MAX_SIN_COSTO).map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">Sin costo no se puede medir el margen de una oferta</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl" onClick={() => onEditarProducto(p)}>
+                    <Pencil className="mr-1 h-3.5 w-3.5" /> Cargar
+                  </Button>
+                </li>
+              ))}
+              {sinCosto.length > MAX_SIN_COSTO && (
+                <li className="py-2 text-xs text-muted-foreground">y {sinCosto.length - MAX_SIN_COSTO} más</li>
+              )}
             </Seccion>
           )}
         </div>
