@@ -15,9 +15,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  getProductsPage, setOferta, getStockStats, getCategorias, updateProduct, getVencimientosProximos,
-  logCambioPrecio, getReposicionPredictiva, getCambiosPrecioRecientes,
-  type SetOfertaInput, type StockStats, type UpdateProductInput, type ReposicionItem, type CambioPrecioReciente,
+  getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
+  logCambioPrecio, getCambiosPrecioRecientes,
+  type SetOfertaInput, type StockStats, type UpdateProductInput, type CambioPrecioReciente,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
 import { OfertaDialog } from "@/components/stock/oferta-dialog";
@@ -25,29 +25,19 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
-import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
-import {
-  FORMATOS_CARTEL, formatoCartelGuardado, temaCartelGuardado, type OpcionesCartel,
-} from "@/components/stock/cartel-preferencias";
-import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
-import { CentroOfertas } from "@/components/stock/centro-ofertas";
-import { Recomendaciones } from "@/components/stock/recomendaciones";
-import { RankingOfertas } from "@/components/stock/ranking-ofertas";
+import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
+import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
 import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
-import { estadoVigencia, hoyArgentinaISO, textoVigencia } from "@/lib/oferta-vigencia";
+import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
 const PAGE_SIZE = 30;
 
 type QuickFilter = "todos" | "stockBajo" | "agotados" | "revisar";
-
-function conCartel(p: Product): boolean {
-  return ofertaConfigurada(p) && estadoVigencia(p.ofertaDesde, p.ofertaHasta) !== "vencida";
-}
 
 export default function StockPage() {
   const [search, setSearch] = useState("");
@@ -66,18 +56,12 @@ export default function StockPage() {
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
-  const [vencimientos, setVencimientos] = useState<Product[]>([]);
-  const [reposicion, setReposicion] = useState<ReposicionItem[]>([]);
   const [cambiosPrecio, setCambiosPrecio] = useState<CambioPrecioReciente[]>([]);
   const [seleccionadosPrecio, setSeleccionadosPrecio] = useState<Set<string>>(new Set());
   const [precioAbierto, setPrecioAbierto] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
-  const [carteles, setCarteles] = useState<{ productos: Product[]; opciones?: OpcionesCartel }>({ productos: [] });
-  const [folleto, setFolleto] = useState<{ productos: Product[]; opciones?: OpcionesCartel }>({ productos: [] });
-  // Se incrementa al guardar/quitar una oferta para que el Centro de ofertas recargue
-  const [ofertasVersion, setOfertasVersion] = useState(0);
-  const [plantillaInicial, setPlantillaInicial] = useState<string | undefined>();
+  const { imprimirCarteles, limpiar: limpiarCarteles, impresion } = useImpresionOfertas();
   const [loteOpen, setLoteOpen] = useState(false);
 
   useEffect(() => {
@@ -108,22 +92,6 @@ export default function StockPage() {
   const loadCategorias = useCallback(async () => {
     try {
       setCategorias(await getCategorias());
-    } catch {
-      // no crítico
-    }
-  }, []);
-
-  const loadVencimientos = useCallback(async () => {
-    try {
-      setVencimientos(await getVencimientosProximos(7));
-    } catch {
-      // no crítico
-    }
-  }, []);
-
-  const loadReposicion = useCallback(async () => {
-    try {
-      setReposicion(await getReposicionPredictiva(14));
     } catch {
       // no crítico
     }
@@ -165,45 +133,19 @@ export default function StockPage() {
   useEffect(() => {
     loadStats();
     loadCategorias();
-    loadVencimientos();
-    loadReposicion();
     loadCambiosPrecio();
-  }, [loadStats, loadCategorias, loadVencimientos, loadReposicion, loadCambiosPrecio]);
+  }, [loadStats, loadCategorias, loadCambiosPrecio]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([load(), loadStats(), loadCategorias(), loadVencimientos(), loadCambiosPrecio()]);
-  }, [load, loadStats, loadCategorias, loadVencimientos, loadCambiosPrecio]);
+    await Promise.all([load(), loadStats(), loadCategorias(), loadCambiosPrecio()]);
+  }, [load, loadStats, loadCategorias, loadCambiosPrecio]);
 
   const openEdit = (p: Product) => {
     setSelected(p);
     setEditOpen(true);
   };
 
-  // Arranca hoy y se apaga sola el dia que vence el producto (si ya vencio, al menos corre hoy).
-  const aplicarOfertaVencimiento = async (p: Product, descuento: number) => {
-    try {
-      const hoy = hoyArgentinaISO();
-      const vence = p.fechaVencimiento?.toISOString().slice(0, 10);
-      await setOferta(p.id, {
-        activa: true, tipo: "porcentaje", valor: descuento,
-        desde: hoy, hasta: vence && vence > hoy ? vence : hoy,
-      });
-      setOfertasVersion((v) => v + 1);
-      toast.success(`Oferta del ${descuento}% aplicada a ${p.name}`);
-      loadVencimientos();
-    } catch {
-      toast.error("No se pudo aplicar la oferta");
-    }
-  };
-
-  const verCambiosPrecio = () => {
-    setPrecioAbierto(true);
-    // Espera al render para que la tarjeta ya este desplegada
-    setTimeout(() => document.getElementById("cambios-precio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  };
-
-  const openOferta = (p: Product, plantilla?: string) => {
-    setPlantillaInicial(plantilla);
+  const openOferta = (p: Product) => {
     setOfertaProduct(p);
     setOfertaOpen(true);
   };
@@ -213,7 +155,6 @@ export default function StockPage() {
     try {
       await setOferta(ofertaProduct.id, oferta);
       toast.success(oferta.activa ? "Oferta aplicada" : "Oferta quitada");
-      setOfertasVersion((v) => v + 1);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar la oferta");
@@ -294,6 +235,13 @@ export default function StockPage() {
   const idsPrecio = cambiosPrecio.map((c) => c.producto.id);
   const todosSeleccionadosPrecio = idsPrecio.length > 0 && idsPrecio.every((id) => seleccionadosPrecio.has(id));
 
+  // Promociones manda aca con #cambios-precio para reimprimir carteles de precio
+  useEffect(() => {
+    if (cambiosPrecio.length === 0 || window.location.hash !== "#cambios-precio") return;
+    setPrecioAbierto(true);
+    setTimeout(() => document.getElementById("cambios-precio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }, [cambiosPrecio.length]);
+
   const toggleTodosPrecio = () => {
     setSeleccionadosPrecio((prev) => {
       const next = new Set(prev);
@@ -303,33 +251,10 @@ export default function StockPage() {
     });
   };
 
-  // Imprime en A4 lo que se acaba de poner en pantalla (etiquetas o carteles).
-  // El @page se inyecta solo para este print job: no se define en globals.css
-  // porque pisaria el @page de 80mm del ticket termico. Despues se limpia el
-  // estado para que el proximo print no arrastre lo anterior.
-  const imprimirA4 = (margen: string, limpiar: () => void, pagina = "A4") => {
-    setTimeout(() => {
-      const style = document.createElement("style");
-      style.textContent = `@page { size: ${pagina}; margin: ${margen}; }`;
-      document.head.appendChild(style);
-      window.print();
-      document.head.removeChild(style);
-      limpiar();
-    }, 150);
-  };
-
-  // Deja en pantalla solo lo que se va a imprimir (etiquetas, carteles o folleto)
-  const SIN_IMPRESION = { productos: [] as Product[] };
-  // Sin opciones explicitas se usa lo ultimo elegido en este navegador
-  const opcionesCartel = (o?: Partial<OpcionesCartel>): OpcionesCartel => ({
-    comercio: o?.comercio ?? "",
-    formato: o?.formato ?? formatoCartelGuardado(),
-    tema: o?.tema ?? temaCartelGuardado(),
-  });
+  // Deja en pantalla solo lo que se va a imprimir
   const limpiarImpresiones = () => {
     setProductosEtiqueta([]);
-    setCarteles(SIN_IMPRESION);
-    setFolleto(SIN_IMPRESION);
+    limpiarCarteles();
   };
 
   // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion actual.
@@ -338,28 +263,6 @@ export default function StockPage() {
     limpiarImpresiones();
     setProductosEtiqueta(productos);
     imprimirA4("10mm", () => setProductosEtiqueta([]));
-  };
-
-  // Un cartel de oferta A4 por producto: vigentes y programadas (el cartel del
-  // finde se imprime antes). Las vencidas no.
-  const imprimirCarteles = (productos: Product[], o?: Partial<OpcionesCartel>) => {
-    const conOferta = productos.filter(conCartel);
-    if (conOferta.length === 0) {
-      toast.info("Ninguno de los productos seleccionados tiene oferta");
-      return;
-    }
-    limpiarImpresiones();
-    const opciones = opcionesCartel(o);
-    setCarteles({ productos: conOferta, opciones });
-    const pagina = FORMATOS_CARTEL.find((f) => f.value === opciones.formato)?.page ?? "A4";
-    imprimirA4("0", () => setCarteles(SIN_IMPRESION), pagina);
-  };
-
-  const imprimirFolleto = (productos: Product[], o?: Partial<OpcionesCartel>) => {
-    if (productos.length === 0) return;
-    limpiarImpresiones();
-    setFolleto({ productos, opciones: opcionesCartel(o) });
-    imprimirA4("10mm", () => setFolleto(SIN_IMPRESION));
   };
 
   const seleccionConOferta = products.filter((p) => seleccionados.has(p.id) && conCartel(p)).length;
@@ -382,31 +285,6 @@ export default function StockPage() {
           </button>
         ))}
       </div>
-
-      <Recomendaciones
-        vencimientos={vencimientos}
-        reposicion={reposicion}
-        cambiosPrecio={cambiosPrecio}
-        version={ofertasVersion}
-        onCrear={(p, plantilla) => openOferta(p, plantilla)}
-        onAplicarVencimiento={aplicarOfertaVencimiento}
-        onEditarOferta={(p) => openOferta(p)}
-        onEditarProducto={openEdit}
-        onVerCambiosPrecio={verCambiosPrecio}
-      />
-
-      <CentroOfertas
-        version={ofertasVersion}
-        onEditar={(p) => openOferta(p)}
-        onImprimirCarteles={imprimirCarteles}
-        onImprimirFolleto={imprimirFolleto}
-        onCambio={() => {
-          setOfertasVersion((v) => v + 1);
-          load();
-        }}
-      />
-
-      <RankingOfertas version={ofertasVersion} />
 
       {cambiosPrecio.length > 0 && (
         <div id="cambios-precio" className="card-premium mb-4 scroll-mt-4 rounded-2xl p-5">
@@ -724,7 +602,6 @@ export default function StockPage() {
         onOpenChange={setOfertaOpen}
         onSubmit={handleOferta}
         onImprimirCartel={(p, opciones) => imprimirCarteles([p], opciones)}
-        plantillaInicial={plantillaInicial}
       />
       <OfertaLoteDialog
         productos={products.filter((p) => seleccionados.has(p.id))}
@@ -732,7 +609,6 @@ export default function StockPage() {
         onOpenChange={setLoteOpen}
         onAplicado={() => {
           setSeleccionados(new Set());
-          setOfertasVersion((v) => v + 1);
           load();
         }}
       />
@@ -743,13 +619,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <EtiquetasPrint productos={productosEtiqueta} />
-      <CartelOfertaPrint
-        productos={carteles.productos}
-        comercio={carteles.opciones?.comercio}
-        formato={carteles.opciones?.formato}
-        tema={carteles.opciones?.tema}
-      />
-      <FolletoOfertasPrint productos={folleto.productos} comercio={folleto.opciones?.comercio} tema={folleto.opciones?.tema} />
+      {impresion}
     </AppShell>
   );
 }

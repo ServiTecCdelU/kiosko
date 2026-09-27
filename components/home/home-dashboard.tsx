@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Users,
   CalendarClock,
+  Megaphone,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,6 +42,7 @@ const ICONS: Record<string, typeof ShoppingCart> = {
   "/caja": Wallet,
   "/clientes": Users,
   "/stock": Package,
+  "/promociones": Megaphone,
   "/reportes": BarChart3,
   "/sincronizacion": RefreshCw,
 };
@@ -50,6 +52,7 @@ const SUBTITLES: Record<string, string> = {
   "/caja": "Apertura, cierre y arqueo",
   "/clientes": "Fiado y cuenta corriente",
   "/stock": "Inventario y alertas",
+  "/promociones": "Ofertas, sorteos y premios",
   "/reportes": "Ventas, márgenes y más vendidos",
   "/sincronizacion": "Catálogo de la distribuidora",
 };
