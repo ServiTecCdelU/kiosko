@@ -15,7 +15,8 @@ import { formatCurrency } from "@/lib/utils/format";
 import { analizarOferta, plantillasOferta, precioRedondo, type PlantillaOferta } from "@/lib/oferta-analisis";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { errorVigencia, estadoVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
-import { CartelOferta, type FormatoCartel } from "@/components/stock/cartel-oferta";
+import { CartelOferta } from "@/components/stock/cartel-oferta";
+import { useTemaCartel, type OpcionesCartel } from "@/components/stock/cartel-preferencias";
 import { OfertaRentabilidad } from "@/components/stock/oferta-rentabilidad";
 import { OfertaPublicada, useNombreComercio } from "@/components/stock/oferta-publicada";
 import { OfertaVigenciaPicker } from "@/components/stock/oferta-vigencia-picker";
@@ -28,7 +29,7 @@ interface OfertaDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Debe lanzar si no se pudo guardar, para no mostrar "Oferta publicada". */
   onSubmit: (oferta: SetOfertaInput) => Promise<void>;
-  onImprimirCartel?: (producto: Product, comercio: string, formato: FormatoCartel) => void;
+  onImprimirCartel?: (producto: Product, opciones: OpcionesCartel) => void;
   /** Id de una plantilla (ej "3x2") para abrir con esa promo ya cargada (Ofertas recomendadas). */
   plantillaInicial?: string;
 }
@@ -54,6 +55,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
   const [publicada, setPublicada] = useState<Product | null>(null);
   const [working, setWorking] = useState(false);
   const [comercio] = useNombreComercio();
+  const [tema] = useTemaCartel();
 
   useEffect(() => {
     if (open && product) {
@@ -320,7 +322,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
                 <div className="hidden md:block">
                   <p className="mb-1.5 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Así queda el cartel</p>
                   <div className={cn("rounded-2xl bg-muted/60 p-3 transition-opacity", error && "opacity-40")}>
-                    <CartelOferta producto={borrador} comercio={comercio.trim()} style={{ fontSize: "6.2px" }} />
+                    <CartelOferta producto={borrador} comercio={comercio.trim()} tema={tema} style={{ fontSize: "6.2px" }} />
                   </div>
                 </div>
               )}

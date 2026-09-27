@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ChevronDown, FileText, Megaphone, MessageCircle, Pencil, Printer, TrendingDown, TrendingUp, X, Minus, Hourglass, Tv,
+  ChevronDown, FileText, ImageIcon, Megaphone, MessageCircle, Pencil, Printer, TrendingDown, TrendingUp, X, Minus, Hourglass, Tv,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,19 @@ import { etiquetaOferta, textoFolletoOfertas } from "@/lib/oferta-analisis";
 import { estadoVigencia, textoVigencia, type EstadoVigencia } from "@/lib/oferta-vigencia";
 import { veredictoOferta, type ResultadoOferta } from "@/lib/oferta-resultados";
 import { useNombreComercio } from "@/components/stock/oferta-publicada";
-import { FormatoCartelSelector, useFormatoCartel, type FormatoCartel } from "@/components/stock/cartel-oferta";
+import {
+  FormatoCartelSelector, TemaCartelSelector, useFormatoCartel, useTemaCartel, type OpcionesCartel,
+} from "@/components/stock/cartel-preferencias";
 import { getOfertas, setOferta, type OfertaConResultado } from "@/services/products-service";
+import { compartirImagenOferta } from "@/lib/utils/compartir-imagen";
 import type { Product } from "@/lib/types";
 
 interface CentroOfertasProps {
   /** Cambia cada vez que el padre guarda una oferta, para recargar. */
   version: number;
   onEditar: (p: Product) => void;
-  onImprimirCarteles: (productos: Product[], comercio: string, formato: FormatoCartel) => void;
-  onImprimirFolleto: (productos: Product[], comercio: string) => void;
+  onImprimirCarteles: (productos: Product[], opciones: OpcionesCartel) => void;
+  onImprimirFolleto: (productos: Product[], opciones: OpcionesCartel) => void;
   /** Avisa al padre que cambio el catalogo (para refrescar la tabla). */
   onCambio: () => void;
 }
@@ -68,6 +71,7 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
   const [finalizando, setFinalizando] = useState<string | null>(null);
   const [comercio] = useNombreComercio();
   const [formato, setFormato] = useFormatoCartel();
+  const [tema, setTema] = useTemaCartel();
 
   const cargar = useCallback(async () => {
     try {
@@ -99,6 +103,7 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
   const publicables = ofertas.map((o) => o.producto).filter((p) => estadoDe(p) !== "vencida");
   const vencidas = ofertas.map((o) => o.producto).filter((p) => estadoDe(p) === "vencida");
   const nombre = comercio.trim();
+  const opciones: OpcionesCartel = { comercio: nombre, formato, tema };
 
   const finalizar = async (productos: Product[]) => {
     setFinalizando(productos.length === 1 ? productos[0].id : "todas");
@@ -111,6 +116,15 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
       toast.error(e instanceof Error ? e.message : "No se pudo finalizar la oferta");
     } finally {
       setFinalizando(null);
+    }
+  };
+
+  const imagen = async (p: Product) => {
+    try {
+      const r = await compartirImagenOferta(p, { formato: "historia", tema, comercio: nombre || undefined });
+      if (r === "descargada") toast.success("Imagen descargada: subila a tu estado o historia");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar la imagen");
     }
   };
 
@@ -154,10 +168,10 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
       {abierto && (
         <>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-border/60 pt-3">
-            <Button size="sm" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirFolleto(publicables, nombre)}>
+            <Button size="sm" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirFolleto(publicables, opciones)}>
               <FileText className="mr-1.5 h-3.5 w-3.5" /> Folleto A4
             </Button>
-            <Button size="sm" variant="outline" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirCarteles(publicables, nombre, formato)}>
+            <Button size="sm" variant="outline" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirCarteles(publicables, opciones)}>
               <Printer className="mr-1.5 h-3.5 w-3.5" /> Todos los carteles ({publicables.length})
             </Button>
             <Button
@@ -178,9 +192,15 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            Tamaño de los carteles:
-            <div className="w-full max-w-72"><FormatoCartelSelector value={formato} onChange={setFormato} /></div>
+          <div className="mt-3 space-y-2 rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-16">Tema</span>
+              <TemaCartelSelector value={tema} onChange={setTema} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-16">Tamaño</span>
+              <div className="w-full max-w-72"><FormatoCartelSelector value={formato} onChange={setFormato} /></div>
+            </div>
           </div>
 
           <ul className="mt-2 divide-y divide-border/60">
@@ -204,9 +224,14 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     {estado !== "vencida" && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl" title="Imprimir cartel" onClick={() => onImprimirCarteles([p], nombre, formato)}>
-                        <Printer className="h-3.5 w-3.5" />
-                      </Button>
+                      <>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl" title="Imprimir cartel" onClick={() => onImprimirCarteles([p], opciones)}>
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl" title="Imagen para estados" onClick={() => imagen(p)}>
+                          <ImageIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
                     <Button
                       size="icon" variant="ghost" className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"

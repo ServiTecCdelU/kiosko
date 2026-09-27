@@ -25,6 +25,7 @@ import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/
 import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
 import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
+import { OfertasRapidas } from "@/components/pos/ofertas-rapidas";
 import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
 } from "@/lib/utils/tickets-espera";
@@ -644,29 +645,34 @@ function PosScreen() {
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-card p-2">
             {query.trim().length < 2 ? (
-              favoritos.length > 0 ? (
+              favoritos.length > 0 || (ofertasVigentes?.length ?? 0) > 0 ? (
                 <div>
-                  <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
-                  <ul className="flex flex-col gap-1">
-                    {favoritos.map((p) => {
-                      const sinStock = p.stockControlado && p.stock <= 0;
-                      return (
-                        <li key={p.id}>
-                          <button
-                            onClick={() => addToCart(p)}
-                            disabled={sinStock}
-                            className={cn(
-                              "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
-                              sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
-                            )}
-                          >
-                            <span className="line-clamp-1 text-sm font-medium">{p.name}</span>
-                            <span className="shrink-0 text-sm font-semibold text-primary">{formatCurrency(precioFinal(p))}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <OfertasRapidas ofertas={ofertasVigentes ?? []} onAgregar={addToCart} />
+                  {favoritos.length > 0 && (
+                    <>
+                      <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
+                      <ul className="flex flex-col gap-1">
+                        {favoritos.map((p) => {
+                          const sinStock = p.stockControlado && p.stock <= 0;
+                          return (
+                            <li key={p.id}>
+                              <button
+                                onClick={() => addToCart(p)}
+                                disabled={sinStock}
+                                className={cn(
+                                  "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
+                                  sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
+                                )}
+                              >
+                                <span className="line-clamp-1 text-sm font-medium">{p.name}</span>
+                                <span className="shrink-0 text-sm font-semibold text-primary">{formatCurrency(precioFinal(p))}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className="py-10 text-center text-sm text-muted-foreground">

@@ -25,7 +25,10 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
-import { CartelOfertaPrint, FORMATOS_CARTEL, formatoCartelGuardado, type FormatoCartel } from "@/components/stock/cartel-oferta";
+import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
+import {
+  FORMATOS_CARTEL, formatoCartelGuardado, temaCartelGuardado, type OpcionesCartel,
+} from "@/components/stock/cartel-preferencias";
 import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
 import { CentroOfertas } from "@/components/stock/centro-ofertas";
 import { OfertasRecomendadas } from "@/components/stock/ofertas-recomendadas";
@@ -70,8 +73,8 @@ export default function StockPage() {
   const [precioAbierto, setPrecioAbierto] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
-  const [carteles, setCarteles] = useState<{ productos: Product[]; comercio: string; formato?: FormatoCartel }>({ productos: [], comercio: "" });
-  const [folleto, setFolleto] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
+  const [carteles, setCarteles] = useState<{ productos: Product[]; opciones?: OpcionesCartel }>({ productos: [] });
+  const [folleto, setFolleto] = useState<{ productos: Product[]; opciones?: OpcionesCartel }>({ productos: [] });
   // Se incrementa al guardar/quitar una oferta para que el Centro de ofertas recargue
   const [ofertasVersion, setOfertasVersion] = useState(0);
   const [plantillaInicial, setPlantillaInicial] = useState<string | undefined>();
@@ -298,7 +301,13 @@ export default function StockPage() {
   };
 
   // Deja en pantalla solo lo que se va a imprimir (etiquetas, carteles o folleto)
-  const SIN_IMPRESION = { productos: [] as Product[], comercio: "" };
+  const SIN_IMPRESION = { productos: [] as Product[] };
+  // Sin opciones explicitas se usa lo ultimo elegido en este navegador
+  const opcionesCartel = (o?: Partial<OpcionesCartel>): OpcionesCartel => ({
+    comercio: o?.comercio ?? "",
+    formato: o?.formato ?? formatoCartelGuardado(),
+    tema: o?.tema ?? temaCartelGuardado(),
+  });
   const limpiarImpresiones = () => {
     setProductosEtiqueta([]);
     setCarteles(SIN_IMPRESION);
@@ -315,22 +324,23 @@ export default function StockPage() {
 
   // Un cartel de oferta A4 por producto: vigentes y programadas (el cartel del
   // finde se imprime antes). Las vencidas no.
-  const imprimirCarteles = (productos: Product[], comercio = "", formato: FormatoCartel = formatoCartelGuardado()) => {
+  const imprimirCarteles = (productos: Product[], o?: Partial<OpcionesCartel>) => {
     const conOferta = productos.filter(conCartel);
     if (conOferta.length === 0) {
       toast.info("Ninguno de los productos seleccionados tiene oferta");
       return;
     }
     limpiarImpresiones();
-    setCarteles({ productos: conOferta, comercio, formato });
-    const pagina = FORMATOS_CARTEL.find((f) => f.value === formato)?.page ?? "A4";
+    const opciones = opcionesCartel(o);
+    setCarteles({ productos: conOferta, opciones });
+    const pagina = FORMATOS_CARTEL.find((f) => f.value === opciones.formato)?.page ?? "A4";
     imprimirA4("0", () => setCarteles(SIN_IMPRESION), pagina);
   };
 
-  const imprimirFolleto = (productos: Product[], comercio: string) => {
+  const imprimirFolleto = (productos: Product[], o?: Partial<OpcionesCartel>) => {
     if (productos.length === 0) return;
     limpiarImpresiones();
-    setFolleto({ productos, comercio });
+    setFolleto({ productos, opciones: opcionesCartel(o) });
     imprimirA4("10mm", () => setFolleto(SIN_IMPRESION));
   };
 
@@ -745,7 +755,7 @@ export default function StockPage() {
         open={ofertaOpen}
         onOpenChange={setOfertaOpen}
         onSubmit={handleOferta}
-        onImprimirCartel={(p, comercio, formato) => imprimirCarteles([p], comercio, formato)}
+        onImprimirCartel={(p, opciones) => imprimirCarteles([p], opciones)}
         plantillaInicial={plantillaInicial}
       />
       <OfertaLoteDialog
@@ -765,8 +775,13 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <EtiquetasPrint productos={productosEtiqueta} />
-      <CartelOfertaPrint productos={carteles.productos} comercio={carteles.comercio} formato={carteles.formato} />
-      <FolletoOfertasPrint productos={folleto.productos} comercio={folleto.comercio} />
+      <CartelOfertaPrint
+        productos={carteles.productos}
+        comercio={carteles.opciones?.comercio}
+        formato={carteles.opciones?.formato}
+        tema={carteles.opciones?.tema}
+      />
+      <FolletoOfertasPrint productos={folleto.productos} comercio={folleto.opciones?.comercio} tema={folleto.opciones?.tema} />
     </AppShell>
   );
 }

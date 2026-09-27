@@ -1,17 +1,17 @@
-"use client";
 // components/stock/cartel-oferta.tsx — cartel de oferta (A4, A5 o A6) para pegar en la
 // gondola o la vidriera. Todo esta medido en `em`: el mismo componente se usa
 // como vista previa chica dentro del estudio de ofertas y, con otro font-size,
 // para imprimir (#cartel-print en app/globals.css).
-// Los colores son fijos a proposito: es papel, no pantalla, y no cambia con el tema.
-import { useEffect, useState, type CSSProperties } from "react";
+// Los colores salen del tema de temporada (lib/cartel-temas.ts), no del tema claro/oscuro:
+// es papel, no pantalla.
+import type { CSSProperties } from "react";
 import { pesos } from "@/lib/pricing";
 import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
 import { textoVigencia } from "@/lib/oferta-vigencia";
+import { tamanoTitulo, temaCartel, type TemaCartelId } from "@/lib/cartel-temas";
+import { FORMATOS_CARTEL, type FormatoCartel } from "@/components/stock/cartel-preferencias";
 import type { Product } from "@/lib/types";
 
-const ROJO = "#d7141a";
-const AMARILLO = "#ffd400";
 const VERDE = "#0f8a3c";
 
 /** Tamaño de letra (em) para que un texto de `largo` caracteres entre en `ancho` em. */
@@ -22,10 +22,12 @@ function ajustar(largo: number, ancho: number, max: number): string {
 interface CartelOfertaProps {
   producto: Product;
   comercio?: string;
+  tema?: TemaCartelId;
   style?: CSSProperties;
 }
 
-export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
+export function CartelOferta({ producto, comercio, tema, style }: CartelOfertaProps) {
+  const t = temaCartel(tema);
   const a = analizarOferta(producto);
   const etiqueta = etiquetaOferta(producto);
   const esCombo = producto.ofertaTipo === "combo";
@@ -37,27 +39,27 @@ export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
       style={{
         width: "40em", height: "56.5em", boxSizing: "border-box", overflow: "hidden",
         display: "flex", flexDirection: "column", background: "#fff", color: "#111",
-        border: `0.4em solid ${ROJO}`, fontFamily: "inherit",
+        border: `0.4em solid ${t.principal}`, fontFamily: "inherit",
         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
         ...style,
       }}
     >
       <div
         style={{
-          background: ROJO, color: "#fff", textAlign: "center", padding: "1.2em 0 1em",
+          background: t.principal, color: "#fff", textAlign: "center", padding: "1.2em 0 1em",
           fontSize: "1em", fontWeight: 900, fontStyle: "italic", letterSpacing: "0.02em",
         }}
       >
-        <span style={{ fontSize: "7em", lineHeight: 1 }}>¡OFERTA!</span>
+        <span style={{ fontSize: `${tamanoTitulo(t.titulo, 36, 7)}em`, lineHeight: 1, whiteSpace: "nowrap" }}>{t.titulo}</span>
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-evenly", padding: "1.5em 2em", textAlign: "center" }}>
         {etiqueta && (
           <div
             style={{
-              background: AMARILLO, color: ROJO, borderRadius: "1.2em", padding: "0.4em 1.2em",
+              background: t.badgeFondo, color: t.badgeTexto, borderRadius: "1.2em", padding: "0.4em 1.2em",
               fontWeight: 900, lineHeight: 1.05, transform: "rotate(-3deg)",
-              boxShadow: `0.35em 0.35em 0 ${ROJO}`,
+              boxShadow: `0.35em 0.35em 0 ${t.profundo}`,
               fontSize: ajustar(etiqueta.length, 30, esCombo ? 8 : 6),
             }}
           >
@@ -79,7 +81,7 @@ export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
           {esCombo ? (
             <p style={{ margin: 0, fontSize: "2.4em", fontWeight: 700 }}>Llevando {a.unidades}</p>
           ) : (
-            <p style={{ margin: 0, fontSize: "2.6em", color: "#666", textDecoration: "line-through", textDecorationColor: ROJO, textDecorationThickness: "0.1em" }}>
+            <p style={{ margin: 0, fontSize: "2.6em", color: "#666", textDecoration: "line-through", textDecorationColor: t.principal, textDecorationThickness: "0.1em" }}>
               {pesos(producto.price)}{porKg}
             </p>
           )}
@@ -101,67 +103,12 @@ export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
         )}
       </div>
 
-      <div style={{ borderTop: `0.15em dashed ${ROJO}`, padding: "0.9em 2em", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "1.4em", fontWeight: 600 }}>
+      <div style={{ borderTop: `0.15em dashed ${t.principal}`, padding: "0.9em 2em", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "1.4em", fontWeight: 600 }}>
         <span>{comercio || " "}</span>
-        <span style={{ color: producto.ofertaHasta ? ROJO : "#555", fontWeight: producto.ofertaHasta ? 800 : 600 }}>
+        <span style={{ color: producto.ofertaHasta ? t.principal : "#555", fontWeight: producto.ofertaHasta ? 800 : 600 }}>
           {textoVigencia(producto.ofertaDesde, producto.ofertaHasta)}
         </span>
       </div>
-    </div>
-  );
-}
-
-export type FormatoCartel = "a4" | "a5" | "a6";
-
-export const FORMATOS_CARTEL: { value: FormatoCartel; label: string; porHoja: number; page: string }[] = [
-  { value: "a4", label: "Hoja entera", porHoja: 1, page: "A4" },
-  { value: "a5", label: "Media hoja", porHoja: 2, page: "A4 landscape" },
-  { value: "a6", label: "Cuarto de hoja", porHoja: 4, page: "A4" },
-];
-
-const FORMATO_KEY = "kiosko:cartel-formato";
-
-/** Lectura puntual del tamaño guardado (para imprimir desde donde no hay selector). */
-export function formatoCartelGuardado(): FormatoCartel {
-  try {
-    const guardado = localStorage.getItem(FORMATO_KEY);
-    return FORMATOS_CARTEL.some((f) => f.value === guardado) ? (guardado as FormatoCartel) : "a4";
-  } catch {
-    return "a4";
-  }
-}
-
-/** Tamaño de cartel elegido la ultima vez (por navegador). */
-export function useFormatoCartel(): [FormatoCartel, (f: FormatoCartel) => void] {
-  const [formato, setFormato] = useState<FormatoCartel>("a4");
-  useEffect(() => { setFormato(formatoCartelGuardado()); }, []);
-  const guardar = (f: FormatoCartel) => {
-    setFormato(f);
-    try {
-      localStorage.setItem(FORMATO_KEY, f);
-    } catch {
-      // idem
-    }
-  };
-  return [formato, guardar];
-}
-
-export function FormatoCartelSelector({ value, onChange }: { value: FormatoCartel; onChange: (f: FormatoCartel) => void }) {
-  return (
-    <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Tamaño del cartel">
-      {FORMATOS_CARTEL.map((f) => (
-        <button
-          key={f.value}
-          role="radio"
-          aria-checked={value === f.value}
-          onClick={() => onChange(f.value)}
-          className={`rounded-lg py-1.5 text-xs font-medium transition-colors ${
-            value === f.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {f.label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -170,10 +117,11 @@ export function FormatoCartelSelector({ value, onChange }: { value: FormatoCarte
  * Carteles para imprimir en hojas A4: 1 por hoja, 2 (media hoja, hoja apaisada)
  * o 4 (cuarto de hoja). Fuera de pantalla hasta window.print().
  */
-export function CartelOfertaPrint({ productos, comercio, formato = "a4" }: {
+export function CartelOfertaPrint({ productos, comercio, formato = "a4", tema }: {
   productos: Product[];
   comercio?: string;
   formato?: FormatoCartel;
+  tema?: TemaCartelId;
 }) {
   if (productos.length === 0) return null;
   const porHoja = FORMATOS_CARTEL.find((f) => f.value === formato)?.porHoja ?? 1;
@@ -185,7 +133,7 @@ export function CartelOfertaPrint({ productos, comercio, formato = "a4" }: {
         <div key={i} className={`cartel-hoja cartel-${formato}`}>
           {hoja.map((p) => (
             <div key={p.id} className="cartel-celda">
-              <CartelOferta producto={p} comercio={comercio} />
+              <CartelOferta producto={p} comercio={comercio} tema={tema} />
             </div>
           ))}
         </div>

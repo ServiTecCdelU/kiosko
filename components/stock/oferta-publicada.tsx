@@ -1,14 +1,19 @@
 "use client";
 // components/stock/oferta-publicada.tsx — segundo paso del estudio de ofertas:
-// la oferta ya se cobra en el POS, ahora hay que contarla (cartel + WhatsApp).
+// la oferta ya se cobra en el POS, ahora hay que contarla (cartel, imagen y WhatsApp).
 import { useEffect, useState } from "react";
-import { Check, Copy, MessageCircle, Printer } from "lucide-react";
+import { Check, Copy, ImageIcon, MessageCircle, Printer, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CartelOferta, FormatoCartelSelector, useFormatoCartel, type FormatoCartel } from "@/components/stock/cartel-oferta";
+import { CartelOferta } from "@/components/stock/cartel-oferta";
+import {
+  FormatoCartelSelector, TemaCartelSelector, useFormatoCartel, useTemaCartel, type OpcionesCartel,
+} from "@/components/stock/cartel-preferencias";
 import { textoCompartirOferta } from "@/lib/oferta-analisis";
 import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
+import { compartirImagenOferta } from "@/lib/utils/compartir-imagen";
+import type { FormatoImagen } from "@/lib/imagen-oferta";
 import type { Product } from "@/lib/types";
 
 const COMERCIO_KEY = "kiosko:cartel-comercio";
@@ -36,7 +41,7 @@ export function useNombreComercio(): [string, (v: string) => void] {
 
 interface OfertaPublicadaProps {
   producto: Product;
-  onImprimirCartel?: (producto: Product, comercio: string, formato: FormatoCartel) => void;
+  onImprimirCartel?: (producto: Product, opciones: OpcionesCartel) => void;
   onListo: () => void;
 }
 
@@ -44,6 +49,8 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
   const [comercio, setComercio] = useNombreComercio();
   const [copiado, setCopiado] = useState(false);
   const [formato, setFormato] = useFormatoCartel();
+  const [tema, setTema] = useTemaCartel();
+  const [generando, setGenerando] = useState<FormatoImagen | null>(null);
   const texto = textoCompartirOferta(producto, comercio.trim() || undefined);
   const programada = estadoVigencia(producto.ofertaDesde, producto.ofertaHasta) === "programada";
 
@@ -54,6 +61,18 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
       setTimeout(() => setCopiado(false), 2000);
     } catch {
       toast.error("No se pudo copiar. Probá con el botón de WhatsApp.");
+    }
+  };
+
+  const imagen = async (formato: FormatoImagen) => {
+    setGenerando(formato);
+    try {
+      const r = await compartirImagenOferta(producto, { formato, tema, comercio: comercio.trim() || undefined });
+      if (r === "descargada") toast.success("Imagen descargada: subila a tu estado o historia");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar la imagen");
+    } finally {
+      setGenerando(null);
     }
   };
 
@@ -77,7 +96,7 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
 
       <div className="grid gap-4 md:grid-cols-[auto_1fr] md:items-start">
         <div className="mx-auto rounded-2xl bg-muted/60 p-3">
-          <CartelOferta producto={producto} comercio={comercio.trim()} style={{ fontSize: "5.6px" }} />
+          <CartelOferta producto={producto} comercio={comercio.trim()} tema={tema} style={{ fontSize: "5.6px" }} />
         </div>
 
         <div className="space-y-3">
@@ -95,12 +114,21 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
 
           {onImprimirCartel && (
             <div className="space-y-1.5">
+              <TemaCartelSelector value={tema} onChange={setTema} />
               <FormatoCartelSelector value={formato} onChange={setFormato} />
-              <Button className="h-11 w-full rounded-xl" onClick={() => onImprimirCartel(producto, comercio.trim(), formato)}>
+              <Button className="h-11 w-full rounded-xl" onClick={() => onImprimirCartel(producto, { comercio: comercio.trim(), formato, tema })}>
                 <Printer className="mr-2 h-4 w-4" /> Imprimir cartel
               </Button>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" className="h-11 rounded-xl" disabled={generando != null} onClick={() => imagen("historia")}>
+              <ImageIcon className="mr-1.5 h-4 w-4" /> {generando === "historia" ? "Generando..." : "Imagen para estados"}
+            </Button>
+            <Button variant="outline" className="h-11 rounded-xl" disabled={generando != null} onClick={() => imagen("post")}>
+              <Square className="mr-1.5 h-4 w-4" /> {generando === "post" ? "Generando..." : "Imagen cuadrada"}
+            </Button>
+          </div>
           <Button
             variant="outline"
             className="h-11 w-full rounded-xl border-[#25d366]/50 text-[#128c4a] hover:bg-[#25d366]/10 dark:text-[#25d366]"
