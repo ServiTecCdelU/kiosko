@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { analizarOferta, plantillasOferta, precioRedondo, type PlantillaOferta } from "@/lib/oferta-analisis";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
-import { errorVigencia, estadoVigencia } from "@/lib/oferta-vigencia";
+import { errorVigencia, estadoVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { CartelOferta } from "@/components/stock/cartel-oferta";
 import { OfertaRentabilidad } from "@/components/stock/oferta-rentabilidad";
 import { OfertaPublicada, useNombreComercio } from "@/components/stock/oferta-publicada";
@@ -60,8 +60,9 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
       setModo(product.ofertaTipo ?? "porcentaje");
       setValor(product.ofertaValor ? String(product.ofertaValor) : "");
       setCantidad(product.ofertaCantidad ? String(product.ofertaCantidad) : "");
-      setDesde(product.ofertaDesde ?? "");
-      setHasta(product.ofertaHasta ?? "");
+      // Las fechas de una oferta ya finalizada no se arrastran a la nueva
+      setDesde(product.ofertaActiva ? product.ofertaDesde ?? "" : "");
+      setHasta(product.ofertaActiva ? product.ofertaHasta ?? "" : "");
       setPlantilla(null);
       setPublicada(null);
     }
@@ -131,9 +132,10 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
 
   const guardar = async () => {
     if (bloqueado) return;
-    // La vigencia solo viaja si se usa (o hay que borrarla): asi nada toca
-    // oferta_desde/oferta_hasta mientras 34_oferta_vigencia.sql no este corrido.
-    const usaFechas = !!(desde || hasta || product.ofertaDesde || product.ofertaHasta);
+    // Una oferta nueva sin fecha arranca hoy: queda registrado desde cuando
+    // corre, para que el Centro de ofertas pueda medir si vende mas.
+    const inicio = desde || (activa && !product.ofertaActiva ? hoyArgentinaISO() : "");
+    const usaFechas = !!(inicio || hasta || product.ofertaDesde || product.ofertaHasta);
     setWorking(true);
     try {
       await onSubmit({
@@ -141,9 +143,9 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
         tipo: borrador.ofertaTipo,
         valor: borrador.ofertaValor,
         cantidad: modo === "combo" ? cant : undefined,
-        ...(usaFechas ? { desde: desde || null, hasta: hasta || null } : {}),
+        ...(usaFechas ? { desde: inicio || null, hasta: hasta || null } : {}),
       });
-      if (activa) setPublicada(borrador);
+      if (activa) setPublicada({ ...borrador, ofertaDesde: inicio || undefined });
       else onOpenChange(false);
     } catch {
       // el padre ya mostro el error

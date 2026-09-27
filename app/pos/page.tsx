@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
+import { ahorroLinea } from "@/lib/oferta-analisis";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
@@ -329,6 +330,7 @@ function PosScreen() {
           };
         }),
         total,
+        ahorroOfertas: cart.items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0),
         paymentMethod: data.paymentMethod,
         cashAmount: data.cashAmount,
         changeAmount: data.changeAmount,

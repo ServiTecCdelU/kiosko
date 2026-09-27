@@ -72,8 +72,16 @@ function corta(iso: string): string {
   return `${Number(d)}/${Number(m)}`;
 }
 
-/** Leyenda para el cartel y el WhatsApp. Fechas absolutas: el papel queda pegado varios dias. */
-export function textoVigencia(desde: string | null | undefined, hasta: string | null | undefined): string {
+/**
+ * Leyenda para el cartel y el WhatsApp. Fechas absolutas: el papel queda pegado
+ * varios dias. Un "desde" que ya paso no se muestra (la oferta ya corre).
+ */
+export function textoVigencia(
+  desdeOriginal: string | null | undefined,
+  hasta: string | null | undefined,
+  hoy: string = hoyArgentinaISO(),
+): string {
+  const desde = desdeOriginal && desdeOriginal > hoy ? desdeOriginal : null;
   if (desde && hasta) {
     return desde === hasta ? `Válido solo el ${corta(desde)}` : `Válido del ${corta(desde)} al ${corta(hasta)}`;
   }

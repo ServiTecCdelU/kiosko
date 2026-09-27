@@ -309,7 +309,8 @@
 /* Carteles de oferta A4 (components/stock/cartel-oferta.tsx): mismo criterio.
    El @page A4 sin margen se inyecta al imprimir — ver imprimirCarteles en
    app/stock/page.tsx. */
-#cartel-print {
+#cartel-print,
+#folleto-print {
   position: fixed;
   left: -9999px;
   top: 0;
@@ -324,13 +325,25 @@
   #etiquetas-print,
   #etiquetas-print *,
   #cartel-print,
-  #cartel-print * {
+  #cartel-print *,
+  #folleto-print,
+  #folleto-print * {
     visibility: visible;
   }
-  #cartel-print {
+  #cartel-print,
+  #folleto-print {
     position: absolute;
     left: 0;
     top: 0;
+    width: 100%;
+  }
+  #folleto-print .folleto-hoja {
+    page-break-after: always;
+    break-after: page;
+  }
+  #folleto-print .folleto-hoja:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
   /* 1em = 5mm: el cartel (40em x 56.5em) ocupa 200 x 282.5 mm de la hoja */
   #cartel-print .cartel-hoja {

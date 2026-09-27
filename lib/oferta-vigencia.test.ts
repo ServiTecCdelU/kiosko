@@ -66,12 +66,20 @@ describe("presetsVigencia", () => {
 });
 
 describe("textoVigencia", () => {
+  const hoy = "2026-10-01";
+
   test("arma el texto del cartel", () => {
-    assert.equal(textoVigencia(null, null), "Válido hasta agotar stock");
-    assert.equal(textoVigencia(null, "2026-10-05"), "Válido hasta el 5/10");
-    assert.equal(textoVigencia("2026-10-03", null), "Válido desde el 3/10");
-    assert.equal(textoVigencia("2026-10-03", "2026-10-05"), "Válido del 3/10 al 5/10");
-    assert.equal(textoVigencia("2026-10-05", "2026-10-05"), "Válido solo el 5/10");
+    assert.equal(textoVigencia(null, null, hoy), "Válido hasta agotar stock");
+    assert.equal(textoVigencia(null, "2026-10-05", hoy), "Válido hasta el 5/10");
+    assert.equal(textoVigencia("2026-10-03", null, hoy), "Válido desde el 3/10");
+    assert.equal(textoVigencia("2026-10-03", "2026-10-05", hoy), "Válido del 3/10 al 5/10");
+    assert.equal(textoVigencia("2026-10-05", "2026-10-05", hoy), "Válido solo el 5/10");
+  });
+
+  test("un desde que ya paso no se imprime", () => {
+    assert.equal(textoVigencia("2026-09-20", null, hoy), "Válido hasta agotar stock");
+    assert.equal(textoVigencia("2026-09-20", "2026-10-05", hoy), "Válido hasta el 5/10");
+    assert.equal(textoVigencia("2026-10-01", "2026-10-01", hoy), "Válido hasta el 1/10");
   });
 });
 

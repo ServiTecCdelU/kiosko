@@ -26,10 +26,12 @@ import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog"
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
+import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
+import { CentroOfertas } from "@/components/stock/centro-ofertas";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
-import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
+import { estadoVigencia, hoyArgentinaISO, textoVigencia } from "@/lib/oferta-vigencia";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
@@ -67,6 +69,9 @@ export default function StockPage() {
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
   const [carteles, setCarteles] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
+  const [folleto, setFolleto] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
+  // Se incrementa al guardar/quitar una oferta para que el Centro de ofertas recargue
+  const [ofertasVersion, setOfertasVersion] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -177,6 +182,7 @@ export default function StockPage() {
     try {
       await setOferta(ofertaProduct.id, oferta);
       toast.success(oferta.activa ? "Oferta aplicada" : "Oferta quitada");
+      setOfertasVersion((v) => v + 1);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar la oferta");
@@ -286,10 +292,18 @@ export default function StockPage() {
     }, 150);
   };
 
+  // Deja en pantalla solo lo que se va a imprimir (etiquetas, carteles o folleto)
+  const SIN_IMPRESION = { productos: [] as Product[], comercio: "" };
+  const limpiarImpresiones = () => {
+    setProductosEtiqueta([]);
+    setCarteles(SIN_IMPRESION);
+    setFolleto(SIN_IMPRESION);
+  };
+
   // Imprime la etiqueta de un solo producto (atajo) o de toda la seleccion actual.
   const imprimirEtiquetas = (productos: Product[]) => {
     if (productos.length === 0) return;
-    setCarteles({ productos: [], comercio: "" });
+    limpiarImpresiones();
     setProductosEtiqueta(productos);
     imprimirA4("10mm", () => setProductosEtiqueta([]));
   };
@@ -302,9 +316,16 @@ export default function StockPage() {
       toast.info("Ninguno de los productos seleccionados tiene oferta");
       return;
     }
-    setProductosEtiqueta([]);
+    limpiarImpresiones();
     setCarteles({ productos: conOferta, comercio });
-    imprimirA4("0", () => setCarteles({ productos: [], comercio: "" }));
+    imprimirA4("0", () => setCarteles(SIN_IMPRESION));
+  };
+
+  const imprimirFolleto = (productos: Product[], comercio: string) => {
+    if (productos.length === 0) return;
+    limpiarImpresiones();
+    setFolleto({ productos, comercio });
+    imprimirA4("10mm", () => setFolleto(SIN_IMPRESION));
   };
 
   const seleccionConOferta = products.filter((p) => seleccionados.has(p.id) && conCartel(p)).length;
@@ -350,7 +371,16 @@ export default function StockPage() {
                       className="h-7 shrink-0 rounded-xl px-2 text-xs"
                       onClick={async () => {
                         try {
-                          await setOferta(p.id, { activa: true, tipo: "porcentaje", valor: sugerido });
+                          // Arranca hoy y se apaga sola el dia que vence el producto
+                          // (si ya vencio, al menos corre hoy).
+                          const hoy = hoyArgentinaISO();
+                          const vence = p.fechaVencimiento?.toISOString().slice(0, 10);
+                          await setOferta(p.id, {
+                            activa: true, tipo: "porcentaje", valor: sugerido,
+                            desde: hoy,
+                            hasta: vence && vence > hoy ? vence : hoy,
+                          });
+                          setOfertasVersion((v) => v + 1);
                           toast.success(`Oferta del ${sugerido}% aplicada a ${p.name}`);
                           loadVencimientos();
                         } catch {
@@ -383,6 +413,14 @@ export default function StockPage() {
           </span>
         </div>
       )}
+
+      <CentroOfertas
+        version={ofertasVersion}
+        onEditar={openOferta}
+        onImprimirCarteles={imprimirCarteles}
+        onImprimirFolleto={imprimirFolleto}
+        onCambio={load}
+      />
 
       {cambiosPrecio.length > 0 && (
         <div className="card-premium mb-4 rounded-2xl p-5">
@@ -706,6 +744,7 @@ export default function StockPage() {
       />
       <EtiquetasPrint productos={productosEtiqueta} />
       <CartelOfertaPrint productos={carteles.productos} comercio={carteles.comercio} />
+      <FolletoOfertasPrint productos={folleto.productos} comercio={folleto.comercio} />
     </AppShell>
   );
 }

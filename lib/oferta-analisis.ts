@@ -1,7 +1,7 @@
 // lib/oferta-analisis.ts — "cuanto gano y cuanto pierdo" con una oferta.
 // Puro (sin React ni Supabase): lo usa el estudio de ofertas y se testea con node:test.
 import type { OfertaTipo } from "@/lib/types";
-import { type ConOferta, tieneOferta, precioFinal, comboLabel, pesos } from "./pricing.ts";
+import { type ConOferta, tieneOferta, precioFinal, precioLinea, comboLabel, pesos } from "./pricing.ts";
 import { textoVigencia } from "./oferta-vigencia.ts";
 
 export interface ConCosto extends ConOferta {
@@ -78,6 +78,11 @@ export function analizarOferta(producto: ConCosto): AnalisisOferta {
   };
 }
 
+/** Lo que el cliente se ahorra en una linea del carrito (solo ofertas vigentes hoy). */
+export function ahorroLinea(p: ConOferta, cantidad: number): number {
+  return round2(Math.max(0, p.price * cantidad - precioLinea(p, cantidad)));
+}
+
 /** Texto corto de la oferta para badges, etiquetas y carteles: "-20%", "-$200", "3x2"... */
 export function etiquetaOferta(producto: ConOferta): string | null {
   const p = sinFechas(producto);
@@ -150,5 +155,25 @@ export function textoCompartirOferta(p: ConNombre, comercio?: string): string {
   if (a.ahorroTotal > 0) lineas.push(`💰 Ahorrás ${pesos(a.ahorroTotal)}`);
   if (comercio) lineas.push(`📍 ${comercio}`);
   lineas.push(`⏰ ${textoVigencia(p.ofertaDesde, p.ofertaHasta)}`);
+  return lineas.join("\n");
+}
+
+/** Un solo mensaje con todas las ofertas: el "folleto" para el estado de WhatsApp. */
+export function textoFolletoOfertas(productos: ConNombre[], comercio?: string): string {
+  const lineas = ["🔥 *OFERTAS DE LA SEMANA* 🔥"];
+  if (comercio) lineas.push(`📍 ${comercio}`);
+  lineas.push("");
+  for (const p of productos) {
+    const a = analizarOferta(p);
+    const etiqueta = etiquetaOferta(p);
+    if (!etiqueta) continue;
+    const porKg = p.unidad === "kg" ? "/kg" : "";
+    const precio = p.ofertaTipo === "combo"
+      ? `${a.unidades} por ${pesos(a.totalPromo)}`
+      : `${pesos(a.totalPromo)}${porKg} (antes ${pesos(p.price)})`;
+    const hasta = p.ofertaHasta ? ` · ${textoVigencia(p.ofertaDesde, p.ofertaHasta).replace("Válido ", "")}` : "";
+    lineas.push(`• *${p.name}* — ${etiqueta} ➜ ${precio}${hasta}`);
+  }
+  lineas.push("", "¡Te esperamos! 🛒");
   return lineas.join("\n");
 }

@@ -3,6 +3,7 @@ import { apiUrl } from "@/lib/utils/api-url"
 import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { OfertaTipo, Product } from "@/lib/types";
+import type { ResultadoOferta } from "@/lib/oferta-resultados";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -241,6 +242,21 @@ export async function getReposicionPredictiva(dias = 14): Promise<ReposicionItem
     "/api/consultas/productos", "reposicion", { dias },
   );
   return productos.map(mapReposicion);
+}
+
+export interface OfertaConResultado {
+  producto: Product;
+  /** Solo para ofertas que ya arrancaron y tienen fecha de inicio conocida. */
+  resultado?: ResultadoOferta;
+}
+
+/** Todas las ofertas cargadas (vigentes, programadas y vencidas) con su efecto en las ventas. */
+export async function getOfertas(): Promise<OfertaConResultado[]> {
+  const { productos, resultados } = await consultar<{
+    productos: Record<string, any>[];
+    resultados: Record<string, ResultadoOferta>;
+  }>("/api/consultas/productos", "ofertas");
+  return productos.map((d) => ({ producto: mapRow(d), resultado: resultados[d.id] }));
 }
 
 export interface SetOfertaInput {

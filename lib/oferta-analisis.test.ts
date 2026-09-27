@@ -3,6 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   analizarOferta, etiquetaOferta, precioRedondo, plantillasOferta, textoCompartirOferta,
+  ahorroLinea, textoFolletoOfertas,
 } from "./oferta-analisis.ts";
 
 const base = { price: 1000, precioBase: 600 };
@@ -123,5 +124,30 @@ describe("textoCompartirOferta", () => {
     const t = textoCompartirOferta({ name: "Gaseosa", price: 1000, ofertaActiva: true, ofertaTipo: "combo", ofertaValor: 2000, ofertaCantidad: 3 });
     assert.match(t, /3x2/);
     assert.match(t, /Llevando 3 pagás \$2\.000/);
+  });
+});
+
+describe("ahorroLinea", () => {
+  test("combo 3x2 llevando 4: ahorra una unidad", () => {
+    const p = { price: 1000, ofertaActiva: true, ofertaTipo: "combo" as const, ofertaValor: 2000, ofertaCantidad: 3 };
+    assert.equal(ahorroLinea(p, 4), 1000);
+  });
+
+  test("sin oferta no hay ahorro", () => {
+    assert.equal(ahorroLinea({ price: 1000 }, 3), 0);
+  });
+});
+
+describe("textoFolletoOfertas", () => {
+  test("lista cada oferta en una linea", () => {
+    const t = textoFolletoOfertas([
+      { name: "Yerba", price: 1000, ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 20 },
+      { name: "Gaseosa", price: 1000, ofertaActiva: true, ofertaTipo: "combo", ofertaValor: 2000, ofertaCantidad: 3 },
+      { name: "Sin oferta", price: 500 },
+    ], "Despensa Rosa");
+    assert.match(t, /Despensa Rosa/);
+    assert.match(t, /\*Yerba\* — -20% ➜ \$800 \(antes \$1\.000\)/);
+    assert.match(t, /\*Gaseosa\* — 3x2 ➜ 3 por \$2\.000/);
+    assert.doesNotMatch(t, /Sin oferta/);
   });
 });

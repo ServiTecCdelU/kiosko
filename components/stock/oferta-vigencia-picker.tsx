@@ -48,10 +48,14 @@ export function OfertaVigenciaPicker({ desde, hasta, onChange }: OfertaVigenciaP
           <Input type="date" value={hasta} min={desde || undefined} onChange={(e) => onChange(desde, e.target.value)} className="rounded-xl" />
         </div>
       </div>
-      {estado !== "sin-fecha" && (
+      {(estado === "programada" || estado === "vencida" || hasta) && (
         <p className={cn("mt-1.5 text-xs", estado === "vencida" ? "text-destructive" : "text-muted-foreground")}>
-          {estado === "programada" && <>Programada: hasta que arranque se cobra el precio normal. </>}
-          {estado === "vencida" ? "Esas fechas ya pasaron." : `${textoVigencia(desde || null, hasta || null)}. Después se apaga sola.`}
+          {estado === "vencida" ? "Esas fechas ya pasaron." : (
+            <>
+              {estado === "programada" && <>Programada: hasta que arranque se cobra el precio normal. </>}
+              {textoVigencia(desde || null, hasta || null)}.{hasta && " Después se apaga sola."}
+            </>
+          )}
         </p>
       )}
     </div>

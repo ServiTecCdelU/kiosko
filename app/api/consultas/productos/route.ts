@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { ofertasConResultados } from "@/lib/server/ofertas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -318,6 +319,14 @@ export async function POST(req: Request) {
         .slice(0, limit);
 
       return NextResponse.json({ aumentos });
+    }
+
+    case "ofertas": {
+      try {
+        return NextResponse.json(await ofertasConResultados(comercioId));
+      } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Error al leer las ofertas" }, { status: 400 });
+      }
     }
 
     default:

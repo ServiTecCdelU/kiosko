@@ -7,6 +7,8 @@ export interface TicketData {
   createdAt: Date;
   items: { name: string; quantity: number; price: number; subtotal: number; unidad: "un" | "kg" }[];
   total: number;
+  /** Suma de lo que el cliente se ahorro con ofertas de catalogo. */
+  ahorroOfertas?: number;
   paymentMethod: PaymentMethod;
   cashAmount: number;
   changeAmount: number;
@@ -64,6 +66,13 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
       )}
       {ticket.pagadorNombre && <p>Pagó: {ticket.pagadorNombre}</p>}
       {ticket.userName && <p>Atendió: {ticket.userName}</p>}
+      {!!ticket.ahorroOfertas && ticket.ahorroOfertas >= 1 && (
+        <>
+          <div className="my-1 border-t border-dashed border-black" />
+          <p className="text-center text-sm font-bold">*** USTED AHORRÓ {formatCurrency(ticket.ahorroOfertas)} ***</p>
+          <p className="text-center">con nuestras ofertas</p>
+        </>
+      )}
       <div className="my-1 border-t border-dashed border-black" />
       <p className="text-center">¡Gracias por su compra!</p>
     </div>

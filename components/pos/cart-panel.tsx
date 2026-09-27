@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
+import { ahorroLinea } from "@/lib/oferta-analisis";
 import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
@@ -105,6 +106,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
       ? Math.min(totalBruto, Math.round(totalBruto * (Math.min(descuentoValorNum, 100) / 100) * 100) / 100)
       : Math.min(totalBruto, descuentoValorNum);
   const total = Math.max(0, Math.round((totalBruto - descuentoMonto) * 100) / 100);
+  const ahorroOfertas = items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0);
 
   const pagaConNum = Number(pagaCon) || 0;
   const vuelto = method === "efectivo" ? Math.max(0, pagaConNum - total) : 0;
@@ -303,6 +305,13 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
               value={descuentoValor} onChange={(e) => setDescuentoValor(e.target.value)}
               className="rounded-xl"
             />
+          </div>
+        )}
+
+        {ahorroOfertas >= 1 && (
+          <div className="mb-2 flex items-center justify-between rounded-xl bg-money/10 px-3 py-1.5 text-sm">
+            <span className="font-medium text-money">🎉 El cliente ahorra con ofertas</span>
+            <span className="cifra font-bold text-money">{formatCurrency(ahorroOfertas)}</span>
           </div>
         )}
 
