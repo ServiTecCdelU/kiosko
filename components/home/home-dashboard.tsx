@@ -28,6 +28,14 @@ import type { Caja, UserRol } from "@/lib/types";
 // dueño lo abre para "ver rápido cómo va el día", no lo deja fijo en pantalla).
 const REFRESH_MS = 60_000;
 
+// La cifra grande tiene que entrar en la tarjeta aunque el total de ventas sea de
+// muchos digitos: cuanto mas largo el texto, mas chica la letra.
+function tamanoCifra(texto: string): string {
+  if (texto.length <= 9) return "text-4xl sm:text-[2.75rem]";
+  if (texto.length <= 12) return "text-3xl sm:text-4xl";
+  return "text-2xl sm:text-3xl";
+}
+
 const ICONS: Record<string, typeof ShoppingCart> = {
   "/pos": ShoppingCart,
   "/caja": Wallet,
@@ -272,6 +280,8 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
     };
   }, [showStock]);
 
+  const textoVentasHoy = formatCurrency(ventasHoy);
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -285,7 +295,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* Ventas de hoy — protagonista */}
-      <div className="card-premium relative overflow-hidden rounded-2xl p-5">
+      <div className="card-premium relative min-w-0 overflow-hidden rounded-2xl p-5">
         <div
           aria-hidden
           className="grad-money pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full opacity-[0.18] blur-2xl"
@@ -293,7 +303,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
         <div className="eyebrow flex items-center gap-1.5">
           <TrendingUp className="h-4 w-4 text-money" /> Ventas de hoy
         </div>
-        <p className="cifra-hero text-money mt-2 text-4xl sm:text-[2.75rem]">{formatCurrency(ventasHoy)}</p>
+        <p className={`cifra-hero mt-2 whitespace-nowrap text-money ${tamanoCifra(textoVentasHoy)}`}>{textoVentasHoy}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {cantHoy} {cantHoy === 1 ? "venta" : "ventas"}
         </p>

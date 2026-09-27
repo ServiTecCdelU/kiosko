@@ -1,7 +1,7 @@
 // public/sw.js — service worker minimo, servido tal cual (sin build step ni next.config.mjs).
 // Objetivo: que la app (shell + assets ya visitados) siga cargando sin internet.
 // Las ventas offline NO pasan por acá: se manejan en IndexedDB desde la app (lib/offline).
-const CACHE_NAME = "kiosko-shell-v3";
+const CACHE_NAME = "kiosko-shell-v4";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -18,6 +18,8 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  // En desarrollo los archivos cambian con el mismo nombre: cachearlos muestra codigo viejo.
+  if (self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1") return;
   if (request.method !== "GET") return; // ventas/ajustes van directo a la red o a la cola offline
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // no cachear Supabase ni terceros
