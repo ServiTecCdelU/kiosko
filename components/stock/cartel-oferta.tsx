@@ -57,9 +57,11 @@ export function CartelOferta({ producto, comercio, tema, style }: CartelOfertaPr
         {etiqueta && (
           <div
             style={{
-              background: t.badgeFondo, color: t.badgeTexto, borderRadius: "1.2em", padding: "0.4em 1.2em",
+              // Relleno, radio y sombra en em de la PROPIA letra del badge (que es enorme):
+              // valores chicos, o el badge crece hasta tapar el nombre
+              background: t.badgeFondo, color: t.badgeTexto, borderRadius: "0.18em", padding: "0.06em 0.28em",
               fontWeight: 900, lineHeight: 1.05, transform: "rotate(-3deg)",
-              boxShadow: `0.35em 0.35em 0 ${t.profundo}`,
+              boxShadow: `0.05em 0.05em 0 ${t.profundo}`,
               fontSize: ajustar(etiqueta.length, 30, esCombo ? 8 : 6),
             }}
           >

@@ -26,6 +26,7 @@ import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
 import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
 import { OfertasRapidas } from "@/components/pos/ofertas-rapidas";
+import { useNombreComercio } from "@/components/stock/oferta-publicada";
 import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
 } from "@/lib/utils/tickets-espera";
@@ -56,6 +57,7 @@ function PosScreen() {
   const cart = useCart();
   const anunciarVenta = usePantallaCliente(cart.items);
   const ofertasVigentes = useOfertasVigentes();
+  const [nombreComercio] = useNombreComercio();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
@@ -327,6 +329,7 @@ function PosScreen() {
       const ahorroOfertas = cart.items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0);
       anunciarVenta(total, ahorroOfertas);
       const ticket: TicketData = {
+        comercio: nombreComercio.trim() || undefined,
         saleNumber,
         createdAt: new Date(),
         items: cart.items.map((i) => {
@@ -361,7 +364,7 @@ function PosScreen() {
       focusInput();
       imprimirTicket(ticket);
     },
-    [cart, focusInput, imprimirTicket, anunciarVenta, ofertasVigentes],
+    [cart, focusInput, imprimirTicket, anunciarVenta, ofertasVigentes, nombreComercio],
   );
 
   const handleAprobadoQR = useCallback(

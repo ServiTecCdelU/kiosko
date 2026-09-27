@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
+import { precioLinea, comboLabel } from "@/lib/pricing";
 import { ahorroLinea, empujeCombo } from "@/lib/oferta-analisis";
 import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
@@ -275,12 +275,13 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                     })()}
                   </div>
                   <div className="text-right">
-                    {tieneOferta(i.product) && (
+                    {/* Tachado solo si hay ahorro real: un combo incompleto se cobra a lista */}
+                    {ahorroLinea(i.product, i.quantity) > 0 && (
                       <span className="mr-1.5 text-xs text-muted-foreground line-through">
                         {formatCurrency(i.product.price * i.quantity)}
                       </span>
                     )}
-                    <span className={cn("cifra text-sm font-semibold", tieneOferta(i.product) && "text-money")}>
+                    <span className={cn("cifra text-sm font-semibold", ahorroLinea(i.product, i.quantity) > 0 && "text-money")}>
                       {formatCurrency(precioLinea(i.product, i.quantity))}
                     </span>
                   </div>

@@ -92,7 +92,7 @@ export function OfertaRentabilidad({ analisis: a, costo, stock, stockControlado 
           {stock > 0 ? (
             <>
               Tenés <b className="cifra">{stock}</b> en stock: la oferta convierte hasta{" "}
-              <b className="cifra">{formatCurrency(stock * a.precioUnitario)}</b> en caja.
+              <b className="cifra">{formatCurrency(Math.round(stock * a.precioUnitario))}</b> en caja.
             </>
           ) : (
             <span className="text-destructive">Sin stock: reponé antes de publicar la oferta.</span>

@@ -3,6 +3,8 @@ import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import type { PaymentMethod } from "@/lib/types";
 
 export interface TicketData {
+  /** Nombre del negocio (el de los carteles, por navegador). */
+  comercio?: string;
   saleNumber: string;
   createdAt: Date;
   items: { name: string; quantity: number; price: number; subtotal: number; unidad: "un" | "kg" }[];
@@ -32,12 +34,15 @@ const METODO_LABEL: Record<PaymentMethod, string> = {
   credito: "Crédito",
 };
 
+// Lo que decia fijo el ticket antes de que cada comercio cargara su nombre
+const NOMBRE_POR_DEFECTO = "Supermercado Patricia";
+
 export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
   if (!ticket) return null;
 
   return (
     <div id="ticket-print" className="bg-white p-2 font-mono text-[11px] leading-tight text-black">
-      <p className="text-center text-sm font-bold">Supermercado Patricia</p>
+      <p className="text-center text-sm font-bold">{ticket.comercio || NOMBRE_POR_DEFECTO}</p>
       <p className="text-center">Ticket no fiscal</p>
       <p className="text-center">{formatDateTime(ticket.createdAt)}</p>
       <p className="text-center">#{ticket.saleNumber}</p>
