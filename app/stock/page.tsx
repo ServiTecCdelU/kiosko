@@ -31,14 +31,13 @@ import {
 } from "@/components/stock/cartel-preferencias";
 import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
 import { CentroOfertas } from "@/components/stock/centro-ofertas";
-import { OfertasRecomendadas } from "@/components/stock/ofertas-recomendadas";
+import { Recomendaciones } from "@/components/stock/recomendaciones";
 import { RankingOfertas } from "@/components/stock/ranking-ofertas";
 import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
 import { estadoVigencia, hoyArgentinaISO, textoVigencia } from "@/lib/oferta-vigencia";
-import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -180,6 +179,23 @@ export default function StockPage() {
     setEditOpen(true);
   };
 
+  // Arranca hoy y se apaga sola el dia que vence el producto (si ya vencio, al menos corre hoy).
+  const aplicarOfertaVencimiento = async (p: Product, descuento: number) => {
+    try {
+      const hoy = hoyArgentinaISO();
+      const vence = p.fechaVencimiento?.toISOString().slice(0, 10);
+      await setOferta(p.id, {
+        activa: true, tipo: "porcentaje", valor: descuento,
+        desde: hoy, hasta: vence && vence > hoy ? vence : hoy,
+      });
+      setOfertasVersion((v) => v + 1);
+      toast.success(`Oferta del ${descuento}% aplicada a ${p.name}`);
+      loadVencimientos();
+    } catch {
+      toast.error("No se pudo aplicar la oferta");
+    }
+  };
+
   const openOferta = (p: Product, plantilla?: string) => {
     setPlantillaInicial(plantilla);
     setOfertaProduct(p);
@@ -237,11 +253,6 @@ export default function StockPage() {
       { key: "revisar" as QuickFilter, label: "A revisar", value: stats?.revisar ?? "—", icon: ClipboardList, color: "text-warning" },
     ],
     [stats],
-  );
-
-  const reposicionUrgente = useMemo(
-    () => reposicion.filter((r): r is ReposicionItem & { diasRestantes: number } => r.diasRestantes != null && r.diasRestantes <= 5),
-    [reposicion],
   );
 
   const idsPagina = products.map((p) => p.id);
@@ -366,72 +377,13 @@ export default function StockPage() {
         ))}
       </div>
 
-      {vencimientos.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>
-              {vencimientos.length} producto{vencimientos.length > 1 ? "s" : ""} vencen en los próximos 7 días
-            </span>
-          </div>
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {vencimientos.slice(0, 5).map((p) => {
-              const dias = p.fechaVencimiento ? diasHastaVencimiento(p.fechaVencimiento) : null;
-              const sugerido = dias != null ? sugerirDescuentoVencimiento(dias) : null;
-              return (
-                <li key={p.id} className="flex items-center justify-between gap-2 text-foreground">
-                  <span className="truncate">{p.name}</span>
-                  {sugerido != null && !tieneOferta(p) ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 shrink-0 rounded-xl px-2 text-xs"
-                      onClick={async () => {
-                        try {
-                          // Arranca hoy y se apaga sola el dia que vence el producto
-                          // (si ya vencio, al menos corre hoy).
-                          const hoy = hoyArgentinaISO();
-                          const vence = p.fechaVencimiento?.toISOString().slice(0, 10);
-                          await setOferta(p.id, {
-                            activa: true, tipo: "porcentaje", valor: sugerido,
-                            desde: hoy,
-                            hasta: vence && vence > hoy ? vence : hoy,
-                          });
-                          setOfertasVersion((v) => v + 1);
-                          toast.success(`Oferta del ${sugerido}% aplicada a ${p.name}`);
-                          loadVencimientos();
-                        } catch {
-                          toast.error("No se pudo aplicar la oferta");
-                        }
-                      }}
-                    >
-                      Aplicar {sugerido}% off
-                    </Button>
-                  ) : tieneOferta(p) ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">ya tiene oferta</span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {vencimientos.length > 5 && (
-            <p className="mt-1 text-xs text-muted-foreground">y {vencimientos.length - 5} más</p>
-          )}
-        </div>
-      )}
-
-      {reposicionUrgente.length > 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-warning">
-          <PackagePlus className="h-4 w-4 shrink-0" />
-          <span>
-            {reposicionUrgente.length} producto{reposicionUrgente.length > 1 ? "s" : ""} se agotan pronto según el ritmo de venta:{" "}
-            {reposicionUrgente.slice(0, 3).map((r) => `${r.nombre} (${r.diasRestantes}d)`).join(", ")}
-            {reposicionUrgente.length > 3 && ` y ${reposicionUrgente.length - 3} más`}
-          </span>
-        </div>
-      )}
-
-      <OfertasRecomendadas version={ofertasVersion} onCrear={(p, plantilla) => openOferta(p, plantilla)} />
+      <Recomendaciones
+        vencimientos={vencimientos}
+        reposicion={reposicion}
+        version={ofertasVersion}
+        onCrear={(p, plantilla) => openOferta(p, plantilla)}
+        onAplicarVencimiento={aplicarOfertaVencimiento}
+      />
 
       <CentroOfertas
         version={ofertasVersion}
