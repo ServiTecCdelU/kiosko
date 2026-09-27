@@ -3,56 +3,22 @@
 // app/superadmin/page.tsx — panel de superadmin: ver y administrar todos los
 // comercios del SaaS. Item 5.2 del plan maestro.
 // No usa AppShell/hooks/use-auth.ts a proposito: ese es el estado de UN
-// comercio; esta pantalla no pertenece a ninguno.
+// comercio; esta pantalla no pertenece a ninguno. La excepcion es "Entrar":
+// ahi se carga el usuario de soporte en use-auth para abrir el panel del comercio.
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, LogOut, Loader2, Chrome, Plus, Package, Receipt, Users, CircleDollarSign, Check } from "lucide-react";
+import { Building2, LogOut, Loader2, Chrome, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils/format";
 import { useSuperadmin } from "@/hooks/use-superadmin";
+import { setCurrentUser } from "@/hooks/use-auth";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { apiUrl } from "@/lib/utils/api-url";
-
-// Solo para el badge visual: mismo criterio que lib/aviso-pago.ts pero sin
-// cruzar el import server->client (esa lib vive en lib/server para las
-// rutas API, ahi la logica si importa para la seguridad del aviso).
-function anioMesArgentinaCliente(fecha: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit",
-  }).format(new Date(fecha));
-}
-
-interface ComercioUso {
-  productos: number;
-  ventas: number;
-  usuarios: number;
-}
-
-interface Comercio {
-  id: string;
-  nombre: string;
-  slug: string;
-  estado: "activo" | "prueba" | "suspendido" | "baja";
-  plan: "free" | "basico" | "pro";
-  trial_hasta: string | null;
-  suscripcion_hasta: string | null;
-  created_at: string;
-  uso: ComercioUso;
-}
-
-const ESTADO_COLOR: Record<Comercio["estado"], string> = {
-  activo: "border-success/50 text-success",
-  prueba: "border-warning text-warning",
-  suspendido: "border-destructive/50 text-destructive",
-  baja: "border-muted-foreground text-muted-foreground",
-};
+import { ComercioFila } from "@/components/superadmin/comercio-fila";
+import { ComercioDialog } from "@/components/superadmin/comercio-dialog";
+import { NuevoComercioDialog } from "@/components/superadmin/nuevo-comercio-dialog";
+import { superadminApi, type Comercio } from "@/components/superadmin/comun";
 
 export default function SuperadminPage() {
   const { user, ready, logout } = useSuperadmin();
@@ -106,21 +72,18 @@ export default function SuperadminPage() {
 }
 
 function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
+  const router = useRouter();
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [loading, setLoading] = useState(true);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [administrando, setAdministrando] = useState<string | null>(null);
+  const [entrando, setEntrando] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "listar" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error);
-      setComercios(data.comercios ?? []);
+      const { comercios } = await superadminApi<{ comercios: Comercio[] }>({ accion: "listar" });
+      setComercios(comercios ?? []);
     } catch {
       toast.error("No se pudieron cargar los comercios");
     } finally {
@@ -132,37 +95,26 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
     load();
   }, [load]);
 
-  const cambiarCampo = async (id: string, cambios: Record<string, unknown>) => {
+  // Modo soporte: la cookie pasa a ser la de ese comercio (como admin) y la app
+  // se abre en su panel. Desde el aviso de arriba se vuelve al superadmin.
+  const entrar = async (c: Comercio) => {
+    setEntrando(c.id);
     try {
-      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...cambios }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error);
-      toast.success("Comercio actualizado");
-      await load();
+      await superadminApi({ accion: "entrar", id: c.id });
+      const res = await fetch(apiUrl("/api/auth/session"));
+      const user = await res.json();
+      if (!res.ok) throw new Error(user?.error ?? "No se pudo abrir el panel");
+      setCurrentUser(user);
+      router.push("/");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo actualizar");
+      toast.error(e instanceof Error ? e.message : "No se pudo entrar al comercio");
+      setEntrando(null);
     }
   };
 
-  const marcarPago = async (id: string) => {
-    try {
-      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "marcarPago", id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error);
-      toast.success("Pago del mes registrado");
-      await load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo registrar el pago");
-    }
-  };
+  const q = busqueda.trim().toLowerCase();
+  const visibles = q ? comercios.filter((c) => `${c.nombre} ${c.slug}`.toLowerCase().includes(q)) : comercios;
+  const seleccionado = comercios.find((c) => c.id === administrando) ?? null;
 
   return (
     <main className="bg-mesh min-h-screen bg-muted/20">
@@ -171,18 +123,23 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
           <Building2 className="h-5 w-5 text-primary" /> Superadmin
         </h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">{nombre}</span>
+          <span className="hidden text-sm text-muted-foreground sm:inline">{nombre}</span>
           <Button variant="ghost" size="sm" onClick={onLogout}>
             <LogOut className="mr-1.5 h-4 w-4" /> Salir
           </Button>
         </div>
       </div>
 
-      <div className="p-4 sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {comercios.length} comercio{comercios.length === 1 ? "" : "s"}
-          </p>
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative min-w-0 flex-1 basis-60">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+              placeholder={`Buscar entre ${comercios.length} comercio${comercios.length === 1 ? "" : "s"}`}
+              className="rounded-2xl pl-9"
+            />
+          </div>
           <Button className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Nuevo comercio
           </Button>
@@ -190,183 +147,29 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
 
         {loading ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Cargando…</p>
-        ) : comercios.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Sin comercios todavía</p>
+        ) : visibles.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            {comercios.length === 0 ? "Sin comercios todavía" : "Ningún comercio coincide con la búsqueda"}
+          </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {comercios.map((c) => (
-              <ComercioCard key={c.id} comercio={c} onCambiar={cambiarCampo} onMarcarPago={marcarPago} />
+          <ul className="card-premium divide-y divide-border/60 overflow-hidden rounded-2xl">
+            {visibles.map((c) => (
+              <ComercioFila
+                key={c.id} comercio={c} entrando={entrando === c.id}
+                onEntrar={entrar} onAdministrar={(x) => setAdministrando(x.id)}
+              />
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
+      <ComercioDialog
+        comercio={seleccionado}
+        onOpenChange={(o) => !o && setAdministrando(null)}
+        onCambio={load}
+        onEntrar={entrar}
+      />
       <NuevoComercioDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={load} />
     </main>
-  );
-}
-
-function ComercioCard({
-  comercio, onCambiar, onMarcarPago,
-}: {
-  comercio: Comercio;
-  onCambiar: (id: string, cambios: Record<string, unknown>) => Promise<void>;
-  onMarcarPago: (id: string) => Promise<void>;
-}) {
-  const anioMesActual = anioMesArgentinaCliente(new Date().toISOString());
-  const pagoAlDia = !!comercio.suscripcion_hasta && anioMesArgentinaCliente(comercio.suscripcion_hasta) === anioMesActual;
-
-  return (
-    <div className="card-premium rounded-2xl p-5">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold">{comercio.nombre}</p>
-          <p className="text-xs text-muted-foreground">{comercio.slug} · desde {formatDate(comercio.created_at)}</p>
-        </div>
-        <Badge variant="outline" className={cn(ESTADO_COLOR[comercio.estado])}>{comercio.estado}</Badge>
-      </div>
-
-      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-xl bg-muted/50 py-2">
-          <Package className="mx-auto mb-1 h-3.5 w-3.5 text-muted-foreground" />
-          <p className="cifra text-sm font-bold">{comercio.uso.productos}</p>
-          <p className="text-[10px] text-muted-foreground">productos</p>
-        </div>
-        <div className="rounded-xl bg-muted/50 py-2">
-          <Receipt className="mx-auto mb-1 h-3.5 w-3.5 text-muted-foreground" />
-          <p className="cifra text-sm font-bold">{comercio.uso.ventas}</p>
-          <p className="text-[10px] text-muted-foreground">ventas</p>
-        </div>
-        <div className="rounded-xl bg-muted/50 py-2">
-          <Users className="mx-auto mb-1 h-3.5 w-3.5 text-muted-foreground" />
-          <p className="cifra text-sm font-bold">{comercio.uso.usuarios}</p>
-          <p className="text-[10px] text-muted-foreground">empleados</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="mb-1 block text-[10px] uppercase text-muted-foreground">Estado</Label>
-          <select
-            value={comercio.estado}
-            onChange={(e) => onCambiar(comercio.id, { estado: e.target.value })}
-            className="border-input h-8 w-full rounded-lg border bg-transparent px-2 text-xs outline-none"
-          >
-            <option value="prueba">Prueba</option>
-            <option value="activo">Activo</option>
-            <option value="suspendido">Suspendido</option>
-            <option value="baja">Baja</option>
-          </select>
-        </div>
-        <div>
-          <Label className="mb-1 block text-[10px] uppercase text-muted-foreground">Plan</Label>
-          <select
-            value={comercio.plan}
-            onChange={(e) => onCambiar(comercio.id, { plan: e.target.value })}
-            className="border-input h-8 w-full rounded-lg border bg-transparent px-2 text-xs outline-none"
-          >
-            <option value="free">Free</option>
-            <option value="basico">Básico</option>
-            <option value="pro">Pro</option>
-          </select>
-        </div>
-      </div>
-
-      {comercio.trial_hasta && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Prueba hasta {formatDate(comercio.trial_hasta)}
-        </p>
-      )}
-
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-        <Badge
-          variant="outline"
-          className={cn(pagoAlDia ? "border-success/50 text-success" : "border-warning text-warning")}
-        >
-          {pagoAlDia ? <Check className="mr-1 h-3 w-3" /> : <CircleDollarSign className="mr-1 h-3 w-3" />}
-          {pagoAlDia ? "Pago al día" : "Pago pendiente este mes"}
-        </Badge>
-        {!pagoAlDia && (
-          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => onMarcarPago(comercio.id)}>
-            Marcar pago del mes
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function NuevoComercioDialog({
-  open, onOpenChange, onCreated,
-}: {
-  open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => Promise<void>;
-}) {
-  const [nombre, setNombre] = useState("");
-  const [slug, setSlug] = useState("");
-  const [trialDias, setTrialDias] = useState("14");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setNombre("");
-      setSlug("");
-      setTrialDias("14");
-    }
-  }, [open]);
-
-  const handleCrear = async () => {
-    if (!nombre.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch(apiUrl("/api/superadmin/comercios"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accion: "crear", nombre: nombre.trim(), slug: slug.trim(), trialDias: Number(trialDias) || 14,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error);
-      toast.success(`Comercio "${nombre}" creado`);
-      onOpenChange(false);
-      await onCreated();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo crear el comercio");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Nuevo comercio</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label className="mb-1 block text-xs">Nombre</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} className="rounded-xl" autoFocus />
-          </div>
-          <div>
-            <Label className="mb-1 block text-xs">Slug (opcional, se genera solo)</Label>
-            <Input value={slug} onChange={(e) => setSlug(e.target.value)} className="rounded-xl" placeholder="mi-comercio" />
-          </div>
-          <div>
-            <Label className="mb-1 block text-xs">Días de prueba</Label>
-            <Input
-              type="number" inputMode="numeric" value={trialDias}
-              onChange={(e) => setTrialDias(e.target.value)} className="rounded-xl"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button className="rounded-xl" disabled={saving || !nombre.trim()} onClick={handleCrear}>
-            {saving ? "Creando..." : "Crear"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

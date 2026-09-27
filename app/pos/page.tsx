@@ -26,6 +26,7 @@ import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
 import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
 import { OfertasRapidas } from "@/components/pos/ofertas-rapidas";
+import { AvisoSoporte } from "@/components/layout/aviso-soporte";
 import { useNombreComercio } from "@/components/stock/oferta-publicada";
 import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
@@ -527,6 +528,7 @@ function PosScreen() {
 
   return (
     <main className="bg-mesh flex h-screen flex-col bg-muted/30">
+      <AvisoSoporte />
       <header className="glass flex items-center gap-3 border-b border-border/60 px-4 py-3">
         <Link
           href="/"

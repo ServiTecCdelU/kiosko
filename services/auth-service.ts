@@ -1,10 +1,10 @@
 import { apiUrl } from "@/lib/utils/api-url"
-// services/auth-service.ts — login por PIN (client helper)
+// services/auth-service.ts — login por PIN y acceso a la demo (client helpers)
 import { setCurrentUser, DEFAULT_COMERCIO_ID } from "@/hooks/use-auth";
 import type { Usuario } from "@/lib/types";
 
-export async function login(pin: string): Promise<Usuario> {
-  const res = await fetch(apiUrl("/api/auth/login"), {
+async function entrarConPin(ruta: string, pin: string): Promise<Usuario> {
+  const res = await fetch(apiUrl(ruta), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pin }),
@@ -21,4 +21,14 @@ export async function login(pin: string): Promise<Usuario> {
   };
   setCurrentUser(user);
   return user;
+}
+
+/** PIN de un empleado (cajero/encargado) de cualquier comercio. */
+export function login(pin: string): Promise<Usuario> {
+  return entrarConPin("/api/auth/login", pin);
+}
+
+/** PIN de la demo: solo entra al comercio demo. */
+export function loginDemo(pin: string): Promise<Usuario> {
+  return entrarConPin("/api/auth/demo", pin);
 }

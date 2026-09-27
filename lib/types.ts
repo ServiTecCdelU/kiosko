@@ -192,5 +192,8 @@ export interface Usuario {
   email?: string;
   /** Dato de contacto, nunca se usa para iniciar sesion. */
   telefono?: string;
+  /** Superadmin viendo el panel de este comercio (modo soporte). */
+  soporte?: boolean;
+  comercioNombre?: string;
   createdAt: Date;
 }

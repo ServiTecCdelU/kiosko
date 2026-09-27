@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { esSuperadmin } from "@/lib/server/sesion";
+import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { hoyArgentina } from "@/lib/server/fecha-argentina";
 import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
 
@@ -14,6 +14,19 @@ export const dynamic = "force-dynamic";
 
 const ESTADOS = ["activo", "prueba", "suspendido", "baja"];
 const PLANES = ["free", "basico", "pro"];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Admins (acceso con Google) activos de un comercio. */
+async function contarAccesos(comercioId: string): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from("usuarios")
+    .select("id", { count: "exact", head: true })
+    .eq("comercio_id", comercioId)
+    .eq("rol", "admin")
+    .eq("activo", true)
+    .not("email", "is", null);
+  return count ?? 0;
+}
 
 async function contar(tabla: string, comercioId: string): Promise<number> {
   const { count } = await supabaseAdmin
@@ -51,6 +64,7 @@ export async function POST(req: Request) {
           productos: await contar("productos", c.id),
           ventas: await contar("ventas", c.id),
           usuarios: await contar("usuarios", c.id),
+          accesos: await contarAccesos(c.id),
         },
       })),
     );
@@ -110,7 +124,119 @@ export async function POST(req: Request) {
     return NextResponse.json({ comercio: data });
   }
 
+  if (accion === "entrar") return entrarAComercio(req, String(body?.id ?? ""));
+  if (accion === "salir") return volverAlPanel(req);
+  if (accion === "accesos") return listarAccesos(String(body?.id ?? ""));
+  if (accion === "agregarAcceso") {
+    return agregarAcceso(String(body?.id ?? ""), String(body?.nombre ?? "").trim(), String(body?.email ?? "").trim().toLowerCase());
+  }
+  if (accion === "quitarAcceso") return quitarAcceso(String(body?.id ?? ""), String(body?.usuarioId ?? ""));
+
   return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
+}
+
+/**
+ * Modo soporte: el superadmin entra al panel de un comercio como admin. La
+ * cookie sigue marcada superadmin (puede volver al panel) y soporte=true
+ * (app/api/auth/session la reconoce sin fila en `usuarios`).
+ */
+async function entrarAComercio(req: Request, id: string) {
+  if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+  const { data: comercio, error } = await supabaseAdmin.from("comercios").select("id").eq("id", id).maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (!comercio) return NextResponse.json({ error: "Comercio no encontrado" }, { status: 404 });
+
+  const sesion = getSesion(req)!;
+  const res = NextResponse.json({ ok: true });
+  res.headers.append("Set-Cookie", crearCookieSesion({
+    usuarioId: sesion.usuarioId, comercioId: comercio.id, rol: "admin",
+    superadmin: true, soporte: true, nombre: sesion.nombre,
+  }));
+  return res;
+}
+
+function volverAlPanel(req: Request) {
+  const sesion = getSesion(req)!;
+  const res = NextResponse.json({ ok: true });
+  res.headers.append("Set-Cookie", crearCookieSesion({
+    usuarioId: sesion.usuarioId, comercioId: "__superadmin__", rol: "superadmin",
+    superadmin: true, nombre: sesion.nombre,
+  }));
+  return res;
+}
+
+async function listarAccesos(id: string) {
+  if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+  const { data, error } = await supabaseAdmin
+    .from("usuarios")
+    .select("id, nombre, email, activo")
+    .eq("comercio_id", id)
+    .eq("rol", "admin")
+    .not("email", "is", null)
+    .order("nombre", { ascending: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ accesos: data ?? [] });
+}
+
+/** Da acceso con Google (usuario admin con ese correo) a un comercio. */
+async function agregarAcceso(id: string, nombre: string, email: string) {
+  if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+  if (!EMAIL_REGEX.test(email)) return NextResponse.json({ error: "Correo invalido" }, { status: 400 });
+
+  // El login con Google busca UN admin activo por correo: el mismo correo en
+  // dos comercios haria fallar el ingreso.
+  const { data: existentes, error } = await supabaseAdmin
+    .from("usuarios")
+    .select("id, nombre, comercio_id, activo")
+    .eq("rol", "admin")
+    .ilike("email", email);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  const enOtro = (existentes ?? []).find((u) => u.comercio_id !== id && u.activo);
+  if (enOtro) {
+    const { data: otro } = await supabaseAdmin.from("comercios").select("nombre").eq("id", enOtro.comercio_id).maybeSingle();
+    return NextResponse.json({ error: `Ese correo ya tiene acceso a "${otro?.nombre ?? enOtro.comercio_id}"` }, { status: 400 });
+  }
+
+  const propio = (existentes ?? []).find((u) => u.comercio_id === id);
+  if (propio?.activo) return NextResponse.json({ error: "Ese correo ya tiene acceso a este comercio" }, { status: 400 });
+  if (propio) {
+    // Estaba dado de baja: se reactiva en vez de duplicarlo
+    const { error: errAct } = await supabaseAdmin.rpc("actualizar_empleado_kiosko", {
+      p_id: propio.id, p_nombre: nombre || propio.nombre, p_rol: "admin", p_activo: true,
+    });
+    if (errAct) return NextResponse.json({ error: errAct.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  const { error: errCrear } = await supabaseAdmin.rpc("crear_empleado_kiosko", {
+    p_comercio_id: id,
+    p_nombre: nombre || email.split("@")[0],
+    p_rol: "admin",
+    p_email: email,
+  });
+  if (errCrear) return NextResponse.json({ error: errCrear.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}
+
+async function quitarAcceso(id: string, usuarioId: string) {
+  if (!id || !usuarioId) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+  const { data: u, error } = await supabaseAdmin
+    .from("usuarios")
+    .select("id, nombre")
+    .eq("id", usuarioId)
+    .eq("comercio_id", id)
+    .eq("rol", "admin")
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (!u) return NextResponse.json({ error: "Acceso no encontrado" }, { status: 404 });
+
+  // Se desactiva (no se borra): queda el historial de quien opero
+  const { error: errAct } = await supabaseAdmin.rpc("actualizar_empleado_kiosko", {
+    p_id: u.id, p_nombre: u.nombre, p_rol: "admin", p_activo: false,
+  });
+  if (errAct) return NextResponse.json({ error: errAct.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(req: Request) {

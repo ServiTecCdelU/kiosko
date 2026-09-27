@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { errorPinReservado } from "@/lib/server/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,8 @@ export async function POST(req: Request) {
   } else if (!PIN_REGEX.test(pin)) {
     return NextResponse.json({ error: "El PIN debe tener 4 digitos" }, { status: 400 });
   }
+  const reservado = rol === "admin" ? null : await errorPinReservado(comercioId, pin);
+  if (reservado) return NextResponse.json({ error: reservado }, { status: 400 });
 
   const { data, error } = await supabaseAdmin.rpc("crear_empleado_kiosko", {
     p_comercio_id: comercioId,
@@ -88,6 +91,21 @@ export async function PATCH(req: Request) {
   if (pin !== null && !PIN_REGEX.test(pin)) {
     return NextResponse.json({ error: "El PIN debe tener 4 digitos" }, { status: 400 });
   }
+
+  // actualizar_empleado_kiosko no filtra por comercio: sin esto, desde un
+  // comercio se podria editar (PIN, rol) a un empleado de otro.
+  const comercioId = comercioIdDeSesion(req);
+  const { data: propio, error: errPropio } = await supabaseAdmin
+    .from("usuarios")
+    .select("id")
+    .eq("id", usuarioId)
+    .eq("comercio_id", comercioId)
+    .maybeSingle();
+  if (errPropio) return NextResponse.json({ error: errPropio.message }, { status: 400 });
+  if (!propio) return NextResponse.json({ error: "Empleado no encontrado" }, { status: 404 });
+
+  const reservado = await errorPinReservado(comercioId, pin);
+  if (reservado) return NextResponse.json({ error: reservado }, { status: 400 });
 
   const { error } = await supabaseAdmin.rpc("actualizar_empleado_kiosko", {
     p_id: usuarioId,

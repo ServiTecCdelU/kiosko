@@ -27,6 +27,9 @@ export interface Sesion {
    * validacion de abajo. Ver app/api/superadmin/*. */
   superadmin?: boolean;
   nombre?: string;
+  /** Superadmin adentro del panel de un comercio (boton "Entrar" del
+   * superadmin): comercioId es el de ese comercio y rol "admin". */
+  soporte?: boolean;
 }
 
 function firmar(payload: string): string {
@@ -34,7 +37,7 @@ function firmar(payload: string): string {
 }
 
 export function crearCookieSesion(datos: {
-  usuarioId: string; comercioId: string; rol: string; superadmin?: boolean; nombre?: string;
+  usuarioId: string; comercioId: string; rol: string; superadmin?: boolean; nombre?: string; soporte?: boolean;
 }): string {
   const sesion: Sesion = { ...datos, exp: Date.now() + DURACION_MS };
   const payload = Buffer.from(JSON.stringify(sesion)).toString("base64url");

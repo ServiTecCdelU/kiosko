@@ -14,6 +14,24 @@ export async function GET(req: Request) {
   const sesion = getSesion(req);
   if (!sesion) return NextResponse.json({ error: "Sin sesion" }, { status: 401 });
 
+  // Superadmin adentro de un comercio: no es una fila de `usuarios`. Se
+  // re-verifica que siga siendo superadmin y que el comercio exista.
+  if (sesion.soporte && sesion.superadmin) {
+    const [{ data: sa }, { data: comercio }] = await Promise.all([
+      supabaseAdmin.from("superadmins").select("email").ilike("email", sesion.usuarioId).maybeSingle(),
+      supabaseAdmin.from("comercios").select("id, nombre").eq("id", sesion.comercioId).maybeSingle(),
+    ]);
+    if (!sa || !comercio) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+    return NextResponse.json({
+      id: `soporte:${sesion.usuarioId}`,
+      nombre: `Soporte · ${sesion.nombre ?? sesion.usuarioId}`,
+      rol: "admin",
+      comercioId: comercio.id,
+      soporte: true,
+      comercioNombre: comercio.nombre,
+    });
+  }
+
   const { data: usuario, error } = await supabaseAdmin
     .from("usuarios")
     .select("id, nombre, rol, comercio_id, activo")
