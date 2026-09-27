@@ -9,6 +9,8 @@ export interface TicketData {
   total: number;
   /** Suma de lo que el cliente se ahorro con ofertas de catalogo. */
   ahorroOfertas?: number;
+  /** Lineas de publicidad al pie ("Yerba 1kg 3x2 $2.000"). */
+  ofertasDestacadas?: string[];
   paymentMethod: PaymentMethod;
   cashAmount: number;
   changeAmount: number;
@@ -71,6 +73,13 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
           <div className="my-1 border-t border-dashed border-black" />
           <p className="text-center text-sm font-bold">*** USTED AHORRÓ {formatCurrency(ticket.ahorroOfertas)} ***</p>
           <p className="text-center">con nuestras ofertas</p>
+        </>
+      )}
+      {!!ticket.ofertasDestacadas?.length && (
+        <>
+          <div className="my-1 border-t border-dashed border-black" />
+          <p className="text-center font-bold">HOY EN OFERTA</p>
+          {ticket.ofertasDestacadas.map((o, i) => <p key={i} className="line-clamp-2">★ {o}</p>)}
         </>
       )}
       <div className="my-1 border-t border-dashed border-black" />

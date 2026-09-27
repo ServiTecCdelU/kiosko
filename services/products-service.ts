@@ -251,12 +251,15 @@ export interface OfertaConResultado {
   resultado?: ResultadoOferta;
 }
 
-/** Todas las ofertas cargadas (vigentes, programadas y vencidas) con su efecto en las ventas. */
-export async function getOfertas(): Promise<OfertaConResultado[]> {
+/**
+ * Todas las ofertas cargadas (vigentes, programadas y vencidas) con su efecto en
+ * las ventas. `conResultados: false` es mucho mas liviano (no lee ventas).
+ */
+export async function getOfertas(conResultados = true): Promise<OfertaConResultado[]> {
   const { productos, resultados } = await consultar<{
     productos: Record<string, any>[];
     resultados: Record<string, ResultadoOferta>;
-  }>("/api/consultas/productos", "ofertas");
+  }>("/api/consultas/productos", "ofertas", { resultados: conResultados });
   return productos.map((d) => ({ producto: mapRow(d), resultado: resultados[d.id] }));
 }
 

@@ -83,6 +83,36 @@ export function ahorroLinea(p: ConOferta, cantidad: number): number {
   return round2(Math.max(0, p.price * cantidad - precioLinea(p, cantidad)));
 }
 
+export interface EmpujeCombo {
+  /** Unidades que faltan para completar el proximo combo. */
+  faltan: number;
+  /** Cuanto mas paga el cliente si las suma (0 = le salen gratis). */
+  costoExtra: number;
+  /** Cuanto se ahorra en esas unidades contra el precio de lista. */
+  ahorroExtra: number;
+  gratis: boolean;
+}
+
+/** Unidades que conviene sumar para completar el combo ("¡llevá 1 más gratis!"). */
+const FALTAN_MAX = 2;
+
+/**
+ * Para el cajero: si el cliente se queda a medio combo, cuanto le falta y cuanto
+ * le cuesta completarlo. null si no hay combo, ya esta completo o falta mucho.
+ */
+export function empujeCombo(p: ConOferta, cantidad: number): EmpujeCombo | null {
+  if (!tieneOferta(p) || p.ofertaTipo !== "combo") return null;
+  const n = Number(p.ofertaCantidad);
+  const resto = cantidad % n;
+  if (resto === 0 || !Number.isInteger(cantidad)) return null;
+  const faltan = n - resto;
+  if (faltan > FALTAN_MAX) return null;
+  const costoExtra = round2(precioLinea(p, cantidad + faltan) - precioLinea(p, cantidad));
+  const ahorroExtra = round2(faltan * p.price - costoExtra);
+  if (ahorroExtra <= 0) return null;
+  return { faltan, costoExtra, ahorroExtra, gratis: costoExtra < 0.01 };
+}
+
 /** Texto corto de la oferta para badges, etiquetas y carteles: "-20%", "-$200", "3x2"... */
 export function etiquetaOferta(producto: ConOferta): string | null {
   const p = sinFechas(producto);

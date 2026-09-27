@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
-import { ahorroLinea } from "@/lib/oferta-analisis";
+import { ahorroLinea, empujeCombo } from "@/lib/oferta-analisis";
 import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
@@ -59,6 +59,25 @@ interface CartPanelProps {
   processing: boolean;
   /** Los metodos de Mercado Pago necesitan conexion: se deshabilitan sin ella. */
   isOnline?: boolean;
+}
+
+/** "¡Llevá 1 más gratis!": el cliente quedo a medio combo; un toque suma lo que falta. */
+function EmpujeComboAviso({ item, onSumar }: { item: CartItem; onSumar: (faltan: number) => void }) {
+  const e = empujeCombo(item.product, item.quantity);
+  if (!e) return null;
+  return (
+    <button
+      onClick={() => onSumar(e.faltan)}
+      className="mt-1.5 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-300"
+    >
+      <span>
+        🎁 {e.gratis
+          ? `¡Ofrecele ${e.faltan} más GRATIS!`
+          : `Ofrecele ${e.faltan} más por ${formatCurrency(e.costoExtra)} (ahorra ${formatCurrency(e.ahorroExtra)})`}
+      </span>
+      <span className="shrink-0 rounded-md bg-amber-500/20 px-1.5 py-0.5">+{e.faltan}</span>
+    </button>
+  );
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
@@ -266,6 +285,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                     </span>
                   </div>
                 </div>
+                <EmpujeComboAviso item={i} onSumar={(faltan) => onSetQuantity(i.product.id, i.quantity + faltan)} />
               </li>
             ))}
           </ul>

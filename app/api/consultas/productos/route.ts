@@ -323,7 +323,7 @@ export async function POST(req: Request) {
 
     case "ofertas": {
       try {
-        return NextResponse.json(await ofertasConResultados(comercioId));
+        return NextResponse.json(await ofertasConResultados(comercioId, body?.resultados !== false));
       } catch (e) {
         return NextResponse.json({ error: e instanceof Error ? e.message : "Error al leer las ofertas" }, { status: 400 });
       }

@@ -15,7 +15,7 @@ import { formatCurrency } from "@/lib/utils/format";
 import { analizarOferta, plantillasOferta, precioRedondo, type PlantillaOferta } from "@/lib/oferta-analisis";
 import { sugerirDescuentoVencimiento, diasHastaVencimiento } from "@/lib/oferta-vencimiento";
 import { errorVigencia, estadoVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
-import { CartelOferta } from "@/components/stock/cartel-oferta";
+import { CartelOferta, type FormatoCartel } from "@/components/stock/cartel-oferta";
 import { OfertaRentabilidad } from "@/components/stock/oferta-rentabilidad";
 import { OfertaPublicada, useNombreComercio } from "@/components/stock/oferta-publicada";
 import { OfertaVigenciaPicker } from "@/components/stock/oferta-vigencia-picker";
@@ -28,7 +28,7 @@ interface OfertaDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Debe lanzar si no se pudo guardar, para no mostrar "Oferta publicada". */
   onSubmit: (oferta: SetOfertaInput) => Promise<void>;
-  onImprimirCartel?: (producto: Product, comercio: string) => void;
+  onImprimirCartel?: (producto: Product, comercio: string, formato: FormatoCartel) => void;
   /** Id de una plantilla (ej "3x2") para abrir con esa promo ya cargada (Ofertas recomendadas). */
   plantillaInicial?: string;
 }

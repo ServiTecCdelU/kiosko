@@ -25,7 +25,7 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
-import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
+import { CartelOfertaPrint, FORMATOS_CARTEL, formatoCartelGuardado, type FormatoCartel } from "@/components/stock/cartel-oferta";
 import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
 import { CentroOfertas } from "@/components/stock/centro-ofertas";
 import { OfertasRecomendadas } from "@/components/stock/ofertas-recomendadas";
@@ -70,7 +70,7 @@ export default function StockPage() {
   const [precioAbierto, setPrecioAbierto] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosEtiqueta, setProductosEtiqueta] = useState<Product[]>([]);
-  const [carteles, setCarteles] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
+  const [carteles, setCarteles] = useState<{ productos: Product[]; comercio: string; formato?: FormatoCartel }>({ productos: [], comercio: "" });
   const [folleto, setFolleto] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
   // Se incrementa al guardar/quitar una oferta para que el Centro de ofertas recargue
   const [ofertasVersion, setOfertasVersion] = useState(0);
@@ -286,10 +286,10 @@ export default function StockPage() {
   // El @page se inyecta solo para este print job: no se define en globals.css
   // porque pisaria el @page de 80mm del ticket termico. Despues se limpia el
   // estado para que el proximo print no arrastre lo anterior.
-  const imprimirA4 = (margen: string, limpiar: () => void) => {
+  const imprimirA4 = (margen: string, limpiar: () => void, pagina = "A4") => {
     setTimeout(() => {
       const style = document.createElement("style");
-      style.textContent = `@page { size: A4; margin: ${margen}; }`;
+      style.textContent = `@page { size: ${pagina}; margin: ${margen}; }`;
       document.head.appendChild(style);
       window.print();
       document.head.removeChild(style);
@@ -315,15 +315,16 @@ export default function StockPage() {
 
   // Un cartel de oferta A4 por producto: vigentes y programadas (el cartel del
   // finde se imprime antes). Las vencidas no.
-  const imprimirCarteles = (productos: Product[], comercio = "") => {
+  const imprimirCarteles = (productos: Product[], comercio = "", formato: FormatoCartel = formatoCartelGuardado()) => {
     const conOferta = productos.filter(conCartel);
     if (conOferta.length === 0) {
       toast.info("Ninguno de los productos seleccionados tiene oferta");
       return;
     }
     limpiarImpresiones();
-    setCarteles({ productos: conOferta, comercio });
-    imprimirA4("0", () => setCarteles(SIN_IMPRESION));
+    setCarteles({ productos: conOferta, comercio, formato });
+    const pagina = FORMATOS_CARTEL.find((f) => f.value === formato)?.page ?? "A4";
+    imprimirA4("0", () => setCarteles(SIN_IMPRESION), pagina);
   };
 
   const imprimirFolleto = (productos: Product[], comercio: string) => {
@@ -744,7 +745,7 @@ export default function StockPage() {
         open={ofertaOpen}
         onOpenChange={setOfertaOpen}
         onSubmit={handleOferta}
-        onImprimirCartel={(p, comercio) => imprimirCarteles([p], comercio)}
+        onImprimirCartel={(p, comercio, formato) => imprimirCarteles([p], comercio, formato)}
         plantillaInicial={plantillaInicial}
       />
       <OfertaLoteDialog
@@ -764,7 +765,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <EtiquetasPrint productos={productosEtiqueta} />
-      <CartelOfertaPrint productos={carteles.productos} comercio={carteles.comercio} />
+      <CartelOfertaPrint productos={carteles.productos} comercio={carteles.comercio} formato={carteles.formato} />
       <FolletoOfertasPrint productos={folleto.productos} comercio={folleto.comercio} />
     </AppShell>
   );

@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   analizarOferta, etiquetaOferta, precioRedondo, plantillasOferta, textoCompartirOferta,
-  ahorroLinea, textoFolletoOfertas,
+  ahorroLinea, textoFolletoOfertas, empujeCombo,
 } from "./oferta-analisis.ts";
 
 const base = { price: 1000, precioBase: 600 };
@@ -149,5 +149,30 @@ describe("textoFolletoOfertas", () => {
     assert.match(t, /\*Yerba\* — -20% ➜ \$800 \(antes \$1\.000\)/);
     assert.match(t, /\*Gaseosa\* — 3x2 ➜ 3 por \$2\.000/);
     assert.doesNotMatch(t, /Sin oferta/);
+  });
+});
+
+describe("empujeCombo", () => {
+  const combo = (n: number, v: number) => ({ price: 1000, ofertaActiva: true, ofertaTipo: "combo" as const, ofertaCantidad: n, ofertaValor: v });
+
+  test("con 2 de un 3x2 la tercera sale gratis", () => {
+    assert.deepEqual(empujeCombo(combo(3, 2000), 2), { faltan: 1, costoExtra: 0, ahorroExtra: 1000, gratis: true });
+  });
+
+  test("con 1 de un 2da al 50% la segunda cuesta la mitad", () => {
+    assert.deepEqual(empujeCombo(combo(2, 1500), 1), { faltan: 1, costoExtra: 500, ahorroExtra: 500, gratis: false });
+  });
+
+  test("con el combo completo no hay nada que sugerir", () => {
+    assert.equal(empujeCombo(combo(3, 2000), 3), null);
+    assert.equal(empujeCombo(combo(3, 2000), 6), null);
+  });
+
+  test("si faltan mas de 2 unidades no insiste", () => {
+    assert.equal(empujeCombo(combo(4, 3000), 1), null);
+  });
+
+  test("sin combo no aplica", () => {
+    assert.equal(empujeCombo({ price: 1000, ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 10 }, 1), null);
   });
 });

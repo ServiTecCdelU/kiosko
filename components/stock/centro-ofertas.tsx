@@ -15,6 +15,7 @@ import { etiquetaOferta, textoFolletoOfertas } from "@/lib/oferta-analisis";
 import { estadoVigencia, textoVigencia, type EstadoVigencia } from "@/lib/oferta-vigencia";
 import { veredictoOferta, type ResultadoOferta } from "@/lib/oferta-resultados";
 import { useNombreComercio } from "@/components/stock/oferta-publicada";
+import { FormatoCartelSelector, useFormatoCartel, type FormatoCartel } from "@/components/stock/cartel-oferta";
 import { getOfertas, setOferta, type OfertaConResultado } from "@/services/products-service";
 import type { Product } from "@/lib/types";
 
@@ -22,7 +23,7 @@ interface CentroOfertasProps {
   /** Cambia cada vez que el padre guarda una oferta, para recargar. */
   version: number;
   onEditar: (p: Product) => void;
-  onImprimirCarteles: (productos: Product[], comercio: string) => void;
+  onImprimirCarteles: (productos: Product[], comercio: string, formato: FormatoCartel) => void;
   onImprimirFolleto: (productos: Product[], comercio: string) => void;
   /** Avisa al padre que cambio el catalogo (para refrescar la tabla). */
   onCambio: () => void;
@@ -66,6 +67,7 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
   const [abierto, setAbierto] = useState(false);
   const [finalizando, setFinalizando] = useState<string | null>(null);
   const [comercio] = useNombreComercio();
+  const [formato, setFormato] = useFormatoCartel();
 
   const cargar = useCallback(async () => {
     try {
@@ -155,7 +157,7 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
             <Button size="sm" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirFolleto(publicables, nombre)}>
               <FileText className="mr-1.5 h-3.5 w-3.5" /> Folleto A4
             </Button>
-            <Button size="sm" variant="outline" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirCarteles(publicables, nombre)}>
+            <Button size="sm" variant="outline" className="rounded-xl" disabled={publicables.length === 0} onClick={() => onImprimirCarteles(publicables, nombre, formato)}>
               <Printer className="mr-1.5 h-3.5 w-3.5" /> Todos los carteles ({publicables.length})
             </Button>
             <Button
@@ -174,6 +176,11 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
                 <X className="mr-1 h-3.5 w-3.5" /> Limpiar vencidas ({vencidas.length})
               </Button>
             )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            Tamaño de los carteles:
+            <div className="w-full max-w-72"><FormatoCartelSelector value={formato} onChange={setFormato} /></div>
           </div>
 
           <ul className="mt-2 divide-y divide-border/60">
@@ -197,7 +204,7 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     {estado !== "vencida" && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl" title="Imprimir cartel" onClick={() => onImprimirCarteles([p], nombre)}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl" title="Imprimir cartel" onClick={() => onImprimirCarteles([p], nombre, formato)}>
                         <Printer className="h-3.5 w-3.5" />
                       </Button>
                     )}

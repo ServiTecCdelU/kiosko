@@ -1,9 +1,10 @@
-// components/stock/cartel-oferta.tsx — cartel de oferta A4 para pegar en la
+"use client";
+// components/stock/cartel-oferta.tsx — cartel de oferta (A4, A5 o A6) para pegar en la
 // gondola o la vidriera. Todo esta medido en `em`: el mismo componente se usa
 // como vista previa chica dentro del estudio de ofertas y, con otro font-size,
-// para imprimir a hoja completa (#cartel-print en app/globals.css).
+// para imprimir (#cartel-print en app/globals.css).
 // Los colores son fijos a proposito: es papel, no pantalla, y no cambia con el tema.
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { pesos } from "@/lib/pricing";
 import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
 import { textoVigencia } from "@/lib/oferta-vigencia";
@@ -110,14 +111,83 @@ export function CartelOferta({ producto, comercio, style }: CartelOfertaProps) {
   );
 }
 
-/** Carteles para imprimir, uno por hoja A4. Fuera de pantalla hasta window.print(). */
-export function CartelOfertaPrint({ productos, comercio }: { productos: Product[]; comercio?: string }) {
+export type FormatoCartel = "a4" | "a5" | "a6";
+
+export const FORMATOS_CARTEL: { value: FormatoCartel; label: string; porHoja: number; page: string }[] = [
+  { value: "a4", label: "Hoja entera", porHoja: 1, page: "A4" },
+  { value: "a5", label: "Media hoja", porHoja: 2, page: "A4 landscape" },
+  { value: "a6", label: "Cuarto de hoja", porHoja: 4, page: "A4" },
+];
+
+const FORMATO_KEY = "kiosko:cartel-formato";
+
+/** Lectura puntual del tamaño guardado (para imprimir desde donde no hay selector). */
+export function formatoCartelGuardado(): FormatoCartel {
+  try {
+    const guardado = localStorage.getItem(FORMATO_KEY);
+    return FORMATOS_CARTEL.some((f) => f.value === guardado) ? (guardado as FormatoCartel) : "a4";
+  } catch {
+    return "a4";
+  }
+}
+
+/** Tamaño de cartel elegido la ultima vez (por navegador). */
+export function useFormatoCartel(): [FormatoCartel, (f: FormatoCartel) => void] {
+  const [formato, setFormato] = useState<FormatoCartel>("a4");
+  useEffect(() => { setFormato(formatoCartelGuardado()); }, []);
+  const guardar = (f: FormatoCartel) => {
+    setFormato(f);
+    try {
+      localStorage.setItem(FORMATO_KEY, f);
+    } catch {
+      // idem
+    }
+  };
+  return [formato, guardar];
+}
+
+export function FormatoCartelSelector({ value, onChange }: { value: FormatoCartel; onChange: (f: FormatoCartel) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Tamaño del cartel">
+      {FORMATOS_CARTEL.map((f) => (
+        <button
+          key={f.value}
+          role="radio"
+          aria-checked={value === f.value}
+          onClick={() => onChange(f.value)}
+          className={`rounded-lg py-1.5 text-xs font-medium transition-colors ${
+            value === f.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Carteles para imprimir en hojas A4: 1 por hoja, 2 (media hoja, hoja apaisada)
+ * o 4 (cuarto de hoja). Fuera de pantalla hasta window.print().
+ */
+export function CartelOfertaPrint({ productos, comercio, formato = "a4" }: {
+  productos: Product[];
+  comercio?: string;
+  formato?: FormatoCartel;
+}) {
   if (productos.length === 0) return null;
+  const porHoja = FORMATOS_CARTEL.find((f) => f.value === formato)?.porHoja ?? 1;
+  const hojas: Product[][] = [];
+  for (let i = 0; i < productos.length; i += porHoja) hojas.push(productos.slice(i, i + porHoja));
   return (
     <div id="cartel-print">
-      {productos.map((p) => (
-        <div key={p.id} className="cartel-hoja">
-          <CartelOferta producto={p} comercio={comercio} />
+      {hojas.map((hoja, i) => (
+        <div key={i} className={`cartel-hoja cartel-${formato}`}>
+          {hoja.map((p) => (
+            <div key={p.id} className="cartel-celda">
+              <CartelOferta producto={p} comercio={comercio} />
+            </div>
+          ))}
         </div>
       ))}
     </div>

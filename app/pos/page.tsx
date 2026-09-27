@@ -4,12 +4,14 @@ import { apiUrl } from "@/lib/utils/api-url"
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera, MonitorSmartphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { precioFinal, precioLinea, tieneOferta, comboLabel } from "@/lib/pricing";
-import { ahorroLinea } from "@/lib/oferta-analisis";
+import { precioFinal, precioLinea, tieneOferta, comboLabel, pesos } from "@/lib/pricing";
+import { ahorroLinea, analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
+import { usePantallaCliente } from "@/hooks/use-pantalla-cliente";
+import { useOfertasVigentes } from "@/hooks/use-ofertas-vigentes";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
@@ -38,6 +40,9 @@ import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
 import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
 import type { Caja, Product } from "@/lib/types";
 
+/** Ofertas que se imprimen al pie de cada ticket. */
+const OFERTAS_EN_TICKET = 3;
+
 export default function PosPage() {
   return (
     <AuthGuard>
@@ -48,6 +53,8 @@ export default function PosPage() {
 
 function PosScreen() {
   const cart = useCart();
+  const anunciarVenta = usePantallaCliente(cart.items);
+  const ofertasVigentes = useOfertasVigentes();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
@@ -316,6 +323,8 @@ function PosScreen() {
     (saleNumber: string, total: number, data: ConfirmData, userName?: string) => {
       const vuelto = data.changeAmount > 0 ? ` · Vuelto ${formatCurrency(data.changeAmount)}` : "";
       if (saleNumber !== "PENDIENTE") toast.success(`Ticket #${saleNumber}${vuelto}`);
+      const ahorroOfertas = cart.items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0);
+      anunciarVenta(total, ahorroOfertas);
       const ticket: TicketData = {
         saleNumber,
         createdAt: new Date(),
@@ -330,7 +339,12 @@ function PosScreen() {
           };
         }),
         total,
-        ahorroOfertas: cart.items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0),
+        ahorroOfertas,
+        // Publicidad al pie: ofertas de hoy que el cliente no se llevo
+        ofertasDestacadas: (ofertasVigentes ?? [])
+          .filter((p) => !cart.items.some((i) => i.product.id === p.id))
+          .slice(0, OFERTAS_EN_TICKET)
+          .map((p) => `${p.name} ${etiquetaOferta(p)} ${pesos(analizarOferta(p).totalPromo)}`),
         paymentMethod: data.paymentMethod,
         cashAmount: data.cashAmount,
         changeAmount: data.changeAmount,
@@ -346,7 +360,7 @@ function PosScreen() {
       focusInput();
       imprimirTicket(ticket);
     },
-    [cart, focusInput, imprimirTicket],
+    [cart, focusInput, imprimirTicket, anunciarVenta, ofertasVigentes],
   );
 
   const handleAprobadoQR = useCallback(
@@ -545,6 +559,13 @@ function PosScreen() {
               <PauseCircle className="h-3.5 w-3.5" /> En espera ({ticketsEspera.length})
             </button>
           )}
+          <button
+            onClick={() => window.open(apiUrl("/pantalla-cliente"), "pantalla-cliente", "popup,width=1280,height=800")}
+            title="Abrir la pantalla del cliente (arrastrala al 2do monitor)"
+            className="hidden items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground md:flex"
+          >
+            <MonitorSmartphone className="h-3.5 w-3.5" /> Pantalla cliente
+          </button>
           {lastTicket && (
             <button
               onClick={() => lastTicket && imprimirTicket(lastTicket)}

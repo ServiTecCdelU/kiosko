@@ -38,7 +38,8 @@ async function ventasDesde(comercioId: string, desde: string): Promise<VentaResu
   return ventas;
 }
 
-export async function ofertasConResultados(comercioId: string): Promise<{
+/** `medir: false` salta la lectura de ventas (pantallas y ticket solo necesitan la lista). */
+export async function ofertasConResultados(comercioId: string, medir = true): Promise<{
   productos: Record<string, any>[];
   resultados: Record<string, ResultadoOferta>;
 }> {
@@ -52,6 +53,7 @@ export async function ofertasConResultados(comercioId: string): Promise<{
     .limit(500);
   if (error) throw new Error(error.message);
   const productos = data ?? [];
+  if (!medir) return { productos, resultados: {} };
 
   // Solo se mide lo que ya arranco y tiene fecha de inicio conocida
   const hoy = hoyArgentinaISO();

@@ -6,7 +6,7 @@ import { Check, Copy, MessageCircle, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CartelOferta } from "@/components/stock/cartel-oferta";
+import { CartelOferta, FormatoCartelSelector, useFormatoCartel, type FormatoCartel } from "@/components/stock/cartel-oferta";
 import { textoCompartirOferta } from "@/lib/oferta-analisis";
 import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import type { Product } from "@/lib/types";
@@ -36,13 +36,14 @@ export function useNombreComercio(): [string, (v: string) => void] {
 
 interface OfertaPublicadaProps {
   producto: Product;
-  onImprimirCartel?: (producto: Product, comercio: string) => void;
+  onImprimirCartel?: (producto: Product, comercio: string, formato: FormatoCartel) => void;
   onListo: () => void;
 }
 
 export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaPublicadaProps) {
   const [comercio, setComercio] = useNombreComercio();
   const [copiado, setCopiado] = useState(false);
+  const [formato, setFormato] = useFormatoCartel();
   const texto = textoCompartirOferta(producto, comercio.trim() || undefined);
   const programada = estadoVigencia(producto.ofertaDesde, producto.ofertaHasta) === "programada";
 
@@ -93,9 +94,12 @@ export function OfertaPublicada({ producto, onImprimirCartel, onListo }: OfertaP
           </div>
 
           {onImprimirCartel && (
-            <Button className="h-11 w-full rounded-xl" onClick={() => onImprimirCartel(producto, comercio.trim())}>
-              <Printer className="mr-2 h-4 w-4" /> Imprimir cartel A4
-            </Button>
+            <div className="space-y-1.5">
+              <FormatoCartelSelector value={formato} onChange={setFormato} />
+              <Button className="h-11 w-full rounded-xl" onClick={() => onImprimirCartel(producto, comercio.trim(), formato)}>
+                <Printer className="mr-2 h-4 w-4" /> Imprimir cartel
+              </Button>
+            </div>
           )}
           <Button
             variant="outline"

@@ -367,12 +367,33 @@
     page-break-after: auto;
     break-after: auto;
   }
-  /* 1em = 5mm: el cartel (40em x 56.5em) ocupa 200 x 282.5 mm de la hoja */
   #cartel-print .cartel-hoja {
-    font-size: 5mm;
-    padding: 5mm;
     page-break-after: always;
     break-after: page;
+  }
+  /* El cartel mide 40em x 56.5em; el font-size de la celda fija su tamaño real.
+     A4: 1em = 5mm -> 200 x 282.5 mm, uno por hoja */
+  #cartel-print .cartel-a4 .cartel-celda {
+    font-size: 5mm;
+    padding: 5mm;
+  }
+  /* A5: hoja apaisada, 2 carteles de 140 x 198 mm (1em = 3.5mm) */
+  #cartel-print .cartel-a5 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  #cartel-print .cartel-a5 .cartel-celda {
+    font-size: 3.5mm;
+    padding: 5mm 4.25mm;
+  }
+  /* A6: 4 carteles de 100 x 141 mm por hoja (1em = 2.5mm) */
+  #cartel-print .cartel-a6 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  #cartel-print .cartel-a6 .cartel-celda {
+    font-size: 2.5mm;
+    padding: 3mm 2.5mm;
   }
   #cartel-print .cartel-hoja:last-child {
     page-break-after: auto;
