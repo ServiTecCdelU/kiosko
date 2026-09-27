@@ -3,8 +3,9 @@
 // estado (vigente / programada / vencida), si estan vendiendo mas que antes, y
 // acciones en lote (folleto A4, carteles, WhatsApp con todas, finalizar vencidas).
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
-  ChevronDown, FileText, Megaphone, MessageCircle, Pencil, Printer, TrendingDown, TrendingUp, X, Minus, Hourglass,
+  ChevronDown, FileText, Megaphone, MessageCircle, Pencil, Printer, TrendingDown, TrendingUp, X, Minus, Hourglass, Tv,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -162,6 +163,11 @@ export function CentroOfertas({ version, onEditar, onImprimirCarteles, onImprimi
               className="rounded-xl border-[#25d366]/50 text-[#128c4a] hover:bg-[#25d366]/10 dark:text-[#25d366]"
             >
               <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> WhatsApp con todas
+            </Button>
+            <Button size="sm" variant="outline" className="rounded-xl" asChild>
+              <Link href="/ofertas-tv" target="_blank" rel="noopener">
+                <Tv className="mr-1.5 h-3.5 w-3.5" /> Pantalla TV
+              </Link>
             </Button>
             {vencidas.length > 0 && (
               <Button size="sm" variant="ghost" className="rounded-xl text-muted-foreground" disabled={finalizando != null} onClick={() => finalizar(vencidas)}>

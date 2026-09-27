@@ -287,6 +287,28 @@
   }
 }
 
+/* Pantalla de ofertas para TV (app/ofertas-tv/page.tsx) */
+@keyframes tv-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes tv-progreso {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.tv-marquee {
+  animation: tv-marquee linear infinite;
+}
+.tv-progreso {
+  animation: tv-progreso linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tv-marquee,
+  .tv-progreso {
+    animation: none;
+  }
+}
+
 /* Ticket termico: se renderiza siempre en el DOM (fuera de pantalla) y solo se
    muestra al imprimir, para que window.print() lo encuentre sin parpadeos de layout. */
 #ticket-print {

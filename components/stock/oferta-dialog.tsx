@@ -29,6 +29,8 @@ interface OfertaDialogProps {
   /** Debe lanzar si no se pudo guardar, para no mostrar "Oferta publicada". */
   onSubmit: (oferta: SetOfertaInput) => Promise<void>;
   onImprimirCartel?: (producto: Product, comercio: string) => void;
+  /** Id de una plantilla (ej "3x2") para abrir con esa promo ya cargada (Ofertas recomendadas). */
+  plantillaInicial?: string;
 }
 
 /** "final" es un modo de carga: se guarda como descuento en $ (monto = precio - final). */
@@ -41,7 +43,7 @@ const MODOS: { value: Modo; label: string }[] = [
   { value: "combo", label: "Combo" },
 ];
 
-export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimirCartel }: OfertaDialogProps) {
+export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimirCartel, plantillaInicial }: OfertaDialogProps) {
   const [activa, setActiva] = useState(false);
   const [modo, setModo] = useState<Modo>("porcentaje");
   const [valor, setValor] = useState("");
@@ -65,8 +67,15 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
       setHasta(product.ofertaActiva ? product.ofertaHasta ?? "" : "");
       setPlantilla(null);
       setPublicada(null);
+      const sugerida = plantillaInicial ? plantillasOferta(product.price).find((p) => p.id === plantillaInicial) : undefined;
+      if (sugerida) {
+        setModo(sugerida.oferta.tipo);
+        setValor(String(sugerida.oferta.valor));
+        setCantidad(sugerida.oferta.cantidad ? String(sugerida.oferta.cantidad) : "");
+        setPlantilla(sugerida.id);
+      }
     }
-  }, [open, product]);
+  }, [open, product, plantillaInicial]);
 
   const borrador = useMemo<Product | null>(() => {
     if (!product) return null;

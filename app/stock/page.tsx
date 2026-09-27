@@ -28,6 +28,8 @@ import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { CartelOfertaPrint } from "@/components/stock/cartel-oferta";
 import { FolletoOfertasPrint } from "@/components/stock/folleto-ofertas";
 import { CentroOfertas } from "@/components/stock/centro-ofertas";
+import { OfertasRecomendadas } from "@/components/stock/ofertas-recomendadas";
+import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
@@ -72,6 +74,8 @@ export default function StockPage() {
   const [folleto, setFolleto] = useState<{ productos: Product[]; comercio: string }>({ productos: [], comercio: "" });
   // Se incrementa al guardar/quitar una oferta para que el Centro de ofertas recargue
   const [ofertasVersion, setOfertasVersion] = useState(0);
+  const [plantillaInicial, setPlantillaInicial] = useState<string | undefined>();
+  const [loteOpen, setLoteOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -172,7 +176,8 @@ export default function StockPage() {
     setEditOpen(true);
   };
 
-  const openOferta = (p: Product) => {
+  const openOferta = (p: Product, plantilla?: string) => {
+    setPlantillaInicial(plantilla);
     setOfertaProduct(p);
     setOfertaOpen(true);
   };
@@ -414,9 +419,11 @@ export default function StockPage() {
         </div>
       )}
 
+      <OfertasRecomendadas version={ofertasVersion} onCrear={(p, plantilla) => openOferta(p, plantilla)} />
+
       <CentroOfertas
         version={ofertasVersion}
-        onEditar={openOferta}
+        onEditar={(p) => openOferta(p)}
         onImprimirCarteles={imprimirCarteles}
         onImprimirFolleto={imprimirFolleto}
         onCambio={load}
@@ -540,6 +547,9 @@ export default function StockPage() {
               onClick={() => imprimirEtiquetas(products.filter((p) => seleccionados.has(p.id)))}
             >
               <Printer className="mr-1.5 h-3.5 w-3.5" /> Imprimir etiquetas
+            </Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setLoteOpen(true)}>
+              <Layers className="mr-1.5 h-3.5 w-3.5" /> Oferta en lote
             </Button>
             {seleccionConOferta > 0 && (
               <Button
@@ -735,6 +745,17 @@ export default function StockPage() {
         onOpenChange={setOfertaOpen}
         onSubmit={handleOferta}
         onImprimirCartel={(p, comercio) => imprimirCarteles([p], comercio)}
+        plantillaInicial={plantillaInicial}
+      />
+      <OfertaLoteDialog
+        productos={products.filter((p) => seleccionados.has(p.id))}
+        open={loteOpen}
+        onOpenChange={setLoteOpen}
+        onAplicado={() => {
+          setSeleccionados(new Set());
+          setOfertasVersion((v) => v + 1);
+          load();
+        }}
       />
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
       <NuevoProductoDialog

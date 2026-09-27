@@ -4,6 +4,7 @@ import { consultar } from "@/services/api-client";
 import { getComercioId } from "@/hooks/use-auth";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { ResultadoOferta } from "@/lib/oferta-resultados";
+import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -257,6 +258,19 @@ export async function getOfertas(): Promise<OfertaConResultado[]> {
     resultados: Record<string, ResultadoOferta>;
   }>("/api/consultas/productos", "ofertas");
   return productos.map((d) => ({ producto: mapRow(d), resultado: resultados[d.id] }));
+}
+
+export interface OfertaSugerida {
+  producto: Product;
+  sugerencia: SugerenciaOferta;
+}
+
+/** Productos que convendria ofertar (stock quieto, margen de sobra), con la promo sugerida. */
+export async function getOfertasSugeridas(): Promise<OfertaSugerida[]> {
+  const { items } = await consultar<{ items: { producto: Record<string, any>; sugerencia: SugerenciaOferta }[] }>(
+    "/api/consultas/productos", "sugerenciasOfertas",
+  );
+  return items.map((i) => ({ producto: mapRow(i.producto), sugerencia: i.sugerencia }));
 }
 
 export interface SetOfertaInput {
