@@ -13,12 +13,17 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { listClientes } from "@/services/clientes-service";
+import { useAuth } from "@/hooks/use-auth";
+import { PremioComprasCard } from "@/components/clientes/premio-compras-card";
+import { SorteosCard } from "@/components/clientes/sorteos-card";
 import { DeudoresPanel } from "@/components/clientes/deudores-panel";
 import { NuevoClienteDialog } from "@/components/clientes/nuevo-cliente-dialog";
 import { ClienteDetailDialog } from "@/components/clientes/cliente-detail-dialog";
 import type { Cliente } from "@/lib/types";
 
 export default function ClientesPage() {
+  const { rol } = useAuth();
+  const puedeGestionar = rol === "admin" || rol === "encargado";
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -74,6 +79,9 @@ export default function ClientesPage() {
       </div>
 
       <DeudoresPanel onVerCliente={abrirDetalle} />
+
+      <PremioComprasCard puedeConfigurar={puedeGestionar} />
+      <SorteosCard puedeGestionar={puedeGestionar} />
 
       {/* Buscador + alta */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
