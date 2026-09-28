@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CONTACT, ROUTES } from '@/lib/marketing/contact'
+import { ROUTES } from '@/lib/marketing/contact'
 import { Brand } from './shared'
 
 const NAV = [
@@ -32,18 +32,10 @@ export function SiteHeader() {
         <div className="flex items-center gap-4">
           <Link
             href={ROUTES.login}
-            className="text-sm font-medium text-slate-300 transition-colors hover:text-white"
+            className="inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_6px_24px_-8px_rgba(59,139,255,0.7)] transition hover:bg-[#5a9dff]"
           >
             Ingresar
           </Link>
-          <a
-            href={CONTACT.whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_6px_24px_-8px_rgba(59,139,255,0.7)] transition hover:bg-[#5a9dff]"
-          >
-            Hablar por WhatsApp
-          </a>
         </div>
       </div>
     </header>
