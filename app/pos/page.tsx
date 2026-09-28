@@ -21,6 +21,7 @@ import { parseCodigoBalanza } from "@/lib/barcode-balanza";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { panelHref } from "@/lib/panel";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
@@ -531,7 +532,7 @@ function PosScreen() {
       <AvisoSoporte />
       <header className="glass flex items-center gap-3 border-b border-border/60 px-4 py-3">
         <Link
-          href="/"
+          href={panelHref(getCurrentUser()?.comercioSlug)}
           className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/70 bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
           aria-label="Volver"
         >

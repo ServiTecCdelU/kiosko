@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSesion } from "@/lib/server/sesion";
+import { slugDeComercio } from "@/lib/server/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
   if (sesion.soporte && sesion.superadmin) {
     const [{ data: sa }, { data: comercio }] = await Promise.all([
       supabaseAdmin.from("superadmins").select("email").ilike("email", sesion.usuarioId).maybeSingle(),
-      supabaseAdmin.from("comercios").select("id, nombre").eq("id", sesion.comercioId).maybeSingle(),
+      supabaseAdmin.from("comercios").select("id, nombre, slug").eq("id", sesion.comercioId).maybeSingle(),
     ]);
     if (!sa || !comercio) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
     return NextResponse.json({
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
       comercioId: comercio.id,
       soporte: true,
       comercioNombre: comercio.nombre,
+      comercioSlug: comercio.slug,
     });
   }
 
@@ -48,5 +50,6 @@ export async function GET(req: Request) {
     nombre: usuario.nombre,
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
+    comercioSlug: await slugDeComercio(usuario.comercio_id),
   });
 }

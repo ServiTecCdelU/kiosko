@@ -195,5 +195,7 @@ export interface Usuario {
   /** Superadmin viendo el panel de este comercio (modo soporte). */
   soporte?: boolean;
   comercioNombre?: string;
+  /** Slug del comercio: el panel vive en /<slug> (la landing queda en /). */
+  comercioSlug?: string;
   createdAt: Date;
 }

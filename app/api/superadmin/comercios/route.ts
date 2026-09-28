@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { hoyArgentina } from "@/lib/server/fecha-argentina";
 import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
+import { esSlugReservado } from "@/lib/panel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,9 @@ export async function POST(req: Request) {
     if (!nombre) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
     const slug = slugInput || nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     if (!slug) return NextResponse.json({ error: "No se pudo generar el slug" }, { status: 400 });
+    if (esSlugReservado(slug)) {
+      return NextResponse.json({ error: `"${slug}" es una ruta del sistema, elegí otro slug` }, { status: 400 });
+    }
 
     const trialDias = Number(body?.trialDias) || 14;
     const { data, error } = await supabaseAdmin

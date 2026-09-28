@@ -56,13 +56,20 @@ export async function errorPinReservado(comercioId: string, pin: string | null |
   return `El PIN ${DEMO_PIN} está reservado para la demo. Elegí otro.`;
 }
 
+/** Slug del comercio: el panel del cliente vive en /<slug>. */
+export async function slugDeComercio(comercioId: string): Promise<string | undefined> {
+  const { data } = await supabaseAdmin.from("comercios").select("slug").eq("id", comercioId).maybeSingle();
+  return data?.slug ?? undefined;
+}
+
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */
-export function respuestaLoginPin(usuario: UsuarioPin): NextResponse {
+export async function respuestaLoginPin(usuario: UsuarioPin): Promise<NextResponse> {
   const res = NextResponse.json({
     id: usuario.id,
     nombre: usuario.nombre,
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
+    comercioSlug: await slugDeComercio(usuario.comercio_id),
   });
   // La cookie firmada es la fuente de verdad del comercioId para toda ruta API.
   res.headers.append(

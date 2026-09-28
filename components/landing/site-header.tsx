@@ -32,7 +32,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-4">
           <Link
             href={ROUTES.login}
-            className="hidden text-sm font-medium text-slate-300 transition-colors hover:text-white sm:inline"
+            className="text-sm font-medium text-slate-300 transition-colors hover:text-white"
           >
             Ingresar
           </Link>

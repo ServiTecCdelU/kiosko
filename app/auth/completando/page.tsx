@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { setCurrentUser } from "@/hooks/use-auth";
 import { apiUrl } from "@/lib/utils/api-url";
+import { panelHref } from "@/lib/panel";
 
 export default function CompletandoLoginPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function CompletandoLoginPage() {
         if (!res.ok) throw new Error();
         const user = await res.json();
         setCurrentUser(user);
-        router.replace(user.rol === "admin" ? "/" : "/pos");
+        router.replace(user.rol === "admin" ? panelHref(user.comercioSlug) : "/pos");
       } catch {
         router.replace("/login?error=no_autorizado");
       }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Store, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { visibleNavItems } from "@/lib/nav";
+import { hrefDe, visibleNavItems } from "@/lib/nav";
 import { useAuth, AUTH_DISABLED } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { AvisoPagoBanner } from "@/components/layout/aviso-pago-banner";
@@ -60,11 +60,12 @@ export function AppShell({ title, children }: AppShellProps) {
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {items.map((item) => {
-            const active = pathname === item.href;
+            const href = hrefDe(item, user?.comercioSlug);
+            const active = pathname === href;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 title={colapsado ? item.label : undefined}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -115,11 +116,12 @@ export function AppShell({ title, children }: AppShellProps) {
       {/* Top nav mobile */}
       <header className="sticky top-0 z-20 flex items-center gap-2 overflow-x-auto border-b border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground lg:hidden">
         {items.map((item) => {
-          const active = pathname === item.href;
+          const href = hrefDe(item, user?.comercioSlug);
+            const active = pathname === href;
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium",
                 active

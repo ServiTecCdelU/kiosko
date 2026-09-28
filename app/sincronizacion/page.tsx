@@ -17,6 +17,8 @@ import type { SyncLog, SyncEstado } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils/format";
 import type { SyncResult } from "@/services/sync-service";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { getCurrentUser } from "@/hooks/use-auth";
+import { panelHref } from "@/lib/panel";
 
 function estadoBadge(estado: SyncEstado) {
   if (estado === "ok") {
@@ -86,7 +88,7 @@ function SincronizacionContent() {
   return (
     <main className="bg-mesh min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-4xl">
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/">
+        <Link href={panelHref(getCurrentUser()?.comercioSlug)}>
           <Button variant="ghost" size="icon" className="rounded-2xl">
             <ArrowLeft className="h-5 w-5" />
           </Button>

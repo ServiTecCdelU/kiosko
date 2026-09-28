@@ -57,7 +57,21 @@ export function useAuth() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setUser(readStored());
+    const stored = readStored();
+    setUser(stored);
+    // Sesiones guardadas antes de que el panel pasara a /<slug> no traen el
+    // slug: se completa desde la cookie (si ya no vale, se cierra la sesion).
+    if (stored && !stored.comercioSlug && !AUTH_DISABLED) {
+      fetch(apiUrl("/api/auth/session"))
+        .then(async (res) => {
+          const fresh = res.ok ? ((await res.json()) as Usuario) : null;
+          setCurrentUser(fresh ? { ...stored, ...fresh } : null);
+          setUser(readStored());
+        })
+        .catch(() => {})
+        .finally(() => setReady(true));
+      return;
+    }
     setReady(true);
   }, []);
 

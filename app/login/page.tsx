@@ -13,6 +13,7 @@ import { login, loginDemo } from "@/services/auth-service";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { apiUrl } from "@/lib/utils/api-url";
 import { DEMO_PIN } from "@/lib/demo";
+import { panelHref } from "@/lib/panel";
 import type { Usuario } from "@/lib/types";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
@@ -67,7 +68,7 @@ function LoginContent() {
       try {
         const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value);
         toast.success(modo === "demo" ? "¡Bienvenido a la demo!" : `Hola, ${user.nombre}`);
-        router.replace(user.rol === "admin" ? "/" : "/pos");
+        router.replace(user.rol === "admin" ? panelHref(user.comercioSlug) : "/pos");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "PIN incorrecto");
         setPin("");

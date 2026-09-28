@@ -15,6 +15,7 @@ import { useSuperadmin } from "@/hooks/use-superadmin";
 import { setCurrentUser } from "@/hooks/use-auth";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { apiUrl } from "@/lib/utils/api-url";
+import { panelHref } from "@/lib/panel";
 import { ComercioFila } from "@/components/superadmin/comercio-fila";
 import { ComercioDialog } from "@/components/superadmin/comercio-dialog";
 import { NuevoComercioDialog } from "@/components/superadmin/nuevo-comercio-dialog";
@@ -105,7 +106,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
       const user = await res.json();
       if (!res.ok) throw new Error(user?.error ?? "No se pudo abrir el panel");
       setCurrentUser(user);
-      router.push("/");
+      router.push(panelHref(user.comercioSlug));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo entrar al comercio");
       setEntrando(null);
