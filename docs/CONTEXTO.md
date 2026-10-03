@@ -1,0 +1,177 @@
+# Contexto del proyecto — para retomar en otra computadora
+
+Documento de arranque rápido para Claude Code (o cualquier persona) que abre el
+repo por primera vez. Resume decisiones de producto, arquitectura real y qué
+queda pendiente. Actualizado: **2026-10-03**.
+
+Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
+`docs/superpowers/specs/` si se toca esa área.
+
+---
+
+## 1. Qué es y hacia dónde va
+
+- **Producto**: POS + backoffice para kioscos, despensas y supermercados chicos
+  de Argentina. Nombre comercial en la landing/metadatos: **MultiComercioPanel**
+  (marca **ServiTec**). El repo y el paquete se siguen llamando `kiosko`.
+- **Decisión estratégica (2026-06-19)**: se vende como **SaaS multi-comercio**
+  (una plataforma, muchos comercios con suscripción mensual), no como
+  instalación por cliente. Por eso todo el dominio es multi-tenant desde el
+  principio (`comercio_id` en todas las tablas). La intención es que cada
+  comercio use sus propias credenciales de Mercado Pago (todavía no: ver §6).
+- **Tres perfiles de comercio** a los que apunta: kiosko (1 operador),
+  despensa (fiado + pesables + vencimientos), supermercado (varios cajeros).
+- **Proyecto hermano**: `Distribuidora J&J` (`../../Distribuidora J&J`). Solo
+  se le lee el catálogo por API pública; base de datos separada.
+
+## 2. Despliegue y URLs
+
+- Hosting: **Vercel**, proyecto `kiosko` (`.vercel/project.json`, no se commitea).
+- Repo: `github.com/ServiTecCdelU/kiosko`, rama `main` (se pushea directo).
+- Producción se sirve detrás de un proxy en **`https://www.servitec.net.ar/comercio`**
+  → en ese deploy `BASE_PATH=/comercio`. En local `BASE_PATH` va vacío.
+- Ruteo:
+  - `/` → landing pública (`components/landing/`).
+  - `/<slug>` → panel de un comercio (`app/[comercio]/`). Los slugs no pueden
+    chocar con rutas fijas: ver `RUTAS_RESERVADAS` en `lib/panel.ts`.
+  - `/login`, `/pos`, `/caja`, `/stock`, `/ventas`, `/clientes`, `/compras`,
+    `/promociones`, `/reportes`, `/usuarios`, `/sincronizacion`.
+  - `/superadmin` → panel del dueño del SaaS (todos los comercios).
+  - `/pantalla-cliente` y `/ofertas-tv` → pantallas secundarias (visor del
+    cliente y TV de ofertas).
+- **Demo pública**: comercio con slug `demo`, PIN `1234` (publicado a propósito
+  en el login, `lib/demo.ts`). Datos de 15 días regenerables con
+  `supabase/38_demo_datos.sql` (solo toca filas `demo_*`).
+
+## 3. Arquitectura (lo que hay que saber antes de tocar código)
+
+### Acceso a datos — todo pasa por el servidor
+- El **anon key está revocado y RLS cerrado** (`22_cerrar_anon_rls.sql`). El
+  navegador **no** consulta Supabase directo.
+- Lecturas: `services/api-client.ts → consultar(ruta, accion, params)` hace POST
+  a `/api/consultas/<dominio>`, que expone un **conjunto cerrado de acciones**
+  (el cliente nunca manda tablas ni filtros libres).
+- Escrituras: rutas `/api/<dominio>` que usan `lib/supabase-admin.ts` (service
+  role) y RPCs de Postgres para lo transaccional.
+- Lógica de servidor compartida en `lib/server/` (venta, caja, reportes, MP,
+  ofertas, ZPL, sesión, rate limit, fecha argentina).
+
+### Sesión y tenant
+- Cookie propia `kiosko_sesion`, **firmada con HMAC** (`lib/server/sesion.ts`),
+  12 h. El `comercioId` **se toma de la sesión del servidor**
+  (`comercioIdDeSesion`), nunca del body (aunque `consultar` todavía lo manda).
+- Login:
+  - **Admin del comercio** → Google (Supabase Auth, PKCE en el navegador:
+    `app/auth/callback/page.tsx`; verificación server-side en
+    `app/api/auth/google-verify`).
+  - **Cajero / encargado** → PIN (hash bcrypt en Postgres, rate limit por IP en
+    `lib/server/limite-intentos.ts`).
+  - **Superadmin** → misma cuenta Google, matcheada contra la tabla `superadmins`.
+    Puede "Entrar" a un comercio en modo soporte (`sesion.soporte`).
+- Roles: `admin`, `encargado`, `cajero`. Qué ve cada uno: `lib/nav.ts`.
+- `hooks/use-auth.ts` guarda el usuario en `sessionStorage` solo para la UI;
+  la autorización real es la cookie.
+
+### basePath
+- Todo `fetch` a rutas propias usa `apiUrl()` (`lib/utils/api-url.ts`) para
+  sumar `NEXT_PUBLIC_BASE_PATH`. Olvidarlo rompe producción (pasó varias veces:
+  ver commits `fix: ... BASE_PATH`).
+- Metadatos/OG con URL absoluta: `lib/site.ts` (`conBase`, `siteOrigin`).
+
+### Dinero
+- Precio **autoritativo en el servidor** (`lib/server/procesar-venta.ts` +
+  `lib/pricing.ts`); el cliente no puede fijar precios.
+- Venta atómica: RPC `process_sale_kiosko` (stock, movimientos, caja, fiado con
+  límite de crédito). Anulación: `anular_venta_kiosko`. Devolución con caja ya
+  cerrada: migración 29.
+- Multi-caja: una caja abierta **por puesto**, caja por cajero, consolidado del
+  día (`lib/consolidado.ts`).
+- Mercado Pago QR y Point: `lib/server/mercadopago.ts`, `app/api/mercadopago/*`
+  (webhook confirma la venta usando la misma lógica de `procesar-venta`).
+
+### Impresión
+- Ticket ZPL directo a **Zebra ZD220** (`lib/server/zpl.ts`,
+  `app/api/imprimir-ticket/`), alto dinámico, fallback al ticket del navegador.
+- Etiquetas de góndola, carteles A4/A5/A6, folleto e imagen de oferta para
+  WhatsApp/Instagram (`lib/imagen-oferta.ts`, `lib/cartel-temas.ts`).
+
+### Offline / PWA
+- PWA instalable (`public/manifest.json`, `public/sw.js`). El service worker
+  **no cachea en localhost**.
+- Cola de ventas offline en IndexedDB (`lib/offline/`, `hooks/use-offline-sync.ts`).
+
+## 4. Base de datos (Supabase propio)
+
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 38).
+  Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
+  todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
+- Después de una base nueva: dar de alta el primer superadmin (comentario al
+  pie de `33_superadmin.sql`) y configurar el proveedor Google en
+  Authentication → Providers (sección 2 del spec de login Google).
+- Tablas principales: `comercios`, `usuarios`, `superadmins`, `puestos`,
+  `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
+  `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
+  `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
+- La siguiente migración es **`39_*.sql`**. Regla: informar el SQL exacto al
+  usuario **antes** de escribir el código que lo usa; el usuario lo corre.
+- Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
+  `.gitignore`). En otra PC hay que copiarlas a mano: **nunca commitearlas**.
+
+## 5. Variables de entorno
+
+| Variable | Uso |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente Supabase del navegador (solo Auth de Google) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role, server-only (todo el acceso a datos) |
+| `SESSION_SECRET` | Firma de la cookie (si falta, usa el service role key) |
+| `BASE_PATH` | `/comercio` en producción, vacío en local |
+| `NEXT_PUBLIC_SITE_URL` | Dominio público para OG (default `www.servitec.net.ar`) |
+| `NEXT_PUBLIC_APP_URL` | URL técnica del deploy (webhooks de Mercado Pago) |
+| `MP_ACCESS_TOKEN` | Token de Mercado Pago **único para toda la app** (`lib/server/mercadopago.ts`) |
+| `IMPRESORA_ZPL_RAW` | Destino RAW de la Zebra |
+| `DISTRIBUIDORA_API_URL` | Sincronización de catálogo |
+
+Tests de integración: `.env.test.local` con `TEST_SUPABASE_URL` y
+`TEST_SUPABASE_SERVICE_KEY` de un proyecto Supabase **de prueba** (ver CLAUDE.md).
+
+## 6. Estado de funcionalidades (2026-10-03)
+
+Hecho y en producción: POS con lector y balanza EAN-13 de peso embebido, pago
+mixto/fiado/recargo/MP QR/MP Point, tickets en espera, caja con arqueo y
+movimientos, multi-caja con puestos y rol encargado, anulación y devolución
+post-cierre, stock con vencimientos, favoritos, importación Excel, auditoría de
+precios, reposición predictiva, recomendaciones; proveedores y compras con
+costo/margen; clientes con fiado, límite de crédito y puntos; ofertas con
+vigencia, combos, simulador, historial y ranking, centro de ofertas, carteles,
+pantalla TV, premio por compras y sorteos; reportes con Excel/PDF; empleados;
+superadmin con modo soporte; aviso de pago mensual (día 7 al 10); landing;
+demo con datos; panel por slug.
+
+### Pendiente (lo que sigue del plan maestro)
+
+| # | Ítem | Nota |
+|---|---|---|
+| 2.3 | **Mercado Pago por comercio + token cifrado** | Hoy se cobra con un solo `MP_ACCESS_TOKEN` de entorno; la columna `comercios.mp_access_token` (06_multitenant) existe pero no se usa y es texto plano. Para el SaaS: leer el token del comercio, cifrado con pgcrypto o Supabase Vault, descifrado solo server-side. |
+| 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
+| 5.1 | Onboarding self-service + **enforcement de `trial_hasta`** | Hoy el superadmin crea comercios y setea el trial, pero nada bloquea al vencer. |
+| 5.3 | Backup / exportación de datos por comercio | — |
+| 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
+| — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
+| — | Sacar `comercioId` del body de `consultar` | El servidor ya lo ignora; es limpieza. |
+
+Criterio adoptado: no planificar en el vacío — priorizar según el dolor real
+del primer comercio en producción.
+
+## 7. Mapa de documentación
+
+| Archivo | Qué es | Vigencia |
+|---|---|---|
+| `CLAUDE.md` | Reglas del proyecto y comandos | **Vigente** |
+| `docs/CONTEXTO.md` | Este archivo | **Vigente** |
+| `docs/PLAN-MAESTRO-2026-09-18.md` | Roadmap consolidado | Vigente como roadmap; su sección 1 quedó vieja (ver §6 acá) |
+| `docs/superpowers/specs/*` | Diseños por feature (login PIN, multi-caja, proveedores, devoluciones, login Google) | Referencia del área |
+| `docs/superpowers/plans/*` | Planes de implementación ya ejecutados | Historia |
+| `docs/ESTUDIO-MERCADO-Y-PLAN.md` | Estudio de mercado y dirección visual "Mostrador" | Referencia de producto |
+| `PLAN.md`, `PLAN_MEJORAS.md` | Planes de agosto | Historia (reemplazados por el plan maestro) |
+| `AUDITORIA_PAGOS.md` | Auditoría de cobros y cuenta corriente | Historia (corregido en migraciones 18–19) |
+| `implementacion-de-ticket-a-ZPL.md` | Notas del ticket Zebra | Referencia de impresión |

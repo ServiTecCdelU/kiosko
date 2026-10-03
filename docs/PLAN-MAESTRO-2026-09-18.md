@@ -1,5 +1,9 @@
 # Plan Maestro — Kiosko · Despensa · Supermercado
 
+> **Nota (2026-10-03)**: la sección 1 refleja el estado del 18/09 y quedó vieja.
+> Las fases 0 a 4 están prácticamente completas. Estado actual y pendientes
+> reales en `docs/CONTEXTO.md` §6.
+
 - **Fecha**: 2026-09-18
 - **Reemplaza como referencia viva a**: `PLAN.md`, `PLAN_MEJORAS.md` y
   `docs/ESTUDIO-MERCADO-Y-PLAN.md` (quedan como historia; varios de sus ítems ya
