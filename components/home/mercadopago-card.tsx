@@ -33,7 +33,7 @@ export function MercadoPagoCard() {
   }, [cargar]);
 
   return (
-    <section className="card-premium rounded-2xl p-5" aria-labelledby="mp-titulo">
+    <section id="mercado-pago" className="card-premium scroll-mt-6 rounded-2xl p-5" aria-labelledby="mp-titulo">
       <div className="flex items-start gap-4">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <CreditCard className="h-6 w-6" />

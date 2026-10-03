@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/format";
 import { AccesosGoogle } from "@/components/superadmin/accesos-google";
-import { pagoAlDia, superadminApi, type Comercio } from "@/components/superadmin/comun";
+import { nombreRubro, pagoAlDia, superadminApi, whatsappDe, type Comercio } from "@/components/superadmin/comun";
 import { DIAS_GRACIA } from "@/lib/acceso-comercio";
 
 interface ComercioDialogProps {
@@ -71,6 +71,8 @@ function FinDePrueba({ trialHasta, onCambiar }: { trialHasta: string | null; onC
 export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: ComercioDialogProps) {
   if (!comercio) return null;
   const alDia = pagoAlDia(comercio);
+  const rubro = nombreRubro(comercio.config?.rubro);
+  const whatsapp = whatsappDe(comercio.config?.telefono);
 
   const cambiar = async (cambios: Record<string, unknown>) => {
     try {
@@ -101,6 +103,17 @@ export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: C
             {comercio.slug} · desde {formatDate(comercio.created_at)}
             {comercio.trial_hasta && ` · prueba hasta ${formatDate(comercio.trial_hasta)}`}
           </DialogDescription>
+          {(rubro || whatsapp) && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {comercio.config?.origen === "autoregistro" && <span>Se dio de alta solo</span>}
+              {rubro && <span>Rubro: <b className="text-foreground">{rubro}</b></span>}
+              {whatsapp && (
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
+                  WhatsApp {comercio.config?.telefono}
+                </a>
+              )}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-5">

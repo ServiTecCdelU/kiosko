@@ -5,6 +5,7 @@
 // desactivo o cambio de rol al usuario despues de emitida.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { patronCorreoExacto } from "@/lib/correo";
 import { getSesion } from "@/lib/server/sesion";
 import { slugDeComercio } from "@/lib/server/demo";
 
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
   // re-verifica que siga siendo superadmin y que el comercio exista.
   if (sesion.soporte && sesion.superadmin) {
     const [{ data: sa }, { data: comercio }] = await Promise.all([
-      supabaseAdmin.from("superadmins").select("email").ilike("email", sesion.usuarioId).maybeSingle(),
+      supabaseAdmin.from("superadmins").select("email").ilike("email", patronCorreoExacto(sesion.usuarioId)).maybeSingle(),
       supabaseAdmin.from("comercios").select("id, nombre, slug").eq("id", sesion.comercioId).maybeSingle(),
     ]);
     if (!sa || !comercio) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });

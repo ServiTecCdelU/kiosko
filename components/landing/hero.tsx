@@ -42,13 +42,17 @@ export function Hero() {
         </p>
 
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className={btnPrimary}>
+          <Link href={ROUTES.signup} className={btnPrimary}>
+            Probar gratis {TRIAL_DAYS} días
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className={btnGhost}>
             <WhatsAppIcon />
             Hablar por WhatsApp
           </a>
         </div>
         <p className="mt-5 font-mono text-xs text-muted-foreground/80">
-          Sin instalación · Funciona en PC, tablet y celular
+          Sin tarjeta · Sin instalación · Funciona en PC, tablet y celular
         </p>
 
         <div className="relative mx-auto mt-16 max-w-5xl">

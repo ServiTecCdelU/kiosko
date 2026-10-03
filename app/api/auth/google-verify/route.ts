@@ -11,7 +11,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { crearCookieSesion } from "@/lib/server/sesion";
+import { patronCorreoExacto } from "@/lib/correo";
+import { crearCookieRegistro, crearCookieSesion } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
   const { data: superadmin, error: errorSuperadmin } = await supabaseAdmin
     .from("superadmins")
     .select("email, nombre")
-    .ilike("email", email)
+    .ilike("email", patronCorreoExacto(email))
     .maybeSingle();
 
   if (superadmin) {
@@ -69,14 +70,25 @@ export async function POST(req: Request) {
     .select("id, nombre, rol, comercio_id, activo")
     .eq("rol", "admin")
     .eq("activo", true)
-    .ilike("email", email)
+    .ilike("email", patronCorreoExacto(email))
     .maybeSingle();
 
-  if (errorUsuario || !usuario) {
+  if (errorUsuario || errorSuperadmin) {
     return NextResponse.json(
-      { error: "no_autorizado", detail: `email=${email} superadminErr=${errorSuperadmin?.message ?? "-"} usuarioErr=${errorUsuario?.message ?? "-"}` },
-      { status: 401 },
+      { error: "no_autorizado", detail: `superadminErr=${errorSuperadmin?.message ?? "-"} usuarioErr=${errorUsuario?.message ?? "-"}` },
+      { status: 500 },
     );
+  }
+
+  // Correo verificado por Google pero sin comercio: onboarding self-service.
+  // Se recuerda el correo en una cookie firmada corta y se manda a crear el
+  // comercio (app/registro). El correo NUNCA sale del formulario.
+  if (!usuario) {
+    const meta = data.user?.user_metadata ?? {};
+    const nombre = String(meta.full_name ?? meta.name ?? "").trim().slice(0, 80);
+    const res = NextResponse.json({ redirectTo: "/registro" });
+    res.headers.append("Set-Cookie", crearCookieRegistro({ email, nombre }));
+    return res;
   }
 
   const res = NextResponse.json({ redirectTo: "/auth/completando" });

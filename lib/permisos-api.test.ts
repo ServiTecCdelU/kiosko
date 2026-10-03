@@ -10,6 +10,10 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/auth/session", "GET"), "publica");
   });
 
+  test("el alta de un comercio nuevo es publica (todavia no hay sesion; la protege la cookie de registro)", () => {
+    assert.equal(reglaDeRuta("/api/registro", "POST"), "publica");
+  });
+
   test("el webhook de Mercado Pago es publico (MP no manda cookie)", () => {
     assert.equal(reglaDeRuta("/api/mercadopago/webhook", "POST"), "publica");
   });

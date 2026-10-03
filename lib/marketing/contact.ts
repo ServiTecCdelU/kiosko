@@ -17,5 +17,5 @@ export const LEGAL = {
 
 export const ROUTES = {
   login: '/login',
-  signup: '/login',
+  signup: '/registro',
 } as const

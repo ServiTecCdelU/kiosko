@@ -2,6 +2,7 @@
 import { apiUrl } from "@/lib/utils/api-url";
 import { evaluarAcceso } from "@/lib/acceso-comercio";
 import { DEMO_SLUG } from "@/lib/demo";
+import { RUBROS } from "@/lib/registro";
 
 export interface ComercioUso {
   productos: number;
@@ -20,6 +21,8 @@ export interface Comercio {
   trial_hasta: string | null;
   suscripcion_hasta: string | null;
   created_at: string;
+  /** Datos del alta self-service (40_autoregistro.sql). */
+  config: { origen?: string; rubro?: string | null; telefono?: string | null } | null;
   uso: ComercioUso;
 }
 
@@ -45,6 +48,26 @@ function anioMesArgentina(fecha: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit",
   }).format(new Date(fecha));
+}
+
+const DIAS_NUEVO = 7;
+
+/** Se dio de alta solo (app/registro) hace menos de DIAS_NUEVO dias. */
+export function esNuevo(c: Comercio): boolean {
+  return c.config?.origen === "autoregistro" && Date.now() - new Date(c.created_at).getTime() < DIAS_NUEVO * 86_400_000;
+}
+
+export function nombreRubro(id: string | null | undefined): string | null {
+  return RUBROS.find((r) => r.id === id)?.nombre ?? null;
+}
+
+/** Link de WhatsApp al telefono que dejo en el alta (solo digitos, con codigo de pais). */
+export function whatsappDe(telefono: string | null | undefined): string | null {
+  if (!telefono) return null;
+  const digitos = telefono.replace(/\D/g, "");
+  if (digitos.length < 8) return null;
+  // Numero local argentino sin codigo de pais: se le agrega 549.
+  return `https://wa.me/${digitos.startsWith("54") ? digitos : `549${digitos.replace(/^0/, "")}`}`;
 }
 
 /** Situacion de la prueba para el badge: misma regla que aplica proxy.ts. */

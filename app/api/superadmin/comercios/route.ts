@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { patronCorreoExacto } from "@/lib/correo";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { hoyArgentina } from "@/lib/server/fecha-argentina";
 import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
@@ -15,6 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ESTADOS = ["activo", "prueba", "suspendido", "baja"];
+const COLUMNAS_PANEL = "id, nombre, slug, estado, plan, trial_hasta, suscripcion_hasta, created_at, config";
 const PLANES = ["free", "basico", "pro"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,9 +53,11 @@ export async function POST(req: Request) {
   const accion = String(body?.accion ?? "");
 
   if (accion === "listar") {
+    // Columnas explicitas: el panel no necesita (ni debe recibir) el token
+    // cifrado de Mercado Pago ni nada que se agregue a comercios despues.
     const { data: comercios, error } = await supabaseAdmin
       .from("comercios")
-      .select("*")
+      .select(COLUMNAS_PANEL)
       .order("created_at", { ascending: true });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
@@ -95,12 +99,22 @@ export async function POST(req: Request) {
         plan: "free",
         trial_hasta: new Date(Date.now() + trialDias * 86400_000).toISOString(),
       })
-      .select()
+      .select(COLUMNAS_PANEL)
       .single();
 
     if (error) {
       const msg = (error as any).code === "23505" ? "Ya existe un comercio con ese slug" : error.message;
       return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    // Sin puesto no se puede abrir la caja (26_multi_caja.sql): nace con "Caja 1".
+    const { error: errorPuesto } = await supabaseAdmin.from("puestos").insert({
+      id: `puesto_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+      comercio_id: data.id,
+      nombre: "Caja 1",
+    });
+    if (errorPuesto) {
+      return NextResponse.json({ error: `Comercio creado, pero falto la caja: ${errorPuesto.message}` }, { status: 400 });
     }
     return NextResponse.json({ comercio: data });
   }
@@ -122,7 +136,7 @@ export async function POST(req: Request) {
       .from("comercios")
       .update({ suscripcion_hasta: limiteUtc.toISOString() })
       .eq("id", id)
-      .select()
+      .select(COLUMNAS_PANEL)
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -194,7 +208,7 @@ async function agregarAcceso(id: string, nombre: string, email: string) {
     .from("usuarios")
     .select("id, nombre, comercio_id, activo")
     .eq("rol", "admin")
-    .ilike("email", email);
+    .ilike("email", patronCorreoExacto(email));
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   const enOtro = (existentes ?? []).find((u) => u.comercio_id !== id && u.activo);
@@ -283,7 +297,7 @@ export async function PATCH(req: Request) {
     .from("comercios")
     .update(cambios)
     .eq("id", id)
-    .select()
+    .select(COLUMNAS_PANEL)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

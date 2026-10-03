@@ -39,6 +39,15 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - `/superadmin` → panel del dueño del SaaS (todos los comercios).
   - `/pantalla-cliente` y `/ofertas-tv` → pantallas secundarias (visor del
     cliente y TV de ofertas).
+- **Alta self-service** (`/registro`, CTA "Probar gratis" de la landing y link en el
+  login): "Continuar con Google"; si el correo no tiene comercio, `google-verify` deja
+  una cookie firmada `kiosko_registro` (30 min) y lleva al formulario (nombre del
+  comercio, rubro, nombre, WhatsApp). `POST /api/registro` llama a la RPC atómica
+  `registrar_comercio_autoservicio` (migración 40): comercio en prueba de 14 días +
+  admin con ese correo + "Caja 1". Un correo de Google = un comercio; máximo 3 altas
+  por IP por hora. Rubro, WhatsApp y origen quedan en `comercios.config`. El panel
+  nuevo muestra la tarjeta "Primeros pasos" y el superadmin ve el badge "nuevo".
+  Spec: `docs/superpowers/specs/2026-10-03-autoregistro-design.md`.
 - **Demo pública**: comercio con slug `demo`, PIN `1234` (publicado a propósito
   en el login, `lib/demo.ts`). Datos de 15 días regenerables con
   `supabase/38_demo_datos.sql` (solo toca filas `demo_*`).
@@ -123,7 +132,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 39).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 40).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -133,7 +142,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
   `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`40_*.sql`**. Regla: informar el SQL exacto al
+- La siguiente migración es **`41_*.sql`**. Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
   `.gitignore`). En otra PC hay que copiarlas a mano: **nunca commitearlas**.
@@ -173,7 +182,6 @@ demo con datos; panel por slug.
 | # | Ítem | Nota |
 |---|---|---|
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
-| 5.1 | Onboarding self-service | Hoy el superadmin crea cada comercio a mano (el vencimiento de la prueba ya se aplica). |
 | 5.3 | Backup / exportación de datos por comercio | — |
 | 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |

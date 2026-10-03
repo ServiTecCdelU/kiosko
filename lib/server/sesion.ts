@@ -51,14 +51,15 @@ export function borrarCookieSesion(): string {
   return `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
-export function getSesion(req: Request): Sesion | null {
+/** Contenido de una cookie firmada con firmar(), o null si falta o fue adulterada. */
+function leerCookieFirmada(req: Request, nombre: string): Record<string, any> | null {
   const cookies = req.headers.get("cookie");
   if (!cookies) return null;
   const crudo = cookies
     .split(";")
     .map((c) => c.trim())
-    .find((c) => c.startsWith(`${COOKIE}=`))
-    ?.slice(COOKIE.length + 1);
+    .find((c) => c.startsWith(`${nombre}=`))
+    ?.slice(nombre.length + 1);
   if (!crudo) return null;
 
   const [payload, firma] = crudo.split(".");
@@ -70,12 +71,48 @@ export function getSesion(req: Request): Sesion | null {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   try {
-    const sesion = JSON.parse(Buffer.from(payload, "base64url").toString()) as Sesion;
-    if (!sesion.comercioId || Date.now() > sesion.exp) return null;
-    return sesion;
+    return JSON.parse(Buffer.from(payload, "base64url").toString());
   } catch {
     return null;
   }
+}
+
+export function getSesion(req: Request): Sesion | null {
+  const sesion = leerCookieFirmada(req, COOKIE) as Sesion | null;
+  if (!sesion || !sesion.comercioId || Date.now() > sesion.exp) return null;
+  return sesion;
+}
+
+// ------------------------------------------------------------
+// Registro (onboarding self-service, app/registro): correo que Google ya
+// verifico pero que todavia no tiene comercio. Dura poco: alcanza para
+// completar el formulario. `tipo` impide usarla como sesion y viceversa.
+// ------------------------------------------------------------
+const COOKIE_REGISTRO = "kiosko_registro";
+const DURACION_REGISTRO_MS = 1000 * 60 * 30;
+
+export interface Registro {
+  tipo: "registro";
+  email: string;
+  nombre: string;
+  exp: number;
+}
+
+export function crearCookieRegistro(datos: { email: string; nombre: string }): string {
+  const registro: Registro = { tipo: "registro", ...datos, exp: Date.now() + DURACION_REGISTRO_MS };
+  const payload = Buffer.from(JSON.stringify(registro)).toString("base64url");
+  const maxAge = Math.floor(DURACION_REGISTRO_MS / 1000);
+  return `${COOKIE_REGISTRO}=${payload}.${firmar(payload)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+export function borrarCookieRegistro(): string {
+  return `${COOKIE_REGISTRO}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+}
+
+export function getRegistro(req: Request): Registro | null {
+  const r = leerCookieFirmada(req, COOKIE_REGISTRO) as Registro | null;
+  if (!r || r.tipo !== "registro" || !r.email || Date.now() > r.exp) return null;
+  return r;
 }
 
 /**

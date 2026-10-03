@@ -10,8 +10,9 @@ import { toast } from "sonner";
 import { Store, Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { login, loginDemo } from "@/services/auth-service";
-import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import { apiUrl } from "@/lib/utils/api-url";
+import Link from "next/link";
+import { iniciarLoginGoogle } from "@/lib/auth-google";
+import { TRIAL_DAYS } from "@/lib/marketing/contact";
 import { DEMO_PIN } from "@/lib/demo";
 import { panelHref } from "@/lib/panel";
 import type { Usuario } from "@/lib/types";
@@ -40,7 +41,7 @@ function LoginContent() {
   useEffect(() => {
     if (searchParams.get("error") === "no_autorizado") {
       toast.error(
-        "Esa cuenta de Google no tiene acceso. Pedile a tu proveedor que dé de alta tu correo.",
+        "No se pudo verificar tu cuenta de Google. Probá de nuevo.",
         { duration: 12000 },
       );
     }
@@ -49,13 +50,7 @@ function LoginContent() {
   const entrarConGoogle = useCallback(async () => {
     setEntrandoGoogle(true);
     try {
-      const { error } = await getSupabaseBrowser().auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${window.location.origin}${apiUrl("/auth/callback")}` },
-      });
-      if (error) throw error;
-      // signInWithOAuth redirige el navegador entero: si llega hasta aca es
-      // porque fallo antes de redirigir.
+      await iniciarLoginGoogle();
     } catch {
       toast.error("No se pudo iniciar sesión con Google");
       setEntrandoGoogle(false);
@@ -148,6 +143,13 @@ function LoginContent() {
             {entrandoGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Chrome className="h-4 w-4" />}
             Entrar con Google
           </button>
+
+          <Link
+            href="/registro"
+            className="rounded-2xl border border-dashed border-primary/40 px-4 py-2.5 text-center text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+          >
+            ¿Todavía no tenés cuenta? <span className="font-semibold text-primary">Creá tu comercio</span> · {TRIAL_DAYS} días gratis
+          </Link>
 
           <button
             onClick={() => abrir("pin")}

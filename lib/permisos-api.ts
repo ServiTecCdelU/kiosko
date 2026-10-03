@@ -9,8 +9,12 @@
 
 export type ReglaRuta = "publica" | "superadmin" | "sesion" | "admin";
 
-/** Crean la sesion o las llama un tercero sin cookie (Mercado Pago). */
-const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook"];
+/**
+ * Crean la sesion o las llama un tercero sin cookie (Mercado Pago). /api/registro
+ * crea el comercio de alguien que todavia no tiene sesion: la protege la cookie
+ * firmada de registro (lib/server/sesion.ts), que solo emite el login con Google.
+ */
+const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook", "/api/registro"];
 
 /** Validan la cookie de superadmin adentro de cada handler. */
 const RUTAS_SUPERADMIN = ["/api/superadmin"];

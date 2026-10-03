@@ -5,7 +5,7 @@ import { Check, CircleDollarSign, Loader2, LogIn, Mail, Settings2 } from "lucide
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { ESTADO_COLOR, PLAN_LABEL, avisoPrueba, pagoAlDia, type Comercio } from "@/components/superadmin/comun";
+import { ESTADO_COLOR, PLAN_LABEL, avisoPrueba, esNuevo, pagoAlDia, type Comercio } from "@/components/superadmin/comun";
 
 interface ComercioFilaProps {
   comercio: Comercio;
@@ -24,7 +24,12 @@ export function ComercioFila({ comercio: c, entrando, onEntrar, onAdministrar }:
           {c.nombre.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0">
-          <p className="truncate font-semibold leading-tight">{c.nombre}</p>
+          <p className="flex items-center gap-1.5 truncate font-semibold leading-tight">
+            {c.nombre}
+            {esNuevo(c) && (
+              <Badge className="h-5 rounded-md bg-primary px-1.5 text-[10px] uppercase" title="Se dio de alta solo en los últimos 7 días">nuevo</Badge>
+            )}
+          </p>
           <p className="cifra truncate text-xs text-muted-foreground">
             {c.uso.productos} productos · {c.uso.ventas} ventas · {c.uso.usuarios} empleados
           </p>

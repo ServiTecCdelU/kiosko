@@ -31,3 +31,24 @@ export function registrarFallo(ip: string): void {
 export function limpiarIntentos(ip: string): void {
   intentos.delete(ip);
 }
+
+/**
+ * Tope generico "N veces por ventana" con contador propio (no comparte el de
+ * PIN). Lo usa el alta de comercios (app/api/registro): limita cuantos
+ * comercios se crean desde una misma IP.
+ */
+export function crearLimitador(max: number, ventanaMs: number) {
+  const usos = new Map<string, number[]>();
+  const vigentes = (clave: string) => (usos.get(clave) ?? []).filter((t) => t > Date.now() - ventanaMs);
+  return {
+    /** Minutos hasta poder volver a usarlo, o 0 si puede ya. */
+    minutosBloqueado(clave: string): number {
+      const v = vigentes(clave);
+      if (v.length < max) return 0;
+      return Math.ceil((v[0] + ventanaMs - Date.now()) / 60_000);
+    },
+    registrar(clave: string): void {
+      usos.set(clave, [...vigentes(clave), Date.now()]);
+    },
+  };
+}
