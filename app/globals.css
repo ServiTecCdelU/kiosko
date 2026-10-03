@@ -311,7 +311,8 @@
 
 /* Ticket termico: se renderiza siempre en el DOM (fuera de pantalla) y solo se
    muestra al imprimir, para que window.print() lo encuentre sin parpadeos de layout. */
-#ticket-print {
+#ticket-print,
+#factura-print {
   position: fixed;
   left: -9999px;
   top: 0;
@@ -344,6 +345,8 @@
   }
   #ticket-print,
   #ticket-print *,
+  #factura-print,
+  #factura-print *,
   #etiquetas-print,
   #etiquetas-print *,
   #cartel-print,
@@ -399,10 +402,19 @@
     page-break-after: auto;
     break-after: auto;
   }
-  #ticket-print {
+  #ticket-print,
+  #factura-print {
     position: absolute;
     left: 0;
     top: 0;
+  }
+  /* Comprobante fiscal (components/facturacion/comprobante-fiscal.tsx): se
+     imprime solo, sin el ticket no fiscal que puede estar en el DOM. */
+  body[data-imprimir="factura"] #ticket-print {
+    display: none;
+  }
+  body:not([data-imprimir="factura"]) #factura-print {
+    display: none;
   }
   #etiquetas-print {
     position: static;

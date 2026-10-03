@@ -38,6 +38,14 @@ describe("reglaDeRuta", () => {
     }
   });
 
+  test("configurar AFIP es del admin; facturar y reintentar, de cualquier rol con sesion", () => {
+    for (const ruta of ["/api/afip/config", "/api/afip/pedido", "/api/afip/certificado", "/api/afip/probar"]) {
+      assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
+    }
+    assert.equal(reglaDeRuta("/api/afip/facturar", "POST"), "sesion");
+    assert.equal(reglaDeRuta("/api/afip/reintentar", "POST"), "sesion");
+  });
+
   test("listar lectores Point es del mostrador; cambiarles el modo es del admin", () => {
     assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "GET"), "sesion");
     assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "PATCH"), "admin");

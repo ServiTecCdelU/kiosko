@@ -1,7 +1,8 @@
 // app/api/ventas/route.ts — alta de venta atomica via RPC process_sale_kiosko
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { procesarVenta } from "@/lib/server/procesar-venta";
+import { facturarSiEsAutomatico } from "@/lib/server/afip/facturar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
   const rawItems = Array.isArray(body?.items) ? body.items : [];
 
   try {
+    const comercioId = comercioIdDeSesion(req);
     const res = await procesarVenta({
       items: rawItems,
       paymentMethod: body?.paymentMethod ?? "efectivo",
@@ -28,12 +30,15 @@ export async function POST(req: Request) {
       userId: body?.userId ?? null,
       userName: body?.userName ?? null,
       clienteId: body?.clienteId ?? null,
-      comercioId: comercioIdDeSesion(req),
+      comercioId,
       pagadorNombre: body?.pagadorNombre ?? null,
       cuotas: body?.cuotas ?? null,
       recargoPct: body?.recargoPct ?? null,
       creditoMonto: body?.creditoMonto ?? null,
     });
+    // Facturacion automatica (si el comercio la activo): despues de responder,
+    // asi el cobro nunca espera a AFIP.
+    after(() => facturarSiEsAutomatico(comercioId, res.id));
     return NextResponse.json(res);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo registrar la venta" }, { status: 400 });

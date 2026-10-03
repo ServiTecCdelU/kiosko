@@ -1,10 +1,11 @@
 // app/api/ventas/devolver/route.ts — devolucion parcial de una venta via RPC
 // registrar_devolucion_kiosko. A diferencia de anular, funciona aunque la caja
 // de la venta original ya este cerrada (spec: devoluciones-post-cierre-design.md).
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { notaDeCreditoSiCorresponde } from "@/lib/server/afip/facturar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,5 +81,7 @@ export async function POST(req: Request) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  // Venta facturada: Nota de credito C por lo devuelto (sin frenar la devolucion).
+  after(() => notaDeCreditoSiCorresponde(comercioId, input.ventaId, data.devolucionId));
   return NextResponse.json({ devolucionId: data.devolucionId, total: Number(data.total) || 0 });
 }

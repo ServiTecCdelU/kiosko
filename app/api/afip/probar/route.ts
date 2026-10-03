@@ -1,0 +1,47 @@
+// app/api/afip/probar/route.ts — "Probar conexion" (solo admin, proxy.ts):
+// servidores de AFIP, acceso con el certificado y ultimo comprobante del punto
+// de venta. Con {activar:true} y todo OK, deja la facturacion activa.
+import { NextResponse } from "next/server";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { esComercioDemo } from "@/lib/server/demo";
+import { configOperativa, estadoPublico, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
+import { conAcceso, estadoServidores, ultimoAutorizado } from "@/lib/server/afip/cliente";
+import { CBTE } from "@/lib/afip/constantes";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+interface Paso {
+  paso: string;
+  ok: boolean;
+  detalle: string;
+}
+
+export async function POST(req: Request) {
+  const comercioId = comercioIdDeSesion(req);
+  if (await esComercioDemo(comercioId)) {
+    return NextResponse.json({ error: "La facturación electrónica está disponible en la versión paga." }, { status: 403 });
+  }
+  const activar = (await req.json().catch(() => null))?.activar === true;
+  const pasos: Paso[] = [];
+  const fila = await leerConfigAfip(comercioId);
+
+  try {
+    const cfg = configOperativa(fila);
+    const s = await estadoServidores(cfg.ambiente);
+    const servOk = s.app === "OK" && s.db === "OK" && s.auth === "OK";
+    pasos.push({ paso: `Servidores de AFIP (${cfg.ambiente})`, ok: servOk, detalle: `app ${s.app} · base ${s.db} · acceso ${s.auth}` });
+    if (!servOk) throw new Error("AFIP informa servidores con problemas. Probá más tarde.");
+
+    const ultimo = await conAcceso(cfg, (auth) => ultimoAutorizado(cfg, auth, CBTE.FACTURA_C));
+    pasos.push({ paso: "Acceso con tu certificado", ok: true, detalle: "AFIP aceptó el certificado para Facturación electrónica" });
+    pasos.push({ paso: `Punto de venta ${cfg.punto_venta}`, ok: true, detalle: `Última Factura C autorizada: ${ultimo}` });
+  } catch (e) {
+    pasos.push({ paso: "Error", ok: false, detalle: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ ok: false, pasos, estado: estadoPublico(fila) });
+  }
+
+  const estado = activar ? await marcarActivo(comercioId, true) : fila;
+  return NextResponse.json({ ok: true, pasos, estado: estadoPublico(estado) });
+}

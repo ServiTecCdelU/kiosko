@@ -15,6 +15,7 @@ import {
   Users,
   CalendarClock,
   Megaphone,
+  FileText,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { MercadoPagoCard } from "@/components/home/mercadopago-card";
@@ -49,6 +50,7 @@ const ICONS: Record<string, typeof ShoppingCart> = {
   "/promociones": Megaphone,
   "/reportes": BarChart3,
   "/sincronizacion": RefreshCw,
+  "/facturacion": FileText,
 };
 
 const SUBTITLES: Record<string, string> = {
@@ -59,6 +61,7 @@ const SUBTITLES: Record<string, string> = {
   "/promociones": "Ofertas, sorteos y premios",
   "/reportes": "Ventas, márgenes y más vendidos",
   "/sincronizacion": "Catálogo de la distribuidora",
+  "/facturacion": "Factura C con CAE de AFIP/ARCA",
 };
 
 // Fondo atmosférico: mesh de gradientes teal/lima muy sutil.

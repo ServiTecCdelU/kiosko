@@ -25,6 +25,7 @@ import { panelHref } from "@/lib/panel";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
 import { TicketPrint, type TicketData } from "@/components/pos/ticket-print";
+import { FacturaPos } from "@/components/facturacion/factura-pos";
 import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
 import { OfertasRapidas } from "@/components/pos/ofertas-rapidas";
 import { AvisoSoporte } from "@/components/layout/aviso-soporte";
@@ -69,6 +70,8 @@ function PosScreen() {
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
+  // Id de la ultima venta registrada (para facturarla). null si quedo offline.
+  const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
   const [ticketsEspera, setTicketsEspera] = useState<TicketEnEspera[]>([]);
   const [esperaOpen, setEsperaOpen] = useState(false);
   const [cobroQR, setCobroQR] = useState<CobroQR | null>(null);
@@ -376,6 +379,7 @@ function PosScreen() {
         const saleNumber = venta?.saleNumber ?? ventaId;
         const total = venta?.total ?? cart.total;
         setCobroQR(null);
+        setUltimaVentaId(ventaId);
         finalizarTicket(saleNumber, total, { paymentMethod: "mercadopago", cashAmount: 0, changeAmount: 0, transferAmount: total }, getCurrentUser()?.nombre);
       } catch {
         toast.error("El pago se acreditó pero no se pudo cerrar el ticket automáticamente");
@@ -391,6 +395,7 @@ function PosScreen() {
         const saleNumber = venta?.saleNumber ?? ventaId;
         const total = venta?.total ?? cart.total;
         setCobroPoint(null);
+        setUltimaVentaId(ventaId);
         finalizarTicket(saleNumber, total, { paymentMethod: "mercadopago_point", cashAmount: 0, changeAmount: 0, transferAmount: total }, getCurrentUser()?.nombre);
       } catch {
         toast.error("El pago se acreditó pero no se pudo cerrar el ticket automáticamente");
@@ -502,16 +507,19 @@ function PosScreen() {
           const res = await createSale(saleInput);
           saleNumber = res.saleNumber;
           total = res.total;
+          setUltimaVentaId(res.id);
         } else {
           try {
             const res = await createSale(saleInput);
             saleNumber = res.saleNumber;
             total = res.total;
+            setUltimaVentaId(res.id);
           } catch (e) {
             if (!(e instanceof NetworkUnavailableError)) throw e;
             await encolarVentaPendiente(saleInput);
             for (const i of cart.items) await descontarStockOffline(i.product.id, i.quantity);
             saleNumber = "PENDIENTE";
+            setUltimaVentaId(null); // offline: se factura desde Ventas cuando se sincronice
             total = cart.items.reduce((s, i) => s + precioLinea(i.product, i.quantity), 0);
             toast.warning("Sin conexión: venta guardada, se sincroniza sola al volver el internet");
           }
@@ -581,6 +589,7 @@ function PosScreen() {
               <Printer className="h-3.5 w-3.5" /> Reimprimir
             </button>
           )}
+          <FacturaPos ventaId={ultimaVentaId} />
           {!cajaId && cajasAbiertas.length > 1 && getCurrentUser()?.rol !== "cajero" ? (
             // Encargado/admin sin caja propia con varias abiertas: elige donde imputar.
             <select

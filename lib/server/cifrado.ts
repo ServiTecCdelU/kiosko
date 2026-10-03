@@ -22,11 +22,20 @@ export function claveDesdeTexto(texto: string): Buffer {
   return clave;
 }
 
+function claveDeEntorno(variable: string): Buffer {
+  const texto = process.env[variable];
+  if (!texto) throw new Error(`Falta configurar ${variable} en el servidor`);
+  return claveDesdeTexto(texto);
+}
+
 /** Clave de los tokens de Mercado Pago. Falla claro si no esta configurada. */
 export function claveTokensMP(): Buffer {
-  const texto = process.env.MP_TOKEN_KEY;
-  if (!texto) throw new Error("Falta configurar MP_TOKEN_KEY en el servidor");
-  return claveDesdeTexto(texto);
+  return claveDeEntorno("MP_TOKEN_KEY");
+}
+
+/** Clave de la clave privada AFIP y del acceso WSAA de cada comercio. */
+export function claveAfip(): Buffer {
+  return claveDeEntorno("AFIP_CERT_KEY");
 }
 
 export function cifrar(texto: string, clave: Buffer): string {

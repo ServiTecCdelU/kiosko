@@ -31,6 +31,12 @@ const RUTAS_ADMIN = [
   "/api/consultas/reportes",
   "/api/mercadopago/conexion",
   "/api/backup",
+  // Configuracion de AFIP. Facturar y reintentar (/api/afip/facturar, /reintentar)
+  // NO estan aca: el cajero factura desde el POS en modo manual.
+  "/api/afip/config",
+  "/api/afip/pedido",
+  "/api/afip/certificado",
+  "/api/afip/probar",
 ];
 
 /** Metodos puntuales de admin en rutas que el mostrador tambien usa. */

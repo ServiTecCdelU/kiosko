@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { metodoLabel, metodoColorClass } from "@/lib/utils/metodo-pago";
+import { FacturaVentaSeccion } from "@/components/facturacion/factura-venta";
 import type { Sale } from "@/lib/types";
 
 interface SaleDetailDialogProps {
@@ -17,9 +18,11 @@ interface SaleDetailDialogProps {
   onAnular: (venta: Sale) => void;
   /** Devolver funciona aunque la caja de esta venta ya haya cerrado. */
   onDevolver?: (venta: Sale) => void;
+  /** Se facturo o reintento: refrescar el estado de facturas de la lista. */
+  onFacturaCambio?: () => void;
 }
 
-export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular, onDevolver }: SaleDetailDialogProps) {
+export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular, onDevolver, onFacturaCambio }: SaleDetailDialogProps) {
   if (!venta) return null;
 
   return (
@@ -59,6 +62,8 @@ export function SaleDetailDialog({ venta, onOpenChange, esAdmin, onAnular, onDev
             <span className="text-sm font-semibold">Total</span>
             <span className="cifra text-money text-lg font-bold">{formatCurrency(venta.total)}</span>
           </div>
+
+          <FacturaVentaSeccion ventaId={venta.id} total={venta.total} anulada={venta.estado === "anulada"} onCambio={onFacturaCambio} />
 
           <div className="space-y-1.5 text-sm">
             <div className="flex items-center justify-between">

@@ -13,8 +13,24 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { conectarMP, desconectarMP, getConexionMP, type ConexionMP } from "@/services/mercadopago-service";
+import { AvisoVersionPaga, useEsDemo } from "@/components/home/aviso-version-paga";
 
 export function MercadoPagoCard() {
+  // En la demo no se piden credenciales reales: se muestra la version paga.
+  if (useEsDemo()) {
+    return (
+      <AvisoVersionPaga
+        id="mercado-pago"
+        icono={CreditCard}
+        titulo="Cobros con Mercado Pago"
+        descripcion="Cobrá con QR y con lector Point, y la plata entra directo a tu cuenta."
+      />
+    );
+  }
+  return <ConexionMercadoPago />;
+}
+
+function ConexionMercadoPago() {
   const [conexion, setConexion] = useState<ConexionMP | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);

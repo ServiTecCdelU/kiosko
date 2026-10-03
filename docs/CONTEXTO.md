@@ -48,6 +48,16 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   por IP por hora. Rubro, WhatsApp y origen quedan en `comercios.config`. El panel
   nuevo muestra la tarjeta "Primeros pasos" y el superadmin ve el badge "nuevo".
   Spec: `docs/superpowers/specs/2026-10-03-autoregistro-design.md`.
+- **Facturación electrónica AFIP/ARCA** (`/facturacion`, solo admin; spec
+  `docs/superpowers/specs/2026-10-03-facturacion-afip-design.md`): Factura C y Nota de
+  crédito C con certificado propio de cada comercio. El sistema genera la clave (cifrada
+  con `AFIP_CERT_KEY`) y el CSR; el dueño sube el `.crt`. Emisión manual (botón Facturar
+  en POS y Ventas) o automática (`after()` en `/api/ventas` y en el webhook de MP).
+  Anular o devolver una venta facturada emite la NC sola. Numeración con lock
+  (`tomar_lock_afip`) y recuperación por `FECompConsultar` para no duplicar. El acceso WSAA
+  se guarda cifrado en `afip_tokens`; si AFIP responde 600 se renueva y se reintenta una
+  vez. **Producción de AFIP exige TLS `SECLEVEL=1`** (`lib/server/afip/soap.ts`): sin eso,
+  falla con "dh key too small". Dependencia: `node-forge` (solo firmar CMS y generar CSR).
 - **Backup por comercio**: el admin descarga "Copia de tus datos" desde su panel y el
   superadmin el de cualquier comercio (botón Backup en Administrar). Es un Excel con una
   hoja por tema; las hojas y columnas están en `lib/backup-hojas.ts` (solo se leen esas
@@ -138,7 +148,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 40).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 41).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -148,7 +158,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
   `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`41_*.sql`**. Regla: informar el SQL exacto al
+- La siguiente migración es **`42_*.sql`**. Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
   `.gitignore`). En otra PC hay que copiarlas a mano: **nunca commitearlas**.
@@ -163,6 +173,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 | `BASE_PATH` | `/comercio` en producción, vacío en local |
 | `NEXT_PUBLIC_SITE_URL` | Dominio público para OG (default `www.servitec.net.ar`) |
 | `NEXT_PUBLIC_APP_URL` | URL técnica del deploy (webhooks de Mercado Pago) |
+| `AFIP_CERT_KEY` | Clave AES-256 (32 bytes base64) que cifra la clave privada AFIP y el acceso WSAA de cada comercio. **Si se pierde, cada comercio genera un pedido de certificado nuevo.** Local y producción usan la misma base: tiene que ser el mismo valor en `.env.local` y en Vercel. |
 | `MP_TOKEN_KEY` | Clave AES-256 (32 bytes base64) que cifra el token de MP de cada comercio. **Si se pierde, cada comercio vuelve a cargar su token.** `MP_ACCESS_TOKEN` ya no se usa. |
 | `IMPRESORA_ZPL_RAW` | Destino RAW de la Zebra |
 | `DISTRIBUIDORA_API_URL` | Sincronización de catálogo |
@@ -188,7 +199,8 @@ demo con datos; panel por slug.
 | # | Ítem | Nota |
 |---|---|---|
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
-| 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
+| — | Factura A/B (responsable inscripto) y CAEA (contingencia) | La v1 cubre Factura C + NC C (monotributo). |
+| — | **Probar la facturación con una CUIT real en homologación** | Lo que no se pudo probar sin certificado: CAE real, NC real, impresión con QR. |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
 
 Criterio adoptado: no planificar en el vacío — priorizar según el dolor real

@@ -7,6 +7,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { cifrar, claveTokensMP, descifrar } from "@/lib/server/cifrado";
 import { cuentaDelTokenMP, esTokenDePrueba } from "@/lib/server/mercadopago";
+import { esComercioDemo } from "@/lib/server/demo";
 
 /** El comercio no conecto su cuenta: el POS lo muestra tal cual. */
 export class MPNoConectado extends Error {
@@ -48,7 +49,12 @@ export async function tokenMPDeComercio(comercioId: string): Promise<string> {
     .eq("id", comercioId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data?.mp_token_cifrado) throw new MPNoConectado();
+  if (!data?.mp_token_cifrado) {
+    if (await esComercioDemo(comercioId)) {
+      throw new Error("Cobrar con Mercado Pago está disponible en la versión paga.");
+    }
+    throw new MPNoConectado();
+  }
   return descifrar(data.mp_token_cifrado, claveTokensMP());
 }
 

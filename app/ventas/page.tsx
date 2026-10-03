@@ -22,6 +22,7 @@ import { getVentasDeRango, anularVenta, devolverVenta } from "@/services/sales-s
 import { getCajaDelUsuario } from "@/services/caja-service";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
 import { SaleDetailDialog } from "@/components/ventas/sale-detail-dialog";
+import { FacturaBadge, useFacturacionActiva, useFacturasPorVenta } from "@/components/facturacion/factura-venta";
 import { DevolucionDialog } from "@/components/ventas/devolucion-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { descargarVentasPdf } from "@/lib/utils/ventas-pdf";
@@ -135,6 +136,11 @@ export default function VentasPage() {
   }, [ventas, busqueda, filtroMetodo]);
 
   const hayFiltrosActivos = busqueda.trim().length > 0 || filtroMetodo !== "todos";
+
+  // Estado de factura electronica por venta (solo si el comercio factura).
+  const facturacionActiva = useFacturacionActiva();
+  const idsVisibles = useMemo(() => ventasFiltradas.map((v) => v.id), [ventasFiltradas]);
+  const { porVenta: facturasPorVenta, recargar: recargarFacturas } = useFacturasPorVenta(idsVisibles, facturacionActiva);
 
   const vigentes = useMemo(() => ventasFiltradas.filter((v) => v.estado !== "anulada"), [ventasFiltradas]);
 
@@ -353,7 +359,10 @@ export default function VentasPage() {
                             {v.items.reduce((s, i) => s + i.quantity, 0)}
                           </TableCell>
                           <TableCell>
-                            <Badge className={metodoColorClass(v.paymentMethod)}>{metodoLabelConCuotas(v)}</Badge>
+                            <span className="flex flex-wrap items-center gap-1">
+                              <Badge className={metodoColorClass(v.paymentMethod)}>{metodoLabelConCuotas(v)}</Badge>
+                              <FacturaBadge facturas={facturasPorVenta.get(v.id)} />
+                            </span>
                           </TableCell>
                           <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                             {v.pagadorNombre ?? "—"}
@@ -381,6 +390,7 @@ export default function VentasPage() {
         venta={ventaDetalle}
         onOpenChange={(o) => !o && setVentaDetalle(null)}
         esAdmin={esAdmin}
+        onFacturaCambio={recargarFacturas}
         onAnular={(v) => {
           setVentaDetalle(null);
           setVentaAnular(v);

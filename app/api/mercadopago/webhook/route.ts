@@ -1,10 +1,11 @@
 // app/api/mercadopago/webhook/route.ts — Mercado Pago avisa aca cuando cambia el estado de un pago.
 // Recien cuando esta 'approved' se registra la venta real (process_sale_kiosko).
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPagoMP } from "@/lib/server/mercadopago";
 import { comerciosDeCuentaMP, MPNoConectado, tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 import { procesarVenta } from "@/lib/server/procesar-venta";
+import { facturarSiEsAutomatico } from "@/lib/server/afip/facturar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
         .from("pagos_mp_pendientes")
         .update({ estado: "aprobado", payment_id: pago.id, venta_id: venta.id, updated_at: new Date().toISOString() })
         .eq("id", pendiente.id);
+      after(() => facturarSiEsAutomatico(pendiente.comercio_id, venta.id));
     } else if (pago.status === "rejected" || pago.status === "cancelled") {
       await supabaseAdmin
         .from("pagos_mp_pendientes")
