@@ -2,24 +2,26 @@
 
 // app/login/page.tsx — tres formas de entrar:
 //   · "Acceso a demo": teclado numerico con el PIN publico de la demo a la vista.
-//   · "Entrar con Google": administradores (dueños) de cada comercio.
-//   · "Soy empleado": teclado numerico con el PIN propio de cajero/encargado.
+//   · "Entrar con Google": dueños (admin) de cada comercio.
+//   · "Soy empleado": PIN de 6 numeros, SOLO en una PC registrada por el dueño
+//     (la PC sabe su comercio y su caja: "Super Patricia · Caja 1"). El PIN
+//     viejo de 4 sirve una ultima vez para elegir el nuevo (app/cambiar-pin).
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
-import { Store, Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { FaltaComercioError, login, loginDemo } from "@/services/auth-service";
-import { leerComercioDispositivo, normalizarCodigoComercio, olvidarComercioDispositivo } from "@/lib/comercio-dispositivo";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Store, Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { login, loginDemo } from "@/services/auth-service";
+import { getEstaPc, type EstaPc } from "@/services/dispositivo-service";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
 import { DEMO_PIN } from "@/lib/demo";
+import { LARGO_PIN, LARGO_PIN_VIEJO } from "@/lib/pin";
 import { panelHref } from "@/lib/panel";
 import type { Usuario } from "@/lib/types";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
-const PIN_LENGTH = 4;
 
 type Modo = "inicio" | "demo" | "pin";
 
@@ -38,28 +40,20 @@ function LoginContent() {
   const [pin, setPin] = useState("");
   const [working, setWorking] = useState(false);
   const [entrandoGoogle, setEntrandoGoogle] = useState(false);
-  // Comercio de este dispositivo (el PIN de empleado solo vale dentro de el).
-  const [comercio, setComercio] = useState<string | null>(null);
-  const [codigo, setCodigo] = useState("");
+  // undefined = consultando; la PC tiene que estar registrada para entrar con PIN.
+  const [pc, setPc] = useState<EstaPc | undefined>(undefined);
 
-  useEffect(() => {
-    const deLink = normalizarCodigoComercio(searchParams.get("comercio") ?? "");
-    if (deLink) {
-      setComercio(deLink);
-      setModo("pin");
-    } else {
-      setComercio(leerComercioDispositivo()?.slug ?? null);
-    }
-  }, [searchParams]);
+  const largo = modo === "demo" ? DEMO_PIN.length : LARGO_PIN;
 
   useEffect(() => {
     if (searchParams.get("error") === "no_autorizado") {
-      toast.error(
-        "No se pudo verificar tu cuenta de Google. Probá de nuevo.",
-        { duration: 12000 },
-      );
+      toast.error("No se pudo verificar tu cuenta de Google. Probá de nuevo.", { duration: 12000 });
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    getEstaPc().then(setPc).catch(() => setPc({ registrada: false }));
+  }, []);
 
   const entrarConGoogle = useCallback(async () => {
     setEntrandoGoogle(true);
@@ -75,34 +69,23 @@ function LoginContent() {
     async (value: string) => {
       setWorking(true);
       try {
-        if (modo === "pin" && !comercio) throw new FaltaComercioError("Indicá el código de tu comercio");
-        const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value, comercio!);
+        const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value);
+        if (user.debeCambiarPin) {
+          toast.info("Ahora el PIN es de 6 números: elegí el tuyo.");
+          router.replace("/cambiar-pin");
+          return;
+        }
         toast.success(modo === "demo" ? "¡Bienvenido a la demo!" : `Hola, ${user.nombre}`);
         router.replace(user.rol === "admin" ? panelHref(user.comercioSlug) : "/pos");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "PIN incorrecto");
-        if (e instanceof FaltaComercioError) {
-          olvidarComercioDispositivo();
-          setComercio(null);
-        }
         setPin("");
       } finally {
         setWorking(false);
       }
     },
-    [router, modo, comercio],
+    [router, modo],
   );
-
-  const confirmarCodigo = (e: React.FormEvent) => {
-    e.preventDefault();
-    const slug = normalizarCodigoComercio(codigo);
-    if (!slug) {
-      toast.error("Ese código no es válido: es la parte final del link del panel (ej: kiosco-el-sol)");
-      return;
-    }
-    setComercio(slug);
-    setCodigo("");
-  };
 
   const press = useCallback(
     (key: string) => {
@@ -113,13 +96,13 @@ function LoginContent() {
       }
       if (!key) return;
       setPin((p) => {
-        if (p.length >= PIN_LENGTH) return p;
+        if (p.length >= largo) return p;
         const next = p + key;
-        if (next.length === PIN_LENGTH) submit(next);
+        if (next.length === largo) submit(next);
         return next;
       });
     },
-    [working, submit],
+    [working, submit, largo],
   );
 
   const abrir = (m: Modo) => {
@@ -128,13 +111,15 @@ function LoginContent() {
   };
   const volver = () => abrir("inicio");
 
-  // Con teclado fisico tambien: numeros y borrar
+  const pcLista = modo !== "pin" || pc?.registrada === true;
+
+  // Con teclado fisico tambien: numeros, borrar, Enter (PIN viejo de 4) y Escape.
   useEffect(() => {
-    // Mientras se tipea el codigo del comercio, el teclado es del input, no del PIN.
-    if (modo === "inicio" || (modo === "pin" && !comercio)) return;
+    if (modo === "inicio" || !pcLista) return;
     const onKey = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") press("del");
+      else if (e.key === "Enter" && modo === "pin" && pin.length === LARGO_PIN_VIEJO) submit(pin);
       else if (e.key === "Escape") volver();
     };
     window.addEventListener("keydown", onKey);
@@ -155,6 +140,12 @@ function LoginContent() {
 
       {modo === "inicio" ? (
         <div className="flex w-full max-w-[300px] animate-in fade-in flex-col gap-3 duration-300">
+          {pc?.registrada && (
+            <p className="rounded-2xl border bg-card px-4 py-2 text-center text-xs text-muted-foreground">
+              Esta PC es <b className="text-foreground">{pc.comercio} · {pc.caja}</b>
+            </p>
+          )}
+
           <button
             onClick={() => abrir("demo")}
             className="grad-brand shadow-brand flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
@@ -198,71 +189,70 @@ function LoginContent() {
             </div>
           )}
 
-          {modo === "pin" && !comercio ? (
-            <form onSubmit={confirmarCodigo} className="flex w-full flex-col gap-3">
-              <label htmlFor="codigo-comercio" className="text-center text-sm text-muted-foreground">
-                ¿De qué comercio sos? Poné el código de tu comercio (el final del link del panel, ej: <b>kiosco-el-sol</b>).
-                Pedíselo al dueño: queda guardado en este dispositivo.
-              </label>
-              <input
-                id="codigo-comercio"
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                autoFocus
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder="kiosco-el-sol"
-                className="h-12 rounded-2xl border bg-card px-4 text-center text-base outline-none focus:border-primary"
-              />
-              <button type="submit" className="grad-brand h-12 rounded-2xl text-sm font-semibold text-white">Continuar</button>
-            </form>
-          ) : (<>
-          {modo === "pin" && comercio && (
-            <p className="text-center text-xs text-muted-foreground">
-              Comercio: <b className="text-foreground">{comercio}</b> ·{" "}
-              <button type="button" onClick={() => { olvidarComercioDispositivo(); setComercio(null); setPin(""); }} className="text-primary hover:underline">
-                cambiar
-              </button>
-            </p>
+          {modo === "pin" && pc === undefined && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+
+          {modo === "pin" && pc && !pc.registrada && (
+            <div className="w-full space-y-2 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-4 text-center">
+              <MonitorX className="mx-auto h-6 w-6 text-warning" />
+              <p className="text-sm font-medium">Esta PC no está registrada</p>
+              <p className="text-xs text-muted-foreground">
+                Para entrar con PIN, el dueño tiene que registrarla una vez: entra con Google en esta PC y va a
+                <b> Caja → Registrar esta PC</b>.
+              </p>
+            </div>
           )}
 
-          <div className="flex items-center gap-3" aria-label="PIN">
-            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "h-4 w-4 rounded-full border-2 transition-colors",
-                  i < pin.length ? "border-primary bg-primary" : "border-muted-foreground/40",
-                )}
-              />
-            ))}
-          </div>
+          {pcLista && (modo === "demo" || pc !== undefined) && (
+            <>
+              {modo === "pin" && pc?.registrada && (
+                <p className="text-center text-sm">
+                  <b>{pc.comercio}</b> · {pc.caja}
+                </p>
+              )}
 
-          <div className="grid w-full grid-cols-3 gap-3">
-            {KEYS.map((key, i) => {
-              if (key === "") return <span key={i} />;
-              const isDel = key === "del";
-              return (
-                <button
-                  key={i}
-                  onClick={() => press(key)}
-                  disabled={working}
-                  aria-label={isDel ? "Borrar" : key}
-                  className={cn(
-                    "flex h-16 items-center justify-center rounded-2xl border bg-card text-xl font-semibold transition-colors",
-                    "hover:bg-accent hover:text-accent-foreground active:scale-95",
-                    isDel && "text-muted-foreground",
-                  )}
-                >
-                  {isDel ? <Delete className="h-5 w-5" /> : key}
+              <div className="flex items-center gap-3" aria-label="PIN">
+                {Array.from({ length: largo }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "h-4 w-4 rounded-full border-2 transition-colors",
+                      i < pin.length ? "border-primary bg-primary" : "border-muted-foreground/40",
+                    )}
+                  />
+                ))}
+              </div>
+
+              <div className="grid w-full grid-cols-3 gap-3">
+                {KEYS.map((key, i) => {
+                  if (key === "") return <span key={i} />;
+                  const isDel = key === "del";
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => press(key)}
+                      disabled={working}
+                      aria-label={isDel ? "Borrar" : key}
+                      className={cn(
+                        "flex h-16 items-center justify-center rounded-2xl border bg-card text-xl font-semibold transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground active:scale-95",
+                        isDel && "text-muted-foreground",
+                      )}
+                    >
+                      {isDel ? <Delete className="h-5 w-5" /> : key}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {modo === "pin" && pin.length === LARGO_PIN_VIEJO && !working && (
+                <button onClick={() => submit(pin)} className="text-xs text-primary hover:underline">
+                  Entrar con mi PIN viejo de {LARGO_PIN_VIEJO} números
                 </button>
-              );
-            })}
-          </div>
+              )}
 
-          {working && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-          </>)}
+              {working && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+            </>
+          )}
 
           <button
             onClick={volver}

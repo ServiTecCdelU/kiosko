@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { Usuario, UserRol } from "@/lib/types";
+import { LARGO_PIN, errorPinNuevo } from "@/lib/pin";
 
 export interface UsuarioDialogInput {
   nombre: string;
@@ -28,7 +29,6 @@ interface UsuarioDialogProps {
   onSave: (input: UsuarioDialogInput) => Promise<void>;
 }
 
-const PIN_REGEX = /^[0-9]{4}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function UsuarioDialog({ usuario, open, onOpenChange, onSave }: UsuarioDialogProps) {
@@ -64,8 +64,8 @@ export function UsuarioDialog({ usuario, open, onOpenChange, onSave }: UsuarioDi
   const pinInvalido = esAdmin
     ? false
     : esEdicion
-      ? pinTocado && (!PIN_REGEX.test(pin) || pin !== pinConfirm)
-      : !PIN_REGEX.test(pin) || pin !== pinConfirm;
+      ? pinTocado && (errorPinNuevo(pin) !== null || pin !== pinConfirm)
+      : errorPinNuevo(pin) !== null || pin !== pinConfirm;
 
   const puedeGuardar = !nombreInvalido && !emailInvalido && !pinInvalido;
 
@@ -148,24 +148,24 @@ export function UsuarioDialog({ usuario, open, onOpenChange, onSave }: UsuarioDi
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="mb-1 block text-xs">
-                    {esEdicion ? "Nuevo PIN (opcional)" : "PIN (4 dígitos)"}
+                    {esEdicion ? `Nuevo PIN (opcional, ${LARGO_PIN} números)` : `PIN (${LARGO_PIN} números)`}
                   </Label>
                   <Input
-                    value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    inputMode="numeric" maxLength={4} className="rounded-xl"
-                    placeholder={esEdicion ? "Dejar en blanco" : "0000"}
+                    value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, LARGO_PIN))}
+                    inputMode="numeric" maxLength={LARGO_PIN} className="rounded-xl"
+                    placeholder={esEdicion ? "Dejar en blanco" : "000000"}
                   />
                 </div>
                 <div>
                   <Label className="mb-1 block text-xs">Confirmar PIN</Label>
                   <Input
-                    value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    inputMode="numeric" maxLength={4} className="rounded-xl"
+                    value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, "").slice(0, LARGO_PIN))}
+                    inputMode="numeric" maxLength={LARGO_PIN} className="rounded-xl"
                   />
                 </div>
               </div>
               {pinInvalido && pinTocado && (
-                <p className="text-xs text-destructive">El PIN debe tener 4 dígitos y coincidir en ambos campos</p>
+                <p className="text-xs text-destructive">{errorPinNuevo(pin) ?? "Los dos PIN no coinciden"}</p>
               )}
             </>
           )}

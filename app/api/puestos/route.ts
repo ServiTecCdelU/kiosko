@@ -58,6 +58,18 @@ export async function PATCH(req: Request) {
     cambios.nombre = nombre;
   }
   if (body?.activo !== undefined) cambios.activo = Boolean(body.activo);
+  // Punto de venta de AFIP de esta caja (vacio = usa el general de Facturacion).
+  if (body?.puntoVentaAfip !== undefined) {
+    if (body.puntoVentaAfip === null || body.puntoVentaAfip === "") {
+      cambios.punto_venta_afip = null;
+    } else {
+      const pv = Number(body.puntoVentaAfip);
+      if (!Number.isInteger(pv) || pv < 1 || pv > 99999) {
+        return NextResponse.json({ error: "Punto de venta AFIP invalido (1 a 99999)" }, { status: 400 });
+      }
+      cambios.punto_venta_afip = pv;
+    }
+  }
   if (Object.keys(cambios).length === 0) {
     return NextResponse.json({ error: "Nada para cambiar" }, { status: 400 });
   }

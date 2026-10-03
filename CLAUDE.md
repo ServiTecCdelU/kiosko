@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `42`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `43`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -85,8 +85,10 @@ Ningún dato de un comercio puede pisarse, mezclarse ni verse desde otro, aunque
 - **Toda consulta** del servidor filtra por `comercioIdDeSesion(req)`; un `update`/`delete` por id,
   solo después de validar que la fila es del comercio. Las RPC reciben `p_comercio_id` y validan
   pertenencia antes de modificar.
-- **Login por PIN siempre dentro de un comercio** (`verificar_pin_comercio`). El PIN es único por
-  comercio. El dispositivo recuerda su comercio (`lib/comercio-dispositivo.ts`).
+- **Login por PIN solo en una PC registrada** por el dueño (Caja → PCs…, tabla `dispositivos`,
+  cookie `kiosko_dispositivo`). El comercio y la caja salen de la PC, nunca del navegador; el PIN se
+  busca solo en ese comercio (`verificar_pin_comercio`). PIN de 6 (`lib/pin.ts`), único por comercio,
+  sin obvios; 5 errores bloquean la PC 15 min (`login_intentos`).
 - **Navegador**: todo dato del negocio en localStorage/IndexedDB con `claveDelComercioActual()`
   (`lib/clave-comercio.ts`). Sin sesión no se guarda.
 

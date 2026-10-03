@@ -165,7 +165,7 @@ async function facturaVivaDeVenta(comercioId: string, ventaId: string): Promise<
 export async function facturarVenta(comercioId: string, ventaId: string, documento?: string | null): Promise<FilaFactura> {
   const cfg = await configActiva(comercioId);
   const { data: venta, error } = await supabaseAdmin
-    .from("ventas").select("id, total, estado, cliente_id")
+    .from("ventas").select("id, total, estado, cliente_id, caja_id")
     .eq("comercio_id", comercioId).eq("id", ventaId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!venta) throw new Error("No se encontró la venta");
@@ -182,10 +182,21 @@ export async function facturarVenta(comercioId: string, ventaId: string, documen
   const receptor = receptorDeVenta(total, cliente);
   if (!receptor.ok) throw new Error(receptor.error);
 
+  // Punto de venta: el de la caja donde se hizo la venta, si tiene uno propio;
+  // si no, el general de la configuracion de AFIP.
+  let puntoVenta = cfg.punto_venta;
+  if (venta.caja_id) {
+    const { data: caja } = await supabaseAdmin
+      .from("caja").select("puestos(punto_venta_afip)")
+      .eq("comercio_id", comercioId).eq("id", venta.caja_id).maybeSingle();
+    const pvCaja = (caja?.puestos as unknown as { punto_venta_afip: number | null } | null)?.punto_venta_afip;
+    if (pvCaja) puntoVenta = pvCaja;
+  }
+
   const factura = await crearOReusar(
     {
       comercio_id: comercioId, venta_id: ventaId, devolucion_id: null, factura_asociada_id: null,
-      ambiente: cfg.ambiente, cbte_tipo: CBTE.FACTURA_C, punto_venta: cfg.punto_venta, fecha: hoyArgentinaIso(),
+      ambiente: cfg.ambiente, cbte_tipo: CBTE.FACTURA_C, punto_venta: puntoVenta, fecha: hoyArgentinaIso(),
       total, doc_tipo: receptor.receptor.docTipo, doc_nro: receptor.receptor.docNro, receptor_nombre: receptor.receptor.nombre,
     },
     () => facturaVivaDeVenta(comercioId, ventaId),

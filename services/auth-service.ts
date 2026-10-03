@@ -3,31 +3,23 @@ import { apiUrl } from "@/lib/utils/api-url"
 import { setCurrentUser, DEFAULT_COMERCIO_ID } from "@/hooks/use-auth";
 import type { Usuario } from "@/lib/types";
 
-/** El servidor no sabe de que comercio es: hay que pedir el codigo. */
-export class FaltaComercioError extends Error {
-  constructor(mensaje: string) {
-    super(mensaje);
-    this.name = "FaltaComercioError";
-  }
-}
-
-async function entrarConPin(ruta: string, pin: string, comercio?: string): Promise<Usuario> {
+async function entrarConPin(ruta: string, pin: string): Promise<Usuario> {
   const res = await fetch(apiUrl(ruta), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pin, comercio }),
+    body: JSON.stringify({ pin }),
   });
   const data = await res.json();
-  if (!res.ok) {
-    if (data?.faltaComercio) throw new FaltaComercioError(data.error);
-    throw new Error(data?.error ?? "PIN incorrecto");
-  }
+  if (!res.ok) throw new Error(data?.error ?? "PIN incorrecto");
   const user: Usuario = {
     id: data.id,
     nombre: data.nombre,
     rol: data.rol,
     comercioId: data.comercioId ?? DEFAULT_COMERCIO_ID,
     comercioSlug: data.comercioSlug,
+    debeCambiarPin: data.debeCambiarPin === true,
+    puestoId: data.puestoId,
+    puestoNombre: data.puestoNombre,
     activo: true,
     createdAt: new Date(),
   };
@@ -35,9 +27,9 @@ async function entrarConPin(ruta: string, pin: string, comercio?: string): Promi
   return user;
 }
 
-/** PIN de un empleado (cajero/encargado), siempre dentro de SU comercio (slug). */
-export function login(pin: string, comercio: string): Promise<Usuario> {
-  return entrarConPin("/api/auth/login", pin, comercio);
+/** PIN de un empleado (cajero/encargado), en una PC registrada: el comercio y la caja salen de la PC. */
+export function login(pin: string): Promise<Usuario> {
+  return entrarConPin("/api/auth/login", pin);
 }
 
 /** PIN de la demo: solo entra al comercio demo. */

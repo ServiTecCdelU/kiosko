@@ -20,12 +20,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
+    // Entro con el PIN viejo de 4: primero elige el de 6 (el servidor no le deja otra cosa).
+    if (user.debeCambiarPin) {
+      router.replace("/cambiar-pin");
+      return;
+    }
     if (bloqueado) {
       router.replace("/pos");
     }
   }, [ready, user, bloqueado, router]);
 
-  if (!ready || !user || bloqueado) {
+  if (!ready || !user || bloqueado || user.debeCambiarPin) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

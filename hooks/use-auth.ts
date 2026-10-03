@@ -3,8 +3,6 @@ import { apiUrl } from "@/lib/utils/api-url"
 
 import { useState, useEffect, useCallback } from "react";
 import type { Usuario, UserRol } from "@/lib/types";
-import { recordarComercioDispositivo } from "@/lib/comercio-dispositivo";
-import { DEMO_SLUG } from "@/lib/demo";
 
 const STORAGE_KEY = "kiosko_user";
 let cached: Usuario | null | undefined = undefined;
@@ -41,9 +39,6 @@ function readStored(): Usuario | null {
 export function setCurrentUser(u: Usuario | null): void {
   cached = u;
   if (typeof window === "undefined") return;
-  // El dispositivo recuerda de que comercio es (login por PIN de empleados).
-  // La demo no: no tiene que pisar el comercio real de este mostrador.
-  if (u?.comercioSlug && u.comercioSlug !== DEMO_SLUG) recordarComercioDispositivo(u.comercioSlug);
   if (u) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(u));
   else sessionStorage.removeItem(STORAGE_KEY);
 }

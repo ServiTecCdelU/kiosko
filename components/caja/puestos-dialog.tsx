@@ -51,6 +51,18 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
     }
   };
 
+  const handlePuntoVenta = async (p: PuestoConEstado, valor: string) => {
+    const pv = valor.trim() === "" ? null : Number(valor);
+    if (pv === p.puntoVentaAfip) return;
+    try {
+      await actualizarPuesto(p.id, { puntoVentaAfip: pv });
+      toast.success(pv ? `${p.nombre}: factura con el punto de venta ${pv}` : `${p.nombre}: usa el punto de venta general`);
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar el punto de venta");
+    }
+  };
+
   const handleRenombrar = async (p: PuestoConEstado) => {
     const nombre = window.prompt("Nuevo nombre del puesto:", p.nombre)?.trim();
     if (!nombre || nombre === p.nombre) return;
@@ -74,7 +86,8 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
 
         <div className="space-y-2">
           {puestos.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5">
+            <div key={p.id} className="space-y-2 rounded-xl border px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
               <button
                 className="text-left text-sm font-medium hover:underline"
                 onClick={() => handleRenombrar(p)}
@@ -94,6 +107,20 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
                   onCheckedChange={(v) => handleActivo(p, v)}
                 />
               </div>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Punto de venta AFIP
+              <Input
+                key={`${p.id}-${p.puntoVentaAfip ?? ""}`}
+                defaultValue={p.puntoVentaAfip ?? ""}
+                onBlur={(e) => handlePuntoVenta(p, e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="general"
+                className="h-7 w-20 rounded-lg text-xs"
+              />
+              <span>(vacío = el de Facturación)</span>
+            </label>
             </div>
           ))}
         </div>

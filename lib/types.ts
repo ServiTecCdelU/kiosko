@@ -197,5 +197,10 @@ export interface Usuario {
   comercioNombre?: string;
   /** Slug del comercio: el panel vive en /<slug> (la landing queda en /). */
   comercioSlug?: string;
+  /** Entro con el PIN viejo de 4: tiene que elegir uno de 6 antes de seguir. */
+  debeCambiarPin?: boolean;
+  /** Caja (puesto) de la PC registrada donde entro por PIN. */
+  puestoId?: string;
+  puestoNombre?: string;
   createdAt: Date;
 }

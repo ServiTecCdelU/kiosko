@@ -28,6 +28,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: "No tenes permiso para esta accion" }, { status: 403 });
   }
 
+  // Entro con el PIN viejo de 4: hasta elegir uno de 6 no puede operar.
+  if (sesion?.cambiarPin) {
+    return NextResponse.json({ error: "Primero elegí tu PIN nuevo de 6 números", cambiarPin: true }, { status: 403 });
+  }
+
   // El superadmin en modo soporte puede operar aunque el comercio este bloqueado.
   if (sesion && !sesion.soporte && !esLectura(ruta, request.method)) {
     const acceso = await accesoDeComercio(sesion.comercioId);

@@ -31,6 +31,9 @@ export interface Sesion {
   /** Superadmin adentro del panel de un comercio (boton "Entrar" del
    * superadmin): comercioId es el de ese comercio y rol "admin". */
   soporte?: boolean;
+  /** Entro con el PIN viejo de 4: hasta elegir uno de 6, proxy.ts solo le
+   * deja usar /api/auth (cambiar el PIN o salir). */
+  cambiarPin?: boolean;
 }
 
 function firmar(payload: string): string {
@@ -38,7 +41,7 @@ function firmar(payload: string): string {
 }
 
 export function crearCookieSesion(datos: {
-  usuarioId: string; comercioId: string; rol: string; superadmin?: boolean; nombre?: string; soporte?: boolean;
+  usuarioId: string; comercioId: string; rol: string; superadmin?: boolean; nombre?: string; soporte?: boolean; cambiarPin?: boolean;
 }): string {
   const sesion: Sesion = { ...datos, exp: Date.now() + DURACION_MS };
   const payload = Buffer.from(JSON.stringify(sesion)).toString("base64url");
@@ -81,6 +84,39 @@ export function getSesion(req: Request): Sesion | null {
   const sesion = leerCookieFirmada(req, COOKIE) as Sesion | null;
   if (!sesion || !sesion.comercioId || Date.now() > sesion.exp) return null;
   return sesion;
+}
+
+// ------------------------------------------------------------
+// PC registrada (43_cajas_y_dispositivos.sql): el dueño la ata a una caja de
+// su comercio y recien ahi los empleados pueden entrar con PIN en ella. Es de
+// la PC, no de la persona: dura mucho y sobrevive al cierre de sesion. Lo que
+// manda es la fila en `dispositivos` (activo): darla de baja la anula al instante.
+// ------------------------------------------------------------
+const COOKIE_DISPOSITIVO = "kiosko_dispositivo";
+const DURACION_DISPOSITIVO_MS = 1000 * 60 * 60 * 24 * 365 * 2;
+
+export interface CookieDispositivo {
+  tipo: "dispositivo";
+  id: string;
+  comercioId: string;
+  exp: number;
+}
+
+export function crearCookieDispositivo(id: string, comercioId: string): string {
+  const datos: CookieDispositivo = { tipo: "dispositivo", id, comercioId, exp: Date.now() + DURACION_DISPOSITIVO_MS };
+  const payload = Buffer.from(JSON.stringify(datos)).toString("base64url");
+  const maxAge = Math.floor(DURACION_DISPOSITIVO_MS / 1000);
+  return `${COOKIE_DISPOSITIVO}=${payload}.${firmar(payload)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+export function borrarCookieDispositivo(): string {
+  return `${COOKIE_DISPOSITIVO}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+}
+
+export function getCookieDispositivo(req: Request): CookieDispositivo | null {
+  const d = leerCookieFirmada(req, COOKIE_DISPOSITIVO) as CookieDispositivo | null;
+  if (!d || d.tipo !== "dispositivo" || !d.id || !d.comercioId || Date.now() > d.exp) return null;
+  return d;
 }
 
 // ------------------------------------------------------------

@@ -118,8 +118,11 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - **Admin del comercio** → Google (Supabase Auth, PKCE en el navegador:
     `app/auth/callback/page.tsx`; verificación server-side en
     `app/api/auth/google-verify`).
-  - **Cajero / encargado** → PIN (hash bcrypt en Postgres, rate limit por IP en
-    `lib/server/limite-intentos.ts`).
+  - **Cajero / encargado** → PIN de 6 números, **solo en una PC registrada** por el dueño
+    (Caja → PCs…). La PC queda atada a su comercio y su caja; la cajera pone su PIN y entra
+    directo a esa caja. 5 errores bloquean la PC 15 min. Quien tenía PIN de 4 entra una última
+    vez y elige uno de 6 (`/cambiar-pin`; hasta hacerlo, `proxy.ts` le bloquea la API).
+    Cada caja puede tener su punto de venta de AFIP (Caja → Puestos…).
   - **Superadmin** → misma cuenta Google, matcheada contra la tabla `superadmins`.
     Puede "Entrar" a un comercio en modo soporte (`sesion.soporte`).
 - Roles: `admin`, `encargado`, `cajero`. Qué ve cada uno: `lib/nav.ts`.
@@ -161,7 +164,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 42).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 43).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -171,7 +174,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
   `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`43_*.sql`**. La **42** (`42_aislamiento_saas.sql`) se corre
+- La siguiente migración es **`44_*.sql`**. La **42** (`42_aislamiento_saas.sql`) se corre
   **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en

@@ -14,7 +14,7 @@ export type ReglaRuta = "publica" | "superadmin" | "sesion" | "admin";
  * crea el comercio de alguien que todavia no tiene sesion: la protege la cookie
  * firmada de registro (lib/server/sesion.ts), que solo emite el login con Google.
  */
-const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook", "/api/registro"];
+const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook", "/api/registro", "/api/dispositivo"];
 
 /** Validan la cookie de superadmin adentro de cada handler. */
 const RUTAS_SUPERADMIN = ["/api/superadmin"];
@@ -37,6 +37,8 @@ const RUTAS_ADMIN = [
   "/api/afip/pedido",
   "/api/afip/certificado",
   "/api/afip/probar",
+  // PCs registradas: solo el dueño las registra o da de baja.
+  "/api/dispositivos",
 ];
 
 /** Metodos puntuales de admin en rutas que el mostrador tambien usa. */

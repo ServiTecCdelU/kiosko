@@ -78,6 +78,8 @@ export async function getCajasAbiertas(): Promise<Caja[]> {
 export interface PuestoConEstado extends Puesto {
   cajaAbiertaId?: string;
   cajaAbiertaPor?: string;
+  /** Punto de venta de AFIP propio de esta caja (null = el general). */
+  puntoVentaAfip: number | null;
 }
 
 export async function getPuestos(): Promise<PuestoConEstado[]> {
@@ -91,6 +93,7 @@ export async function getPuestos(): Promise<PuestoConEstado[]> {
     createdAt: new Date(p.created_at),
     cajaAbiertaId: p.caja_abierta_id ?? undefined,
     cajaAbiertaPor: p.caja_abierta_por ?? undefined,
+    puntoVentaAfip: p.punto_venta_afip ?? null,
   }));
 }
 
@@ -126,7 +129,7 @@ export async function crearPuesto(nombre: string): Promise<void> {
 
 export async function actualizarPuesto(
   id: string,
-  cambios: { nombre?: string; activo?: boolean },
+  cambios: { nombre?: string; activo?: boolean; puntoVentaAfip?: number | null },
 ): Promise<void> {
   const res = await fetch(apiUrl("/api/puestos"), {
     method: "PATCH",

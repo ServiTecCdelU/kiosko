@@ -46,6 +46,12 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/afip/reintentar", "POST"), "sesion");
   });
 
+  test("'que PC es esta' es publico (pantalla de login); registrar y quitar PCs es del admin", () => {
+    assert.equal(reglaDeRuta("/api/dispositivo", "GET"), "publica");
+    assert.equal(reglaDeRuta("/api/dispositivos", "POST"), "admin");
+    assert.equal(reglaDeRuta("/api/dispositivos", "DELETE"), "admin");
+  });
+
   test("listar lectores Point es del mostrador; cambiarles el modo es del admin", () => {
     assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "GET"), "sesion");
     assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "PATCH"), "admin");

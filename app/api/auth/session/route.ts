@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
   const { data: usuario, error } = await supabaseAdmin
     .from("usuarios")
-    .select("id, nombre, rol, comercio_id, activo")
+    .select("id, nombre, rol, comercio_id, activo, debe_cambiar_pin")
     .eq("id", sesion.usuarioId)
     .eq("comercio_id", sesion.comercioId)
     .maybeSingle();
@@ -52,5 +52,6 @@ export async function GET(req: Request) {
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
     comercioSlug: await slugDeComercio(usuario.comercio_id),
+    debeCambiarPin: usuario.debe_cambiar_pin === true,
   });
 }

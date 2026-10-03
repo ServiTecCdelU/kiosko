@@ -6,11 +6,11 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { errorPinReservado, errorPinRepetido } from "@/lib/server/demo";
+import { errorPinNuevo } from "@/lib/pin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PIN_REGEX = /^[0-9]{4}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = ["admin", "encargado", "cajero"];
 
@@ -41,8 +41,9 @@ export async function POST(req: Request) {
     if (!EMAIL_REGEX.test(email)) {
       return NextResponse.json({ error: "El administrador necesita un correo de Google valido" }, { status: 400 });
     }
-  } else if (!PIN_REGEX.test(pin)) {
-    return NextResponse.json({ error: "El PIN debe tener 4 digitos" }, { status: 400 });
+  } else {
+    const invalido = errorPinNuevo(pin);
+    if (invalido) return NextResponse.json({ error: invalido }, { status: 400 });
   }
   const reservado = rol === "admin" ? null : await errorPinReservado(comercioId, pin);
   if (reservado) return NextResponse.json({ error: reservado }, { status: 400 });
@@ -90,8 +91,9 @@ export async function PATCH(req: Request) {
   if (rol === "admin" && email !== null && email !== "" && !EMAIL_REGEX.test(email)) {
     return NextResponse.json({ error: "Correo invalido" }, { status: 400 });
   }
-  if (pin !== null && !PIN_REGEX.test(pin)) {
-    return NextResponse.json({ error: "El PIN debe tener 4 digitos" }, { status: 400 });
+  if (pin !== null) {
+    const invalido = errorPinNuevo(pin);
+    if (invalido) return NextResponse.json({ error: invalido }, { status: 400 });
   }
 
   // actualizar_empleado_kiosko no filtra por comercio: sin esto, desde un
@@ -122,5 +124,9 @@ export async function PATCH(req: Request) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  // PIN nuevo de 6 cargado por el dueño: ya no tiene que cambiarlo al entrar.
+  if (pin !== null) {
+    await supabaseAdmin.from("usuarios").update({ debe_cambiar_pin: false }).eq("id", usuarioId).eq("comercio_id", comercioId);
+  }
   return NextResponse.json({ ok: true });
 }

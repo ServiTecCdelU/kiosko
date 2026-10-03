@@ -7,7 +7,7 @@
  * rutas fijas de Next ganan sobre /[comercio] y el panel nunca se veria.
  */
 export const RUTAS_RESERVADAS = [
-  "api", "auth", "caja", "clientes", "compras", "facturacion", "login", "ofertas-tv",
+  "api", "auth", "caja", "cambiar-pin", "clientes", "compras", "facturacion", "login", "ofertas-tv",
   "pantalla-cliente", "pos", "promociones", "registro", "reportes", "sincronizacion",
   "stock", "superadmin", "usuarios", "ventas", "privacy", "terms",
   "icons", "manifest.json", "metadato.jpg", "sw.js", "_next",

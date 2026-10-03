@@ -76,18 +76,25 @@ export async function slugDeComercio(comercioId: string): Promise<string | undef
 }
 
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */
-export async function respuestaLoginPin(usuario: UsuarioPin): Promise<NextResponse> {
+export async function respuestaLoginPin(
+  usuario: UsuarioPin,
+  extra: { debeCambiarPin?: boolean; puestoId?: string; puestoNombre?: string } = {},
+): Promise<NextResponse> {
   const res = NextResponse.json({
     id: usuario.id,
     nombre: usuario.nombre,
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
     comercioSlug: await slugDeComercio(usuario.comercio_id),
+    ...extra,
   });
   // La cookie firmada es la fuente de verdad del comercioId para toda ruta API.
   res.headers.append(
     "Set-Cookie",
-    crearCookieSesion({ usuarioId: usuario.id, comercioId: usuario.comercio_id, rol: usuario.rol }),
+    crearCookieSesion({
+      usuarioId: usuario.id, comercioId: usuario.comercio_id, rol: usuario.rol,
+      ...(extra.debeCambiarPin ? { cambiarPin: true } : {}),
+    }),
   );
   return res;
 }

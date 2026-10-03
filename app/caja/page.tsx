@@ -27,6 +27,7 @@ import {
 } from "@/services/caja-service";
 import { consolidarDia, type CajaDelDia } from "@/lib/consolidado";
 import { PuestosDialog } from "@/components/caja/puestos-dialog";
+import { PcsDialog } from "@/components/caja/pcs-dialog";
 import { getVentasDeCaja, anularVenta } from "@/services/sales-service";
 import { MovimientoDialog } from "@/components/caja/movimiento-dialog";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
@@ -64,6 +65,7 @@ export default function CajaPage() {
   const [puestoApertura, setPuestoApertura] = useState("");
   const [cajasDelDia, setCajasDelDia] = useState<CajaDelDia[]>([]);
   const [puestosOpen, setPuestosOpen] = useState(false);
+  const [pcsOpen, setPcsOpen] = useState(false);
   const [mostrarApertura, setMostrarApertura] = useState(false);
 
   const user = getCurrentUser();
@@ -76,6 +78,11 @@ export default function CajaPage() {
     try {
       const [listaPuestos, abiertas] = await Promise.all([getPuestos(), getCajasAbiertas()]);
       setPuestos(listaPuestos);
+      // Entro por PIN en una PC registrada: la caja a abrir es la de esa PC.
+      const puestoPc = getCurrentUser()?.puestoId;
+      if (puestoPc && listaPuestos.some((x) => x.id === puestoPc && x.activo && !x.cajaAbiertaId)) {
+        setPuestoApertura((prev) => prev || puestoPc);
+      }
       setCajasAbiertas(abiertas);
 
       // El cajero opera SU caja; encargado/admin, la seleccionada (o la propia,
@@ -300,6 +307,14 @@ export default function CajaPage() {
                   className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Puestos…
+                </button>
+              )}
+              {esAdmin && (
+                <button
+                  onClick={() => setPcsOpen(true)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  PCs…
                 </button>
               )}
             </div>
@@ -568,6 +583,7 @@ export default function CajaPage() {
 
       <MovimientoDialog tipo={movTipo} onOpenChange={(o) => !o && setMovTipo(null)} onSubmit={handleMovimiento} />
       <PuestosDialog open={puestosOpen} onOpenChange={setPuestosOpen} puestos={puestos} onChanged={load} />
+      <PcsDialog open={pcsOpen} onOpenChange={setPcsOpen} puestos={puestos} />
       <SaleDetailDialog
         venta={ventaDetalle}
         onOpenChange={(o) => !o && setVentaDetalle(null)}
