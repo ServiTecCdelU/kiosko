@@ -82,6 +82,10 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
 - **`proxy.ts` es la guardia de toda `/api`**: sin sesión → 401, rol insuficiente → 403.
   La regla de cada ruta está en `lib/permisos-api.ts` (falla cerrado: una ruta nueva pide
   sesión). Si una ruta nueva es solo de admin, sumarla a `RUTAS_ADMIN`.
+- **Modo consulta**: un comercio con la prueba vencida (+3 días de gracia), suspendido o
+  dado de baja no puede escribir; `proxy.ts` corta todo lo que no sea lectura
+  (`esLectura` en `lib/acceso-comercio.ts`). Si una ruta nueva solo lee pero va por POST,
+  ponerla bajo `/api/consultas/`.
 - **`comercioId` sale de la sesión del servidor** (`comercioIdDeSesion` en
   `lib/server/sesion.ts`), nunca del body del request.
 - **Todo `fetch` a rutas propias usa `apiUrl()`** (`lib/utils/api-url.ts`): en producción
@@ -138,5 +142,5 @@ Detalle de cada una en `docs/CONTEXTO.md` §5.
 
 ## Roadmap
 Referencia viva: `docs/PLAN-MAESTRO-2026-09-18.md` (fases 0–4 prácticamente completas).
-Pendientes actuales resumidos en `docs/CONTEXTO.md` §6: enforcement de `trial_hasta` / onboarding, backup por comercio,
+Pendientes actuales resumidos en `docs/CONTEXTO.md` §6: onboarding self-service, backup por comercio,
 facturación electrónica AFIP/ARCA, billing de suscripción.

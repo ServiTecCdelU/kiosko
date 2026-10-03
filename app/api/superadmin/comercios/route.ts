@@ -9,6 +9,7 @@ import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion"
 import { hoyArgentina } from "@/lib/server/fecha-argentina";
 import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
 import { esSlugReservado } from "@/lib/panel";
+import { olvidarAcceso } from "@/lib/server/acceso";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -266,6 +267,9 @@ export async function PATCH(req: Request) {
     cambios.plan = body.plan;
   }
   if (body?.trialHasta !== undefined) {
+    if (body.trialHasta && Number.isNaN(new Date(body.trialHasta).getTime())) {
+      return NextResponse.json({ error: "Fecha de fin de prueba invalida" }, { status: 400 });
+    }
     cambios.trial_hasta = body.trialHasta || null;
   }
   if (body?.suscripcionHasta !== undefined) {
@@ -283,5 +287,7 @@ export async function PATCH(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  // Estado o prueba cambiaron: el bloqueo se recalcula ya (lib/server/acceso.ts).
+  olvidarAcceso(id);
   return NextResponse.json({ comercio: data });
 }

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/format";
 import { AccesosGoogle } from "@/components/superadmin/accesos-google";
 import { pagoAlDia, superadminApi, type Comercio } from "@/components/superadmin/comun";
+import { DIAS_GRACIA } from "@/lib/acceso-comercio";
 
 interface ComercioDialogProps {
   comercio: Comercio | null;
@@ -22,6 +23,50 @@ interface ComercioDialogProps {
 }
 
 const selectClase = "border-input h-9 w-full rounded-xl border bg-transparent px-2 text-sm outline-none";
+
+const DIAS_EXTENSION = 7;
+
+/** "AAAA-MM-DD" de una fecha en horario argentino (para el input type=date). */
+function diaArgentina(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date(iso));
+}
+
+/** Fin del dia elegido en Argentina (UTC-3 todo el año), en ISO. */
+function finDelDiaArgentina(dia: string): string {
+  return new Date(`${dia}T23:59:59-03:00`).toISOString();
+}
+
+/**
+ * Fin de la prueba. Al vencer hay DIAS_GRACIA dias de uso normal y despues el
+ * comercio queda en modo consulta (lib/acceso-comercio.ts). Extender desde
+ * hoy si ya estaba vencida, asi la extension no se "gasta" en dias pasados.
+ */
+function FinDePrueba({ trialHasta, onCambiar }: { trialHasta: string | null; onCambiar: (iso: string) => void }) {
+  const extender = () => {
+    const base = Math.max(Date.now(), trialHasta ? new Date(trialHasta).getTime() : 0);
+    onCambiar(finDelDiaArgentina(diaArgentina(new Date(base + DIAS_EXTENSION * 86_400_000).toISOString())));
+  };
+
+  return (
+    <div>
+      <Label htmlFor="fin-prueba" className="mb-1 block text-xs text-muted-foreground">
+        Prueba hasta (después: {DIAS_GRACIA} días de gracia y modo consulta)
+      </Label>
+      <div className="flex gap-2">
+        <input
+          id="fin-prueba"
+          type="date"
+          value={trialHasta ? diaArgentina(trialHasta) : ""}
+          onChange={(e) => e.target.value && onCambiar(finDelDiaArgentina(e.target.value))}
+          className={selectClase}
+        />
+        <Button type="button" size="sm" variant="outline" className="h-9 shrink-0 rounded-xl" onClick={extender}>
+          +{DIAS_EXTENSION} días
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: ComercioDialogProps) {
   if (!comercio) return null;
@@ -78,6 +123,13 @@ export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: C
               </select>
             </div>
           </div>
+
+          {comercio.estado === "prueba" && (
+            <FinDePrueba
+              trialHasta={comercio.trial_hasta}
+              onCambiar={(trialHasta) => cambiar({ trialHasta })}
+            />
+          )}
 
           <div className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5">
             <Badge variant="outline" className={cn(alDia ? "border-success/50 text-success" : "border-warning text-warning")}>

@@ -42,6 +42,18 @@ export class NetworkUnavailableError extends Error {
   }
 }
 
+/**
+ * La venta es valida pero el servidor no la puede tomar ahora (sesion vencida
+ * o comercio en modo consulta). Una venta de la cola offline ya se cobro: NO
+ * se descarta, se reintenta cuando se pueda.
+ */
+export class VentaRetenidaError extends Error {
+  constructor(mensaje: string) {
+    super(mensaje);
+    this.name = "VentaRetenidaError";
+  }
+}
+
 export async function createSale(input: CreateSaleInput): Promise<ProcessSaleResult> {
   let res: Response;
   try {
@@ -53,7 +65,12 @@ export async function createSale(input: CreateSaleInput): Promise<ProcessSaleRes
   } catch {
     throw new NetworkUnavailableError();
   }
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
+  // Sesion vencida o comercio en modo consulta: la venta no es invalida, solo
+  // no se puede registrar AHORA. Quien la tenga en cola offline la conserva.
+  if (res.status === 401 || data?.soloLectura) {
+    throw new VentaRetenidaError(data?.error ?? "No se pudo registrar la venta por ahora");
+  }
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la venta");
   return data as ProcessSaleResult;
 }

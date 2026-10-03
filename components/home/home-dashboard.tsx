@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { MercadoPagoCard } from "@/components/home/mercadopago-card";
+import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
 import { getReporte } from "@/services/reportes-service";
@@ -102,6 +103,9 @@ function HomeContent() {
       />
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8">
+        <div className="overflow-hidden rounded-2xl empty:hidden">
+          <AvisoAccesoBanner rol={rol} />
+        </div>
         <BrandHeader nombre={user?.nombre} />
 
         <DashboardStats rol={rol} />

@@ -66,6 +66,14 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `lib/permisos-api.ts` (con tests): públicas solo `/api/auth/*` y el webhook de MP;
   empleados, compras, proveedores, importación, sincronización, reportes y la
   conexión de MP son solo admin. Una ruta nueva pide sesión por defecto.
+- **Prueba y estado del comercio** (`lib/acceso-comercio.ts`, con tests): los últimos
+  5 días de prueba se avisa; al vencer `trial_hasta` hay 3 días de gracia y después
+  **modo consulta** (puede entrar, ver y exportar, pero no vender ni editar).
+  `suspendido` y `baja` pasan a modo consulta al instante. Lo aplica `proxy.ts` en
+  cada escritura (estado cacheado 60 s, `lib/server/acceso.ts`); el cartel es
+  `components/layout/aviso-acceso-banner.tsx`. Exentos: la demo y el superadmin en
+  modo soporte. Las ventas de la cola offline que el servidor no puede tomar
+  (sesión vencida o modo consulta) **quedan en cola**, no se descartan.
 - En el navegador, `useAuth` valida la cookie una vez por carga y un 401 en
   `consultar()` manda al login.
 - Login:
@@ -165,7 +173,7 @@ demo con datos; panel por slug.
 | # | Ítem | Nota |
 |---|---|---|
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
-| 5.1 | Onboarding self-service + **enforcement de `trial_hasta`** | Hoy el superadmin crea comercios y setea el trial, pero nada bloquea al vencer. |
+| 5.1 | Onboarding self-service | Hoy el superadmin crea cada comercio a mano (el vencimiento de la prueba ya se aplica). |
 | 5.3 | Backup / exportación de datos por comercio | — |
 | 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |

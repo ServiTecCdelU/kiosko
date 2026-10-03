@@ -1,5 +1,7 @@
 // components/superadmin/comun.ts — tipos y helpers del panel de superadmin.
 import { apiUrl } from "@/lib/utils/api-url";
+import { evaluarAcceso } from "@/lib/acceso-comercio";
+import { DEMO_SLUG } from "@/lib/demo";
 
 export interface ComercioUso {
   productos: number;
@@ -43,6 +45,22 @@ function anioMesArgentina(fecha: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit",
   }).format(new Date(fecha));
+}
+
+/** Situacion de la prueba para el badge: misma regla que aplica proxy.ts. */
+export function avisoPrueba(c: Comercio): { texto: string; clase: string; titulo: string } | null {
+  if (c.slug === DEMO_SLUG) return null; // la demo nunca vence
+  const a = evaluarAcceso(c);
+  if (a.motivo === "prueba_por_vencer") {
+    return { texto: `vence en ${a.dias} d`, clase: "border-warning text-warning", titulo: "La prueba vence pronto" };
+  }
+  if (a.motivo === "prueba_en_gracia") {
+    return { texto: `gracia ${a.dias} d`, clase: "border-destructive/50 text-destructive", titulo: "Prueba vencida: le quedan días de gracia antes del bloqueo" };
+  }
+  if (a.motivo === "prueba_vencida") {
+    return { texto: "bloqueado", clase: "border-destructive bg-destructive/10 text-destructive", titulo: "Prueba vencida: en modo consulta" };
+  }
+  return null;
 }
 
 export function pagoAlDia(c: Comercio): boolean {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getCatalogoCompleto } from "@/services/products-service";
-import { createSale, NetworkUnavailableError } from "@/services/sales-service";
+import { createSale, NetworkUnavailableError, VentaRetenidaError } from "@/services/sales-service";
 import {
   guardarCatalogoOffline, listarVentasPendientes, quitarVentaPendiente,
   type VentaPendiente,
@@ -44,6 +44,11 @@ export function useOfflineSync() {
           sincronizadas++;
         } catch (e) {
           if (e instanceof NetworkUnavailableError) break; // se corto de nuevo, seguimos despues
+          if (e instanceof VentaRetenidaError) {
+            // Sesion vencida o modo consulta: las ventas ya se cobraron, quedan en cola.
+            toast.warning(`Hay ventas sin conexión esperando para guardarse: ${e.message}`);
+            break;
+          }
           // error de validacion del server (ej: producto ya no existe): se descarta para no trabar la cola
           await quitarVentaPendiente(venta.id);
           toast.error(`No se pudo sincronizar una venta pendiente: ${e instanceof Error ? e.message : "error"}`);
