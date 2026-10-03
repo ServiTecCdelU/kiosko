@@ -3,7 +3,9 @@
 // Cancela todos los cobros pendientes registrados para ese lector.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,13 +20,22 @@ export async function POST(req: Request) {
 
   const deviceId = String(body?.deviceId ?? "");
   if (!deviceId) return NextResponse.json({ error: "Falta el id del lector" }, { status: 400 });
+  const comercioId = comercioIdDeSesion(req);
 
   const { data: pendientes, error } = await supabaseAdmin
     .from("pagos_mp_pendientes")
     .select("id, intent_id, external_reference")
+    .eq("comercio_id", comercioId)
     .eq("device_id", deviceId)
     .eq("estado", "pendiente");
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  let token: string;
+  try {
+    token = await tokenMPDeComercio(comercioId);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Mercado Pago no esta conectado" }, { status: 400 });
+  }
 
   const resultados: { intentId: string; cancelado: boolean; motivo?: string }[] = [];
 
@@ -33,7 +44,7 @@ export async function POST(req: Request) {
 
     let ok = false;
     try {
-      const r = await cancelarIntentoPagoPoint(deviceId, p.intent_id);
+      const r = await cancelarIntentoPagoPoint(token, deviceId, p.intent_id);
       ok = r.cancelado;
       resultados.push(
         r.cancelado
@@ -55,6 +66,7 @@ export async function POST(req: Request) {
       await supabaseAdmin
         .from("pagos_mp_pendientes")
         .update({ estado: "cancelado", updated_at: new Date().toISOString() })
+        .eq("comercio_id", comercioId)
         .eq("id", p.id);
     }
   }

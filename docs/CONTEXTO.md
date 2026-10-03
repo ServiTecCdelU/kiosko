@@ -17,8 +17,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 - **Decisión estratégica (2026-06-19)**: se vende como **SaaS multi-comercio**
   (una plataforma, muchos comercios con suscripción mensual), no como
   instalación por cliente. Por eso todo el dominio es multi-tenant desde el
-  principio (`comercio_id` en todas las tablas). La intención es que cada
-  comercio use sus propias credenciales de Mercado Pago (todavía no: ver §6).
+  principio (`comercio_id` en todas las tablas). Cada comercio cobra con
+  su propia cuenta de Mercado Pago.
 - **Tres perfiles de comercio** a los que apunta: kiosko (1 operador),
   despensa (fiado + pesables + vencimientos), supermercado (varios cajeros).
 - **Proyecto hermano**: `Distribuidora J&J` (`../../Distribuidora J&J`). Solo
@@ -59,7 +59,15 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 ### Sesión y tenant
 - Cookie propia `kiosko_sesion`, **firmada con HMAC** (`lib/server/sesion.ts`),
   12 h. El `comercioId` **se toma de la sesión del servidor**
-  (`comercioIdDeSesion`), nunca del body (aunque `consultar` todavía lo manda).
+  (`comercioIdDeSesion`), nunca del body. Sin sesión no hay comercio (ya no hay
+  fallback a `comercio_1`).
+- **`proxy.ts` protege toda `/api`**: valida la cookie y el rol antes de que corra
+  la ruta (401 sin sesión, 403 sin permiso). La regla de cada ruta vive en
+  `lib/permisos-api.ts` (con tests): públicas solo `/api/auth/*` y el webhook de MP;
+  empleados, compras, proveedores, importación, sincronización, reportes y la
+  conexión de MP son solo admin. Una ruta nueva pide sesión por defecto.
+- En el navegador, `useAuth` valida la cookie una vez por carga y un 401 en
+  `consultar()` manda al login.
 - Login:
   - **Admin del comercio** → Google (Supabase Auth, PKCE en el navegador:
     `app/auth/callback/page.tsx`; verificación server-side en
@@ -88,6 +96,11 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   día (`lib/consolidado.ts`).
 - Mercado Pago QR y Point: `lib/server/mercadopago.ts`, `app/api/mercadopago/*`
   (webhook confirma la venta usando la misma lógica de `procesar-venta`).
+  **Cada comercio usa su propia cuenta**: el admin pega su Access Token en la tarjeta
+  "Cobros con Mercado Pago" del panel; se valida contra MP y se guarda cifrado con
+  AES-256-GCM (`lib/server/cifrado.ts`, `lib/server/mercadopago-credencial.ts`,
+  migración 39). El webhook identifica el comercio por `?comercio=` (QR) o por la
+  cuenta de MP que cobró (`user_id`, Point). La demo no puede conectar MP.
 
 ### Impresión
 - Ticket ZPL directo a **Zebra ZD220** (`lib/server/zpl.ts`,
@@ -102,7 +115,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 38).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 39).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -112,7 +125,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
   `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`39_*.sql`**. Regla: informar el SQL exacto al
+- La siguiente migración es **`40_*.sql`**. Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
   `.gitignore`). En otra PC hay que copiarlas a mano: **nunca commitearlas**.
@@ -127,7 +140,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 | `BASE_PATH` | `/comercio` en producción, vacío en local |
 | `NEXT_PUBLIC_SITE_URL` | Dominio público para OG (default `www.servitec.net.ar`) |
 | `NEXT_PUBLIC_APP_URL` | URL técnica del deploy (webhooks de Mercado Pago) |
-| `MP_ACCESS_TOKEN` | Token de Mercado Pago **único para toda la app** (`lib/server/mercadopago.ts`) |
+| `MP_TOKEN_KEY` | Clave AES-256 (32 bytes base64) que cifra el token de MP de cada comercio. **Si se pierde, cada comercio vuelve a cargar su token.** `MP_ACCESS_TOKEN` ya no se usa. |
 | `IMPRESORA_ZPL_RAW` | Destino RAW de la Zebra |
 | `DISTRIBUIDORA_API_URL` | Sincronización de catálogo |
 
@@ -151,13 +164,12 @@ demo con datos; panel por slug.
 
 | # | Ítem | Nota |
 |---|---|---|
-| 2.3 | **Mercado Pago por comercio + token cifrado** | Hoy se cobra con un solo `MP_ACCESS_TOKEN` de entorno; la columna `comercios.mp_access_token` (06_multitenant) existe pero no se usa y es texto plano. Para el SaaS: leer el token del comercio, cifrado con pgcrypto o Supabase Vault, descifrado solo server-side. |
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
 | 5.1 | Onboarding self-service + **enforcement de `trial_hasta`** | Hoy el superadmin crea comercios y setea el trial, pero nada bloquea al vencer. |
 | 5.3 | Backup / exportación de datos por comercio | — |
 | 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
-| — | Sacar `comercioId` del body de `consultar` | El servidor ya lo ignora; es limpieza. |
+| — | Sacar `comercioId` del body de los `fetch` de `services/*` | El servidor lo ignora (usa la sesión); es limpieza. |
 
 Criterio adoptado: no planificar en el vacío — priorizar según el dolor real
 del primer comercio en producción.

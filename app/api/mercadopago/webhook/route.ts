@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPagoMP } from "@/lib/server/mercadopago";
+import { comerciosDeCuentaMP, MPNoConectado, tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 import { procesarVenta } from "@/lib/server/procesar-venta";
 
 export const runtime = "nodejs";
@@ -13,6 +14,13 @@ function extraerPaymentId(url: URL, body: any): string | null {
   if (fromQuery) return fromQuery;
   if (body?.data?.id) return String(body.data.id);
   return null;
+}
+
+async function comerciosDelAviso(url: URL, body: any): Promise<string[]> {
+  const comercio = url.searchParams.get("comercio");
+  if (comercio) return [comercio];
+  const cuenta = body?.user_id ?? url.searchParams.get("user_id");
+  return cuenta ? comerciosDeCuentaMP(String(cuenta)) : [];
 }
 
 export async function POST(req: Request) {
@@ -30,13 +38,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true }); // notificacion no relevante, se responde 200 igual
   }
 
+  // De que comercio es el pago: el QR lo manda en la URL; Point avisa a la URL
+  // fija de la cuenta, asi que ahi sale de la cuenta de MP que cobro (user_id).
+  const comercios = await comerciosDelAviso(url, body);
+  if (comercios.length === 0) return NextResponse.json({ ok: true }); // no es de ningun comercio conectado
+
+  let token: string;
   try {
-    const pago = await getPagoMP(paymentId);
+    token = await tokenMPDeComercio(comercios[0]);
+  } catch (e) {
+    // Comercio desconectado: reintentar no lo arregla. Queda el cobro
+    // pendiente para resolverlo a mano desde Caja.
+    if (e instanceof MPNoConectado) return NextResponse.json({ ok: true });
+    return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
+  }
+
+  try {
+    // Con el token del comercio MP solo devuelve pagos de SU cuenta: un aviso
+    // falso no puede hacer pasar el pago de otra cuenta como propio.
+    const pago = await getPagoMP(token, paymentId);
     if (!pago.externalReference) return NextResponse.json({ ok: true });
 
     const { data: pendiente, error: findErr } = await supabaseAdmin
       .from("pagos_mp_pendientes")
       .select("*")
+      .in("comercio_id", comercios)
       .eq("external_reference", pago.externalReference)
       .maybeSingle();
     if (findErr || !pendiente) return NextResponse.json({ ok: true });

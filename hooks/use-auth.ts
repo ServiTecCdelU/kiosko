@@ -52,6 +52,29 @@ export function getComercioId(): string {
   return readStored()?.comercioId ?? DEFAULT_COMERCIO_ID;
 }
 
+// Una sola validacion por carga de pagina aunque varios componentes usen el hook.
+let validacion: Promise<void> | null = null;
+
+function validarSesion(stored: Usuario): Promise<void> {
+  validacion ??= fetch(apiUrl("/api/auth/session"))
+    .then(async (res) => {
+      if (res.status === 401) {
+        setCurrentUser(null);
+        return;
+      }
+      if (res.ok) setCurrentUser({ ...stored, ...((await res.json()) as Usuario) });
+    })
+    // Sin red (modo offline del POS) se sigue con el usuario guardado.
+    .catch(() => {});
+  return validacion;
+}
+
+/** Sesion vencida a mitad de uso: limpia el usuario y vuelve al login. */
+export function sesionVencida(): void {
+  setCurrentUser(null);
+  if (typeof window !== "undefined") window.location.assign(apiUrl("/login"));
+}
+
 export function useAuth() {
   const [user, setUser] = useState<Usuario | null>(() => readStored());
   const [ready, setReady] = useState(false);
@@ -59,16 +82,12 @@ export function useAuth() {
   useEffect(() => {
     const stored = readStored();
     setUser(stored);
-    // Sesiones guardadas antes de que el panel pasara a /<slug> no traen el
-    // slug: se completa desde la cookie (si ya no vale, se cierra la sesion).
-    if (stored && !stored.comercioSlug && !AUTH_DISABLED) {
-      fetch(apiUrl("/api/auth/session"))
-        .then(async (res) => {
-          const fresh = res.ok ? ((await res.json()) as Usuario) : null;
-          setCurrentUser(fresh ? { ...stored, ...fresh } : null);
-          setUser(readStored());
-        })
-        .catch(() => {})
+    // El usuario guardado puede sobrevivir a la cookie (vence a las 12 h): se
+    // valida contra el servidor una vez por carga de pagina. Tambien completa
+    // datos nuevos (ej. el slug) de sesiones guardadas antes.
+    if (stored && !AUTH_DISABLED) {
+      validarSesion(stored)
+        .then(() => setUser(readStored()))
         .finally(() => setReady(true));
       return;
     }

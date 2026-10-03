@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearIntentoPagoPoint, cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,9 +31,16 @@ export async function POST(req: Request) {
 
   const externalReference = crypto.randomUUID();
 
+  let token: string;
+  try {
+    token = await tokenMPDeComercio(comercioId);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Mercado Pago no esta conectado" }, { status: 400 });
+  }
+
   let intento: { id: string } | null = null;
   try {
-    intento = await crearIntentoPagoPoint(deviceId, total, externalReference);
+    intento = await crearIntentoPagoPoint(token, deviceId, total, externalReference);
 
     const { error } = await supabaseAdmin.from("pagos_mp_pendientes").insert({
       id: crypto.randomUUID(),
@@ -51,7 +59,7 @@ export async function POST(req: Request) {
     // cancelarlo: si queda encolado, el lector rechaza todos los cobros
     // siguientes con un 409 ("ya hay un intento en curso").
     if (intento) {
-      await cancelarIntentoPagoPoint(deviceId, intento.id).catch(() => {});
+      await cancelarIntentoPagoPoint(token, deviceId, intento.id).catch(() => {});
     }
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo enviar el cobro al lector" }, { status: 400 });
   }

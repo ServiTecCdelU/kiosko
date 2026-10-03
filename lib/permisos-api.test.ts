@@ -1,0 +1,81 @@
+// lib/permisos-api.test.ts — correr con: npm test
+import { test, describe } from "node:test";
+import assert from "node:assert/strict";
+import { reglaDeRuta, autorizar } from "./permisos-api.ts";
+
+describe("reglaDeRuta", () => {
+  test("login, logout y sesion son publicos (son los que crean la sesion)", () => {
+    assert.equal(reglaDeRuta("/api/auth/login", "POST"), "publica");
+    assert.equal(reglaDeRuta("/api/auth/demo", "POST"), "publica");
+    assert.equal(reglaDeRuta("/api/auth/session", "GET"), "publica");
+  });
+
+  test("el webhook de Mercado Pago es publico (MP no manda cookie)", () => {
+    assert.equal(reglaDeRuta("/api/mercadopago/webhook", "POST"), "publica");
+  });
+
+  test("superadmin se valida en sus propias rutas", () => {
+    assert.equal(reglaDeRuta("/api/superadmin/comercios", "POST"), "superadmin");
+  });
+
+  test("lo del mostrador pide sesion de cualquier rol", () => {
+    for (const ruta of ["/api/ventas", "/api/caja", "/api/consultas/productos", "/api/productos", "/api/imprimir-ticket"]) {
+      assert.equal(reglaDeRuta(ruta, "POST"), "sesion", ruta);
+    }
+  });
+
+  test("empleados, compras, importacion, sincronizacion y reportes son solo admin", () => {
+    for (const ruta of [
+      "/api/usuarios", "/api/consultas/usuarios", "/api/compras", "/api/compras/anular",
+      "/api/proveedores", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
+      "/api/consultas/reportes", "/api/mercadopago/conexion",
+    ]) {
+      assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
+    }
+  });
+
+  test("listar lectores Point es del mostrador; cambiarles el modo es del admin", () => {
+    assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "GET"), "sesion");
+    assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "PATCH"), "admin");
+  });
+
+  test("un prefijo no matchea rutas que solo empiezan igual", () => {
+    assert.equal(reglaDeRuta("/api/usuarios-raros", "GET"), "sesion");
+  });
+
+  test("ruta desconocida: pide sesion (falla cerrado)", () => {
+    assert.equal(reglaDeRuta("/api/algo-nuevo", "GET"), "sesion");
+  });
+});
+
+describe("autorizar", () => {
+  const cajero = { comercioId: "c1", rol: "cajero" };
+  const admin = { comercioId: "c1", rol: "admin" };
+  const superadminPuro = { comercioId: "__superadmin__", rol: "superadmin", superadmin: true };
+
+  test("publica pasa sin sesion", () => {
+    assert.equal(autorizar("publica", null), null);
+  });
+
+  test("sin sesion, una ruta de comercio responde 401", () => {
+    assert.equal(autorizar("sesion", null), 401);
+    assert.equal(autorizar("admin", null), 401);
+  });
+
+  test("el superadmin fuera de un comercio no opera rutas de comercio", () => {
+    assert.equal(autorizar("sesion", superadminPuro), 401);
+  });
+
+  test("cajero entra al mostrador pero no a lo de admin", () => {
+    assert.equal(autorizar("sesion", cajero), null);
+    assert.equal(autorizar("admin", cajero), 403);
+  });
+
+  test("admin entra a todo lo del comercio", () => {
+    assert.equal(autorizar("admin", admin), null);
+  });
+
+  test("las rutas de superadmin se autorizan adentro (pasan siempre)", () => {
+    assert.equal(autorizar("superadmin", null), null);
+  });
+});

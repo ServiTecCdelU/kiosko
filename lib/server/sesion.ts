@@ -4,6 +4,7 @@
 // partir de esta cookie, que se emite al validar el PIN y va firmada con HMAC.
 // Un cliente no puede fabricar ni editar la cookie sin conocer el secreto.
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { COMERCIO_SUPERADMIN } from "@/lib/permisos-api";
 
 const COOKIE = "kiosko_sesion";
 const DURACION_MS = 1000 * 60 * 60 * 12; // 12 horas: cubre el turno mas largo
@@ -78,12 +79,16 @@ export function getSesion(req: Request): Sesion | null {
 }
 
 /**
- * Comercio (tenant) del request. Sale de la sesion firmada; el fallback a
- * "comercio_1" existe solo porque hoy hay un unico tenant — al sumar un
- * segundo comercio hay que eliminarlo y responder 401 sin sesion.
+ * Comercio (tenant) del request. Sale SOLO de la sesion firmada: sin sesion no
+ * hay comercio. proxy.ts ya corta con 401 antes de llegar aca; este throw es
+ * la segunda barrera por si una ruta queda fuera del proxy.
  */
 export function comercioIdDeSesion(req: Request): string {
-  return getSesion(req)?.comercioId ?? "comercio_1";
+  const sesion = getSesion(req);
+  if (!sesion || sesion.comercioId === COMERCIO_SUPERADMIN) {
+    throw new Error("Sin sesion de comercio");
+  }
+  return sesion.comercioId;
 }
 
 /** true solo si la cookie es de un superadmin valido (panel /superadmin). */

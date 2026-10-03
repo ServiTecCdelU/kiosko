@@ -1,13 +1,17 @@
-// app/api/mercadopago/dispositivos/route.ts — lista los lectores Point vinculados a la cuenta
+// app/api/mercadopago/dispositivos/route.ts — lectores Point de la cuenta de MP del comercio.
+// GET lo usa el POS (cualquier rol); PATCH es configuracion y proxy.ts lo deja solo al admin.
 import { NextResponse } from "next/server";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { listarDispositivosMP, cambiarModoOperacionMP } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const dispositivos = await listarDispositivosMP();
+    const token = await tokenMPDeComercio(comercioIdDeSesion(req));
+    const dispositivos = await listarDispositivosMP(token);
     return NextResponse.json({ dispositivos });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 400 });
@@ -31,7 +35,8 @@ export async function PATCH(req: Request) {
   if (!deviceId) return NextResponse.json({ error: "Falta el id del lector" }, { status: 400 });
 
   try {
-    await cambiarModoOperacionMP(deviceId, modo);
+    const token = await tokenMPDeComercio(comercioIdDeSesion(req));
+    await cambiarModoOperacionMP(token, deviceId, modo);
     return NextResponse.json({ ok: true, deviceId, modo });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 400 });

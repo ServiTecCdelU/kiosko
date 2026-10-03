@@ -1,7 +1,9 @@
 // app/api/mercadopago/point/cancelar/route.ts — aborta un cobro pendiente en el lector
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,17 +18,20 @@ export async function POST(req: Request) {
 
   const externalReference = String(body?.externalReference ?? "");
   if (!externalReference) return NextResponse.json({ error: "Falta la referencia" }, { status: 400 });
+  const comercioId = comercioIdDeSesion(req);
 
   const { data: pendiente, error: findErr } = await supabaseAdmin
     .from("pagos_mp_pendientes")
     .select("*")
+    .eq("comercio_id", comercioId)
     .eq("external_reference", externalReference)
     .maybeSingle();
   if (findErr || !pendiente) return NextResponse.json({ error: "No se encontro el cobro" }, { status: 404 });
 
   try {
     if (pendiente.device_id && pendiente.intent_id) {
-      const resultado = await cancelarIntentoPagoPoint(pendiente.device_id, pendiente.intent_id);
+      const token = await tokenMPDeComercio(comercioId);
+      const resultado = await cancelarIntentoPagoPoint(token, pendiente.device_id, pendiente.intent_id);
 
       // Si el lector NO acepto la cancelacion, el cobro sigue vivo ahi y el
       // cliente todavia puede pagar. No hay que tocar el estado: si lo dejamos

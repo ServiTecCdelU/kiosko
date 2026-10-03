@@ -103,6 +103,42 @@ export async function cancelarCobroPoint(externalReference: string): Promise<voi
   }
 }
 
+// ── Conexion de la cuenta de Mercado Pago del comercio (solo admin) ──
+
+export interface ConexionMP {
+  conectado: boolean;
+  /** Ultimos 4 caracteres del token: el token nunca vuelve al navegador. */
+  tokenFinal: string | null;
+  sandbox: boolean;
+  cuentaId: string | null;
+  conectadoAt: string | null;
+  /** URL para pegar en Webhooks de la cuenta de MP (la usa el lector Point). */
+  webhookUrl: string | null;
+}
+
+async function pedirConexion(method: "GET" | "POST" | "DELETE", body?: unknown): Promise<any> {
+  const res = await fetch(apiUrl("/api/mercadopago/conexion"), {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo completar la operacion con Mercado Pago");
+  return data;
+}
+
+export async function getConexionMP(): Promise<ConexionMP> {
+  return pedirConexion("GET");
+}
+
+export async function conectarMP(token: string): Promise<ConexionMP> {
+  return pedirConexion("POST", { token });
+}
+
+export async function desconectarMP(): Promise<void> {
+  await pedirConexion("DELETE");
+}
+
 // ── Cobros sin resolver (plata que entro sin venta, o cobros colgados) ──
 
 export interface CobroSinResolver {

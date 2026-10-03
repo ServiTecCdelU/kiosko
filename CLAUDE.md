@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `38`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `39`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -79,6 +79,9 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
 - **El navegador no consulta Supabase directo** (anon key revocado, RLS cerrado).
   Lecturas: `consultar()` de `services/api-client.ts` → `/api/consultas/<dominio>` con
   acciones cerradas. Escrituras: rutas `/api/*` con `lib/supabase-admin.ts` + RPCs.
+- **`proxy.ts` es la guardia de toda `/api`**: sin sesión → 401, rol insuficiente → 403.
+  La regla de cada ruta está en `lib/permisos-api.ts` (falla cerrado: una ruta nueva pide
+  sesión). Si una ruta nueva es solo de admin, sumarla a `RUTAS_ADMIN`.
 - **`comercioId` sale de la sesión del servidor** (`comercioIdDeSesion` en
   `lib/server/sesion.ts`), nunca del body del request.
 - **Todo `fetch` a rutas propias usa `apiUrl()`** (`lib/utils/api-url.ts`): en producción
@@ -130,11 +133,10 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 ## Variables de Entorno
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SESSION_SECRET`, `BASE_PATH`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`,
-`MP_ACCESS_TOKEN`, `IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`.
+`MP_TOKEN_KEY`, `IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`.
 Detalle de cada una en `docs/CONTEXTO.md` §5.
 
 ## Roadmap
 Referencia viva: `docs/PLAN-MAESTRO-2026-09-18.md` (fases 0–4 prácticamente completas).
-Pendientes actuales resumidos en `docs/CONTEXTO.md` §6: Mercado Pago por comercio con
-token cifrado, enforcement de `trial_hasta` / onboarding, backup por comercio,
+Pendientes actuales resumidos en `docs/CONTEXTO.md` §6: enforcement de `trial_hasta` / onboarding, backup por comercio,
 facturación electrónica AFIP/ARCA, billing de suscripción.

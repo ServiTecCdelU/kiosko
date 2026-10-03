@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearPreferenciaMP } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,10 +31,12 @@ export async function POST(req: Request) {
   const externalReference = crypto.randomUUID();
 
   try {
-    const preferencia = await crearPreferenciaMP({
+    const token = await tokenMPDeComercio(comercioId);
+    const preferencia = await crearPreferenciaMP(token, {
       total,
       externalReference,
-      descripcion: `Venta Demo (${saleInput.items.length} items)`,
+      descripcion: `Venta (${saleInput.items.length} items)`,
+      comercioId,
     });
 
     const { error } = await supabaseAdmin.from("pagos_mp_pendientes").insert({

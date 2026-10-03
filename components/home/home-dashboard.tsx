@@ -17,6 +17,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { MercadoPagoCard } from "@/components/home/mercadopago-card";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
 import { getReporte } from "@/services/reportes-service";
@@ -158,6 +159,8 @@ function HomeContent() {
             );
           })}
         </div>
+
+        {rol === "admin" && <MercadoPagoCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
           Demo · Punto de venta
