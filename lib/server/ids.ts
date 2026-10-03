@@ -1,7 +1,12 @@
-// lib/server/ids.ts — generacion de ids legibles (server-only, service role).
-// Espejo de generateReadableId de services/supabase-helpers.ts, pero con el
-// cliente admin: los ids se generan del lado del servidor junto con el insert.
-import { supabaseAdmin } from "@/lib/supabase-admin";
+// lib/server/ids.ts — ids "legibles" para filas nuevas (server-only).
+//
+// SaaS: los ids son unicos en TODA la base (todos los comercios comparten
+// tablas). Antes eran <prefijo>_<nombre>_<n> con n = cuantos habia en la
+// plataforma: dejaban ver datos de otros comercios ("cli_juanperez_2" = otro
+// kiosko tiene un Juan Perez; "caja_<fecha>_5" = cajas abiertas hoy en toda la
+// plataforma) y dos altas simultaneas chocaban. Ahora la parte final es
+// aleatoria: se sigue leyendo de que se trata, sin filtrar nada de nadie.
+import { randomBytes } from "node:crypto";
 
 export function slugify(text: string): string {
   return text
@@ -11,16 +16,8 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-export async function generarIdLegible(
-  tabla: string,
-  prefijo: string,
-  identificador: string,
-): Promise<string> {
-  const base = `${prefijo}_${slugify(identificador)}`;
-  for (let num = 1; num < 1000; num++) {
-    const candidato = `${base}_${num}`;
-    const { data } = await supabaseAdmin.from(tabla).select("id").eq("id", candidato).maybeSingle();
-    if (!data) return candidato;
-  }
-  return `${base}_${Date.now()}`;
+/** "<prefijo>_<identificador>_<10 hex aleatorios>", ej: cli_juanperez_3f9a1c07be. */
+export async function generarIdLegible(_tabla: string, prefijo: string, identificador: string): Promise<string> {
+  const legible = slugify(identificador).slice(0, 24);
+  return `${prefijo}_${legible ? `${legible}_` : ""}${randomBytes(5).toString("hex")}`;
 }

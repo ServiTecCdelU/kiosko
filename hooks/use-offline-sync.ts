@@ -3,23 +3,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getCatalogoCompleto } from "@/services/products-service";
-import { createSale, NetworkUnavailableError, VentaRetenidaError } from "@/services/sales-service";
+import { createSale } from "@/services/sales-service";
 import {
-  guardarCatalogoOffline, listarVentasPendientes, quitarVentaPendiente,
+  guardarCatalogoOffline, listarVentasPendientes, quitarVentaPendiente, marcarVentaConError,
   type VentaPendiente,
 } from "@/lib/offline/db";
+import { procesarCola } from "@/lib/offline/cola";
+import { siEstaLibre } from "@/lib/offline/candado";
+
+/** Mientras haya ventas en cola, se reintenta cada tanto aunque no haya evento "online". */
+const REINTENTO_MS = 60_000;
 
 /**
- * Orquesta el modo offline del POS: cachea el catálogo cuando hay conexión y
- * reintenta las ventas que quedaron en cola cada vez que vuelve internet.
+ * Orquesta el modo offline del POS: cachea el catalogo cuando hay conexion y
+ * manda las ventas que quedaron en cola (lib/offline/cola.ts): al abrir, al
+ * volver internet y cada minuto mientras queden. Una venta rechazada por el
+ * servidor queda apartada para resolverla a mano: nunca se borra sola.
  */
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendientes, setPendientes] = useState<VentaPendiente[]>([]);
   const syncing = useRef(false);
 
   const refreshPendingCount = useCallback(async () => {
-    setPendingCount((await listarVentasPendientes()).length);
+    setPendientes(await listarVentasPendientes().catch(() => []));
   }, []);
 
   const syncCatalogo = useCallback(async () => {
@@ -31,30 +38,26 @@ export function useOfflineSync() {
     }
   }, []);
 
-  const syncVentasPendientes = useCallback(async () => {
+  const syncVentasPendientes = useCallback(async (avisarSiNoHay = false) => {
     if (syncing.current) return;
     syncing.current = true;
     try {
-      const pendientes: VentaPendiente[] = await listarVentasPendientes();
-      let sincronizadas = 0;
-      for (const venta of pendientes) {
-        try {
-          await createSale(venta.input);
-          await quitarVentaPendiente(venta.id);
-          sincronizadas++;
-        } catch (e) {
-          if (e instanceof NetworkUnavailableError) break; // se corto de nuevo, seguimos despues
-          if (e instanceof VentaRetenidaError) {
-            // Sesion vencida o modo consulta: las ventas ya se cobraron, quedan en cola.
-            toast.warning(`Hay ventas sin conexión esperando para guardarse: ${e.message}`);
-            break;
-          }
-          // error de validacion del server (ej: producto ya no existe): se descarta para no trabar la cola
-          await quitarVentaPendiente(venta.id);
-          toast.error(`No se pudo sincronizar una venta pendiente: ${e instanceof Error ? e.message : "error"}`);
+      // Si otra pestana (o un "Reintentar" manual) ya esta enviando, no se pisa.
+      await siEstaLibre(async () => {
+        const cola = await listarVentasPendientes();
+        if (cola.length === 0) {
+          if (avisarSiNoHay) toast.info("No hay ventas pendientes");
+          return;
         }
-      }
-      if (sincronizadas > 0) toast.success(`${sincronizadas} venta(s) offline sincronizada(s)`);
+        const r = await procesarCola(cola, {
+          enviar: (v) => createSale(v.input),
+          quitar: quitarVentaPendiente,
+          marcarError: marcarVentaConError,
+        });
+        if (r.sincronizadas > 0) toast.success(`${r.sincronizadas} venta(s) sin conexión guardada(s)`);
+        if (r.rechazadas > 0) toast.error(`${r.rechazadas} venta(s) sin conexión no se pudieron guardar: revisalas en "Ventas sin conexión"`);
+        if (r.frenoPor === "retenida") toast.warning(`Hay ventas sin conexión esperando para guardarse: ${r.motivo}`);
+      });
       await refreshPendingCount();
     } finally {
       syncing.current = false;
@@ -64,7 +67,11 @@ export function useOfflineSync() {
   useEffect(() => {
     setIsOnline(navigator.onLine);
     refreshPendingCount();
-    if (navigator.onLine) syncCatalogo();
+    if (navigator.onLine) {
+      syncCatalogo();
+      // Ventas que quedaron de una sesion anterior sin internet.
+      syncVentasPendientes();
+    }
 
     const handleOnline = () => {
       setIsOnline(true);
@@ -85,5 +92,23 @@ export function useOfflineSync() {
     };
   }, [syncCatalogo, syncVentasPendientes, refreshPendingCount]);
 
-  return { isOnline, pendingCount, refreshPendingCount, syncVentasPendientes };
+  // Reintento periodico: cubre cortes en los que el navegador sigue "online"
+  // (el wifi anda pero no hay salida a internet) y no dispara el evento.
+  const hayParaReintentar = pendientes.some((v) => !v.error);
+  useEffect(() => {
+    if (!hayParaReintentar) return;
+    const t = setInterval(() => {
+      if (navigator.onLine) syncVentasPendientes();
+    }, REINTENTO_MS);
+    return () => clearInterval(t);
+  }, [hayParaReintentar, syncVentasPendientes]);
+
+  return {
+    isOnline,
+    pendientes,
+    pendingCount: pendientes.length,
+    conError: pendientes.filter((v) => v.error).length,
+    refreshPendingCount,
+    syncVentasPendientes,
+  };
 }

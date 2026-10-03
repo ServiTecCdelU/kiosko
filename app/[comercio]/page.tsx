@@ -21,7 +21,8 @@ export default function PanelComercioPage({ params }: { params: Promise<{ comerc
   useEffect(() => {
     if (!ready) return;
     if (!user) {
-      router.replace("/login");
+      // El link del panel identifica al comercio: el login por PIN ya lo trae puesto.
+      router.replace(`/login?comercio=${encodeURIComponent(decodeURIComponent(comercio).toLowerCase())}`);
       return;
     }
     // El dashboard es solo del admin (como antes en "/"); el resto va al POS.
@@ -30,7 +31,7 @@ export default function PanelComercioPage({ params }: { params: Promise<{ comerc
       return;
     }
     if (slug && !esSuyo) router.replace(panelHref(slug));
-  }, [ready, user, rol, slug, esSuyo, router]);
+  }, [ready, user, rol, slug, esSuyo, router, comercio]);
 
   if (!ready || !user || rol !== "admin" || !esSuyo) {
     return (

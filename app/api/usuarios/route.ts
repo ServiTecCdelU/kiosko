@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { errorPinReservado } from "@/lib/server/demo";
+import { errorPinReservado, errorPinRepetido } from "@/lib/server/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +46,8 @@ export async function POST(req: Request) {
   }
   const reservado = rol === "admin" ? null : await errorPinReservado(comercioId, pin);
   if (reservado) return NextResponse.json({ error: reservado }, { status: 400 });
+  const repetido = rol === "admin" ? null : await errorPinRepetido(comercioId, pin);
+  if (repetido) return NextResponse.json({ error: repetido }, { status: 400 });
 
   const { data, error } = await supabaseAdmin.rpc("crear_empleado_kiosko", {
     p_comercio_id: comercioId,
@@ -106,6 +108,8 @@ export async function PATCH(req: Request) {
 
   const reservado = await errorPinReservado(comercioId, pin);
   if (reservado) return NextResponse.json({ error: reservado }, { status: 400 });
+  const repetido = await errorPinRepetido(comercioId, pin, usuarioId);
+  if (repetido) return NextResponse.json({ error: repetido }, { status: 400 });
 
   const { error } = await supabaseAdmin.rpc("actualizar_empleado_kiosko", {
     p_id: usuarioId,

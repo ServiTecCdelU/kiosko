@@ -56,6 +56,19 @@ export async function errorPinReservado(comercioId: string, pin: string | null |
   return `El PIN ${DEMO_PIN} está reservado para la demo. Elegí otro.`;
 }
 
+/**
+ * El PIN identifica al empleado DENTRO del comercio: si dos tienen el mismo,
+ * uno entraria como el otro (caja, ventas y arqueo a nombre equivocado).
+ */
+export async function errorPinRepetido(comercioId: string, pin: string | null | undefined, excluirUsuarioId?: string): Promise<string | null> {
+  if (!pin) return null;
+  const { data, error } = await supabaseAdmin.rpc("verificar_pin_comercio", { p_comercio_id: comercioId, p_pin: pin });
+  if (error) return error.message;
+  const otro = (Array.isArray(data) ? data[0] : data) as UsuarioPin | undefined;
+  if (otro && otro.id !== excluirUsuarioId) return `Ese PIN ya lo usa ${otro.nombre}. Elegí otro.`;
+  return null;
+}
+
 /** Slug del comercio: el panel del cliente vive en /<slug>. */
 export async function slugDeComercio(comercioId: string): Promise<string | undefined> {
   const { data } = await supabaseAdmin.from("comercios").select("slug").eq("id", comercioId).maybeSingle();

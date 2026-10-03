@@ -2,6 +2,7 @@ import { apiUrl } from "@/lib/utils/api-url"
 // services/mercadopago-service.ts — cobro con QR y con lector Point (client helper)
 import { consultar } from "@/services/api-client";
 import type { CreateSaleInput } from "@/services/sales-service";
+import { claveDelComercioActual } from "@/lib/clave-comercio";
 
 export interface CobroQR {
   externalReference: string;
@@ -53,12 +54,15 @@ const DEVICE_STORAGE_KEY = "kiosko:mp-point-device-id";
 
 export function getDispositivoGuardado(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(DEVICE_STORAGE_KEY);
+  // Por comercio: el lector Point de un comercio esta en SU cuenta de MP.
+  const clave = claveDelComercioActual(DEVICE_STORAGE_KEY);
+  return clave ? window.localStorage.getItem(clave) : null;
 }
 
 export function guardarDispositivo(deviceId: string): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(DEVICE_STORAGE_KEY, deviceId);
+  const clave = claveDelComercioActual(DEVICE_STORAGE_KEY);
+  if (clave) window.localStorage.setItem(clave, deviceId);
 }
 
 export interface CobroPoint {

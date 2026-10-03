@@ -71,9 +71,24 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `41`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `42`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
+
+### Aislamiento SaaS entre comercios (auditado 2026-10-03 — no romper)
+Ningún dato de un comercio puede pisarse, mezclarse ni verse desde otro, aunque tengan datos iguales.
+- **Tabla nueva**: `comercio_id text not null references comercios(id)`, **sin default**. Nunca
+  `default 'comercio_1'`. Las unicidades de negocio van **por comercio**: `unique (comercio_id, x)`.
+- **Ids**: son globales (todas las tablas se comparten). Nunca derivarlos solo de datos del negocio
+  (nombre, código, fecha): usar parte aleatoria (`lib/server/ids.ts`, `randomUUID`). Un `upsert`
+  nunca por `id` de datos externos: por una clave que incluya `comercio_id`.
+- **Toda consulta** del servidor filtra por `comercioIdDeSesion(req)`; un `update`/`delete` por id,
+  solo después de validar que la fila es del comercio. Las RPC reciben `p_comercio_id` y validan
+  pertenencia antes de modificar.
+- **Login por PIN siempre dentro de un comercio** (`verificar_pin_comercio`). El PIN es único por
+  comercio. El dispositivo recuerda su comercio (`lib/comercio-dispositivo.ts`).
+- **Navegador**: todo dato del negocio en localStorage/IndexedDB con `claveDelComercioActual()`
+  (`lib/clave-comercio.ts`). Sin sesión no se guarda.
 
 ### Convenciones de arquitectura (no romper)
 - **El navegador no consulta Supabase directo** (anon key revocado, RLS cerrado).

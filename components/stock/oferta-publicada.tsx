@@ -15,6 +15,7 @@ import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { compartirImagenOferta } from "@/lib/utils/compartir-imagen";
 import type { FormatoImagen } from "@/lib/imagen-oferta";
 import type { Product } from "@/lib/types";
+import { claveDelComercioActual } from "@/lib/clave-comercio";
 
 const COMERCIO_KEY = "kiosko:cartel-comercio";
 
@@ -23,7 +24,9 @@ export function useNombreComercio(): [string, (v: string) => void] {
   const [nombre, setNombre] = useState("");
   useEffect(() => {
     try {
-      setNombre(localStorage.getItem(COMERCIO_KEY) ?? "");
+      // Por comercio: en la misma PC, otro comercio no imprime carteles con este nombre.
+      const clave = claveDelComercioActual(COMERCIO_KEY);
+      setNombre(clave ? localStorage.getItem(clave) ?? "" : "");
     } catch {
       // sin storage (modo privado): el cartel sale sin nombre
     }
@@ -31,7 +34,8 @@ export function useNombreComercio(): [string, (v: string) => void] {
   const guardar = (v: string) => {
     setNombre(v);
     try {
-      localStorage.setItem(COMERCIO_KEY, v);
+      const clave = claveDelComercioActual(COMERCIO_KEY);
+      if (clave) localStorage.setItem(clave, v);
     } catch {
       // idem
     }

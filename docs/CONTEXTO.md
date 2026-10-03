@@ -58,6 +58,19 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   se guarda cifrado en `afip_tokens`; si AFIP responde 600 se renueva y se reintenta una
   vez. **Producción de AFIP exige TLS `SECLEVEL=1`** (`lib/server/afip/soap.ts`): sin eso,
   falla con "dh key too small". Dependencia: `node-forge` (solo firmar CMS y generar CSR).
+- **Aislamiento SaaS** (auditoría 2026-10-03, reglas en `CLAUDE.md`). Lo que se corrigió:
+  login por PIN buscaba en todos los comercios (ahora `verificar_pin_comercio` + código del
+  comercio recordado por dispositivo, PIN único por comercio); la sincronización con la
+  distribuidora iba fija a `comercio_1` (ahora por comercio, upsert por `(comercio_id, dist_id)`);
+  historial de sincronización sin filtro; ids legibles que revelaban datos de otros; 8 tablas con
+  `comercio_id default 'comercio_1'` y 4 RPC con ese default (migración 42); funciones viejas sin
+  comercio (migración 42); número de ticket de una secuencia global (ahora por comercio,
+  `comercio_contadores`); y en el navegador cola offline, catálogo, tickets en espera, caja, lector
+  Point y nombre de carteles compartidos entre comercios de la misma PC (ahora por comercio).
+- **Modo offline**: service worker bajo el basePath (antes no se registraba en producción y habría
+  cacheado la API), catálogo completo paginado, caja recordada sin conexión, y la cola **nunca
+  descarta una venta cobrada**: las rechazadas quedan en "Ventas sin conexión" para resolverlas
+  (`lib/offline/cola.ts`, candado entre pestañas en `lib/offline/candado.ts`).
 - **Backup por comercio**: el admin descarga "Copia de tus datos" desde su panel y el
   superadmin el de cualquier comercio (botón Backup en Administrar). Es un Excel con una
   hoja por tema; las hojas y columnas están en `lib/backup-hojas.ts` (solo se leen esas
@@ -148,7 +161,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 41).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 42).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -158,7 +171,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
   `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`42_*.sql`**. Regla: informar el SQL exacto al
+- La siguiente migración es **`43_*.sql`**. La **42** (`42_aislamiento_saas.sql`) se corre
+  **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
   `.gitignore`). En otra PC hay que copiarlas a mano: **nunca commitearlas**.

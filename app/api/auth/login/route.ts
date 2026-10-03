@@ -34,13 +34,28 @@ export async function POST(req: Request) {
     return respuestaLoginPin(demo.usuario);
   }
 
+  // El PIN se busca SOLO dentro del comercio indicado (SaaS: dos kioscos pueden
+  // tener empleados con el mismo PIN; buscarlo en toda la base hacia entrar al
+  // comercio equivocado). El comercio llega por su slug: lo recuerda el
+  // dispositivo o lo tipea el empleado (lib/comercio-dispositivo.ts).
+  const slug = String(body?.comercio ?? "").trim().toLowerCase();
+  if (!slug) return NextResponse.json({ error: "Indicá el código de tu comercio", faltaComercio: true }, { status: 400 });
+
+  const { data: comercio, error: errComercio } = await supabaseAdmin
+    .from("comercios").select("id").eq("slug", slug).maybeSingle();
+  if (errComercio) return NextResponse.json({ error: errComercio.message }, { status: 500 });
+  if (!comercio) {
+    registrarFallo(ip);
+    return NextResponse.json({ error: "No existe un comercio con ese código", faltaComercio: true }, { status: 401 });
+  }
+
   // El PIN se verifica dentro de Postgres (bcrypt via pgcrypto): el hash nunca
   // sale de la base y no hace falta una libreria de bcrypt en Node.
-  const { data, error } = await supabaseAdmin.rpc("verificar_pin", { p_pin: pin });
+  const { data, error } = await supabaseAdmin.rpc("verificar_pin_comercio", { p_comercio_id: comercio.id, p_pin: pin });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const usuario = (Array.isArray(data) ? data[0] : data) as UsuarioPin | undefined;
-  if (!usuario) {
+  if (!usuario || usuario.comercio_id !== comercio.id) {
     registrarFallo(ip);
     return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
   }

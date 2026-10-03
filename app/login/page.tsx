@@ -9,7 +9,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Store, Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { login, loginDemo } from "@/services/auth-service";
+import { FaltaComercioError, login, loginDemo } from "@/services/auth-service";
+import { leerComercioDispositivo, normalizarCodigoComercio, olvidarComercioDispositivo } from "@/lib/comercio-dispositivo";
 import Link from "next/link";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
@@ -37,6 +38,19 @@ function LoginContent() {
   const [pin, setPin] = useState("");
   const [working, setWorking] = useState(false);
   const [entrandoGoogle, setEntrandoGoogle] = useState(false);
+  // Comercio de este dispositivo (el PIN de empleado solo vale dentro de el).
+  const [comercio, setComercio] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
+
+  useEffect(() => {
+    const deLink = normalizarCodigoComercio(searchParams.get("comercio") ?? "");
+    if (deLink) {
+      setComercio(deLink);
+      setModo("pin");
+    } else {
+      setComercio(leerComercioDispositivo()?.slug ?? null);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (searchParams.get("error") === "no_autorizado") {
@@ -61,18 +75,34 @@ function LoginContent() {
     async (value: string) => {
       setWorking(true);
       try {
-        const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value);
+        if (modo === "pin" && !comercio) throw new FaltaComercioError("Indicá el código de tu comercio");
+        const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value, comercio!);
         toast.success(modo === "demo" ? "¡Bienvenido a la demo!" : `Hola, ${user.nombre}`);
         router.replace(user.rol === "admin" ? panelHref(user.comercioSlug) : "/pos");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "PIN incorrecto");
+        if (e instanceof FaltaComercioError) {
+          olvidarComercioDispositivo();
+          setComercio(null);
+        }
         setPin("");
       } finally {
         setWorking(false);
       }
     },
-    [router, modo],
+    [router, modo, comercio],
   );
+
+  const confirmarCodigo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const slug = normalizarCodigoComercio(codigo);
+    if (!slug) {
+      toast.error("Ese código no es válido: es la parte final del link del panel (ej: kiosco-el-sol)");
+      return;
+    }
+    setComercio(slug);
+    setCodigo("");
+  };
 
   const press = useCallback(
     (key: string) => {
@@ -100,7 +130,8 @@ function LoginContent() {
 
   // Con teclado fisico tambien: numeros y borrar
   useEffect(() => {
-    if (modo === "inicio") return;
+    // Mientras se tipea el codigo del comercio, el teclado es del input, no del PIN.
+    if (modo === "inicio" || (modo === "pin" && !comercio)) return;
     const onKey = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") press("del");
@@ -167,6 +198,35 @@ function LoginContent() {
             </div>
           )}
 
+          {modo === "pin" && !comercio ? (
+            <form onSubmit={confirmarCodigo} className="flex w-full flex-col gap-3">
+              <label htmlFor="codigo-comercio" className="text-center text-sm text-muted-foreground">
+                ¿De qué comercio sos? Poné el código de tu comercio (el final del link del panel, ej: <b>kiosco-el-sol</b>).
+                Pedíselo al dueño: queda guardado en este dispositivo.
+              </label>
+              <input
+                id="codigo-comercio"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="kiosco-el-sol"
+                className="h-12 rounded-2xl border bg-card px-4 text-center text-base outline-none focus:border-primary"
+              />
+              <button type="submit" className="grad-brand h-12 rounded-2xl text-sm font-semibold text-white">Continuar</button>
+            </form>
+          ) : (<>
+          {modo === "pin" && comercio && (
+            <p className="text-center text-xs text-muted-foreground">
+              Comercio: <b className="text-foreground">{comercio}</b> ·{" "}
+              <button type="button" onClick={() => { olvidarComercioDispositivo(); setComercio(null); setPin(""); }} className="text-primary hover:underline">
+                cambiar
+              </button>
+            </p>
+          )}
+
           <div className="flex items-center gap-3" aria-label="PIN">
             {Array.from({ length: PIN_LENGTH }).map((_, i) => (
               <span
@@ -202,6 +262,7 @@ function LoginContent() {
           </div>
 
           {working && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+          </>)}
 
           <button
             onClick={volver}

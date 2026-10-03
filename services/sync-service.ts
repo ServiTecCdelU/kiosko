@@ -1,30 +1,18 @@
 // services/sync-service.ts
-// Sincroniza el catalogo desde la distribuidora hacia la BD del kiosko.
-// SERVER-SIDE: usa supabaseAdmin. Invocar desde /api/sync.
+// Sincroniza el catalogo desde la distribuidora hacia los productos DE UN COMERCIO.
+// SERVER-SIDE: usa supabaseAdmin. Invocar desde /api/sync con el comercio de la sesion.
 //
-// Regla clave: solo se actualizan campos del catalogo (nombre, precio,
-// categoria, etc.). NUNCA se toca el stock local del kiosko.
+// Reglas clave:
+// - SaaS: cada comercio sincroniza SU copia del catalogo (ids con el comercio
+//   adelante, lib/sync-filas.ts). Se guarda por (comercio_id, dist_id): un
+//   comercio nunca puede tocar productos de otro.
+// - Solo se actualizan campos del catalogo (nombre, precio, categoria...). NUNCA
+//   se toca el stock local del kiosko.
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { leerTodo } from "@/lib/server/leer-todo";
+import { filasDesdeDistribuidora, type ProductoDistribuidora } from "@/lib/sync-filas";
 import type { SyncEstado } from "@/lib/types";
-
-// TODO multi-comercio: hoy la sync apunta al comercio inicial. Cuando haya
-// onboarding de varios comercios, la sync debe correr por comercio y generar
-// ids namespaced (`${comercioId}__${distId}`). El comercio_1 conserva los
-// ids legacy (id == dist_id) para no duplicar el catalogo existente.
-const SYNC_COMERCIO_ID = "comercio_1";
-
-interface DistribuidoraProduct {
-  id: string;
-  name?: string;
-  description?: string;
-  price?: number;
-  imageUrl?: string;
-  category?: string;
-  disabled?: boolean;
-  codigo?: string;
-  codigoBarras?: string;
-}
 
 export interface SyncResult {
   estado: SyncEstado;
@@ -34,19 +22,8 @@ export interface SyncResult {
   error?: string;
 }
 
-// Deriva el codigo desde el id de la distribuidora cuando no viene explicito.
-// prod_mp_123 -> 123 · prod_456 -> 456
-function deriveCodigo(id: string, explicit?: string): string | null {
-  if (explicit) return explicit;
-  if (!id) return null;
-  const mp = id.match(/^prod_mp_(.+)$/);
-  if (mp) return mp[1];
-  const p = id.match(/^prod_(.+)$/);
-  if (p) return p[1];
-  return null;
-}
-
 async function logSync(
+  comercioId: string,
   estado: SyncEstado,
   creados: number,
   actualizados: number,
@@ -55,7 +32,8 @@ async function logSync(
   error?: string,
 ): Promise<void> {
   await supabaseAdmin.from("sync_log").insert({
-    comercio_id: SYNC_COMERCIO_ID,
+    id: crypto.randomUUID(),
+    comercio_id: comercioId,
     estado,
     productos_creados: creados,
     productos_actualizados: actualizados,
@@ -66,18 +44,19 @@ async function logSync(
   });
 }
 
-export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
+export async function syncProductosFromDistribuidora(comercioId: string): Promise<SyncResult> {
+  if (!comercioId) throw new Error("Falta el comercio de la sincronizacion");
   const startedAt = new Date();
   const base = process.env.DISTRIBUIDORA_API_URL;
-
-  if (!base) {
-    const error = "DISTRIBUIDORA_API_URL no esta configurada";
-    await logSync("error", 0, 0, 0, startedAt, error);
+  const fallo = async (error: string): Promise<SyncResult> => {
+    await logSync(comercioId, "error", 0, 0, 0, startedAt, error);
     return { estado: "error", productosCreados: 0, productosActualizados: 0, productosTotal: 0, error };
-  }
+  };
+
+  if (!base) return fallo("DISTRIBUIDORA_API_URL no esta configurada");
 
   // 1. Traer catalogo remoto
-  let remote: DistribuidoraProduct[];
+  let remote: ProductoDistribuidora[];
   try {
     const url = `${base.replace(/\/$/, "")}/api/public/productos`;
     const res = await fetch(url, { cache: "no-store" });
@@ -85,71 +64,48 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
     const json = await res.json();
     remote = Array.isArray(json?.products) ? json.products : [];
   } catch (e) {
-    const error = `No se pudo traer el catalogo: ${e instanceof Error ? e.message : String(e)}`;
-    await logSync("error", 0, 0, 0, startedAt, error);
-    return { estado: "error", productosCreados: 0, productosActualizados: 0, productosTotal: 0, error };
+    return fallo(`No se pudo traer el catalogo: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  // 2. ids y precios existentes (para distinguir creados vs actualizados y auditar cambios de precio)
-  const existing = new Set<string>();
-  const precioAnterior = new Map<string, number>();
-  {
-    const { data } = await supabaseAdmin
+  // 2. Productos ya sincronizados DE ESTE comercio (para distinguir creados vs
+  //    actualizados y auditar cambios de precio). Paginado: puede haber miles.
+  const existentes = await leerTodo<{ id: string; price: number }>((desde, hasta) =>
+    supabaseAdmin
       .from("productos")
       .select("id, price")
-      .eq("comercio_id", SYNC_COMERCIO_ID);
-    for (const r of data ?? []) {
-      existing.add(r.id);
-      precioAnterior.set(r.id, Number(r.price) || 0);
-    }
-  }
+      .eq("comercio_id", comercioId)
+      .not("dist_id", "is", null)
+      .order("id", { ascending: true })
+      .range(desde, hasta),
+  );
+  const precioAnterior = new Map(existentes.map((r) => [r.id, Number(r.price) || 0]));
 
-  // 3. Mapear SOLO campos del catalogo. Nunca stock / stock_minimo / precio_base.
-  const nowIso = new Date().toISOString();
-  const rows = remote
-    .filter((p) => p && p.id)
-    .map((p) => ({
-      id: p.id,
-      comercio_id: SYNC_COMERCIO_ID,
-      dist_id: p.id,
-      codigo: deriveCodigo(p.id, p.codigo),
-      codigo_barras: p.codigoBarras ?? null,
-      name: p.name ?? "",
-      description: p.description ?? "",
-      price: Number(p.price) || 0,
-      category: p.category ?? "",
-      image_url: p.imageUrl ?? "",
-      disabled: p.disabled ?? false,
-      synced_at: nowIso,
-    }));
+  // 3. Mapear SOLO campos del catalogo, con ids del comercio.
+  const rows = filasDesdeDistribuidora(remote, comercioId, new Date().toISOString());
+  const creados = rows.filter((r) => !precioAnterior.has(r.id)).length;
+  const actualizados = rows.length - creados;
 
-  let creados = 0;
-  let actualizados = 0;
-  for (const r of rows) {
-    if (existing.has(r.id)) actualizados++;
-    else creados++;
-  }
-
-  // 4. Upsert por lotes (onConflict id — solo actualiza columnas provistas)
+  // 4. Upsert por lotes por (comercio_id, dist_id): la clave incluye el comercio,
+  //    asi es imposible actualizar una fila de otro kiosko.
   const CHUNK = 500;
   try {
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const { error } = await supabaseAdmin.from("productos").upsert(slice, { onConflict: "id" });
+      const { error } = await supabaseAdmin.from("productos").upsert(slice, { onConflict: "comercio_id,dist_id" });
       if (error) throw error;
     }
   } catch (e) {
     const error = `Error guardando productos: ${e instanceof Error ? e.message : String(e)}`;
-    await logSync("parcial", creados, actualizados, rows.length, startedAt, error);
+    await logSync(comercioId, "parcial", creados, actualizados, rows.length, startedAt, error);
     return { estado: "parcial", productosCreados: creados, productosActualizados: actualizados, productosTotal: rows.length, error };
   }
 
   // 5. Auditar cambios de precio en productos que ya existian (no en altas nuevas)
   const cambiosPrecio = rows
-    .filter((r) => existing.has(r.id) && precioAnterior.has(r.id) && precioAnterior.get(r.id) !== r.price)
+    .filter((r) => precioAnterior.has(r.id) && precioAnterior.get(r.id) !== r.price)
     .map((r) => ({
       id: crypto.randomUUID(),
-      comercio_id: SYNC_COMERCIO_ID,
+      comercio_id: comercioId,
       producto_id: r.id,
       campo: "price",
       valor_anterior: String(precioAnterior.get(r.id)),
@@ -160,6 +116,6 @@ export async function syncProductosFromDistribuidora(): Promise<SyncResult> {
     await supabaseAdmin.from("producto_auditoria").insert(cambiosPrecio);
   }
 
-  await logSync("ok", creados, actualizados, rows.length, startedAt);
+  await logSync(comercioId, "ok", creados, actualizados, rows.length, startedAt);
   return { estado: "ok", productosCreados: creados, productosActualizados: actualizados, productosTotal: rows.length };
 }

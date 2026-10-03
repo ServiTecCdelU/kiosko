@@ -21,6 +21,7 @@ import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { ofertasFlojas, ofertasPorTerminar, productosSinCosto } from "@/lib/recomendaciones";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 import type { Product } from "@/lib/types";
+import { claveDelComercioActual } from "@/lib/clave-comercio";
 
 interface RecomendacionesProps {
   vencimientos: Product[];
@@ -43,7 +44,8 @@ const MAX_SIN_COSTO = 5;
 
 function leerDescartadas(): Record<string, number> {
   try {
-    const crudo = JSON.parse(localStorage.getItem(DESCARTADAS_KEY) ?? "{}") as Record<string, number>;
+    const clave = claveDelComercioActual(DESCARTADAS_KEY);
+    const crudo = JSON.parse((clave && localStorage.getItem(clave)) || "{}") as Record<string, number>;
     const limite = Date.now() - DIAS_DESCARTE * 86_400_000;
     return Object.fromEntries(Object.entries(crudo).filter(([, t]) => t > limite));
   } catch {
@@ -148,7 +150,8 @@ export function Recomendaciones({
     const next = { ...descartadas, [id]: Date.now() };
     setDescartadas(next);
     try {
-      localStorage.setItem(DESCARTADAS_KEY, JSON.stringify(next));
+      const clave = claveDelComercioActual(DESCARTADAS_KEY);
+      if (clave) localStorage.setItem(clave, JSON.stringify(next));
     } catch {
       // sin storage: se descarta solo por esta visita
     }

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Rocket, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { consultar } from "@/services/api-client";
+import { claveDelComercioActual } from "@/lib/clave-comercio";
 
 interface Pasos {
   productos: boolean;
@@ -27,7 +28,8 @@ const CLAVE_OCULTA = "kiosko_primeros_pasos_oculta";
 
 function leerOculta(): boolean {
   try {
-    return localStorage.getItem(CLAVE_OCULTA) === "1";
+    const clave = claveDelComercioActual(CLAVE_OCULTA);
+    return !!clave && localStorage.getItem(clave) === "1";
   } catch {
     return false;
   }
@@ -52,7 +54,8 @@ export function PrimerosPasosCard() {
   const ocultar = () => {
     setOculta(true);
     try {
-      localStorage.setItem(CLAVE_OCULTA, "1");
+      const clave = claveDelComercioActual(CLAVE_OCULTA);
+      if (clave) localStorage.setItem(clave, "1");
     } catch {
       // sin almacenamiento: se oculta solo por esta vez
     }

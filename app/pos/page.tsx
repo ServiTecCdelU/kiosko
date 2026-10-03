@@ -20,6 +20,8 @@ import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { parseCodigoBalanza } from "@/lib/barcode-balanza";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
+import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
+import { VentasOfflineDialog } from "@/components/pos/ventas-offline-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { panelHref } from "@/lib/panel";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
@@ -80,7 +82,8 @@ function PosScreen() {
   const [codigoNoEncontrado, setCodigoNoEncontrado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cartRef = useRef<CartPanelHandle>(null);
-  const { isOnline, pendingCount, syncVentasPendientes } = useOfflineSync();
+  const { isOnline, pendientes, pendingCount, conError, refreshPendingCount, syncVentasPendientes } = useOfflineSync();
+  const [offlineOpen, setOfflineOpen] = useState(false);
 
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
@@ -88,19 +91,22 @@ function PosScreen() {
     focusInput();
     // Multi-caja: el cajero vende en SU caja (la que abrio el). Encargado/admin
     // sin caja propia: si hay una sola abierta se usa esa; con varias, elige.
+    const elegirCaja = (cs: Caja[]) => {
+      setCajasAbiertas(cs);
+      const u = getCurrentUser();
+      const propia = u ? cs.find((c) => c.abiertaPor === u.id) : undefined;
+      if (propia) setCajaId(propia.id);
+      else if (u?.rol !== "cajero" && cs.length === 1) setCajaId(cs[0].id);
+      else setCajaId(undefined);
+    };
     getCajasAbiertas()
       .then((cs) => {
-        setCajasAbiertas(cs);
-        const u = getCurrentUser();
-        const propia = u ? cs.find((c) => c.abiertaPor === u.id) : undefined;
-        if (propia) setCajaId(propia.id);
-        else if (u?.rol !== "cajero" && cs.length === 1) setCajaId(cs[0].id);
-        else setCajaId(undefined);
+        guardarCajasConocidas(cs);
+        elegirCaja(cs);
       })
-      .catch(() => {
-        setCajasAbiertas([]);
-        setCajaId(undefined);
-      });
+      // Sin internet: la ultima lista conocida, para que las ventas offline
+      // sigan imputandose a la caja (si no, quedaban fuera del arqueo).
+      .catch(() => elegirCaja(leerCajasConocidas()));
     (isOnline ? getFavoritos() : getFavoritosOffline())
       .then(setFavoritos)
       .catch(() => getFavoritosOffline().then(setFavoritos));
@@ -518,6 +524,7 @@ function PosScreen() {
             if (!(e instanceof NetworkUnavailableError)) throw e;
             await encolarVentaPendiente(saleInput);
             for (const i of cart.items) await descontarStockOffline(i.product.id, i.quantity);
+            refreshPendingCount();
             saleNumber = "PENDIENTE";
             setUltimaVentaId(null); // offline: se factura desde Ventas cuando se sincronice
             total = cart.items.reduce((s, i) => s + precioLinea(i.product, i.quantity), 0);
@@ -560,10 +567,14 @@ function PosScreen() {
           )}
           {pendingCount > 0 && (
             <button
-              onClick={() => syncVentasPendientes()}
-              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/20"
+              onClick={() => setOfflineOpen(true)}
+              className={
+                conError > 0
+                  ? "flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+                  : "flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/20"
+              }
             >
-              <RefreshCw className="h-3.5 w-3.5" /> {pendingCount} venta(s) sin sincronizar
+              <RefreshCw className="h-3.5 w-3.5" /> {pendingCount} venta(s) sin sincronizar{conError > 0 ? ` · ${conError} con problema` : ""}
             </button>
           )}
           {ticketsEspera.length > 0 && (
@@ -769,6 +780,14 @@ function PosScreen() {
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
       <TicketPrint ticket={lastTicket} />
+      <VentasOfflineDialog
+        open={offlineOpen}
+        onOpenChange={setOfflineOpen}
+        pendientes={pendientes}
+        cajaIdActual={cajaId}
+        onCambio={refreshPendingCount}
+        onSincronizarTodo={() => syncVentasPendientes()}
+      />
       <TicketsEsperaDialog
         open={esperaOpen}
         onOpenChange={setEsperaOpen}

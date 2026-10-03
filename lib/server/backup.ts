@@ -2,15 +2,14 @@
 //
 // Que hojas y columnas van: lib/backup-hojas.ts. Se piden a la base solo esas
 // columnas (nunca "*"), asi un secreto como pin_hash ni siquiera se lee.
-// Se lee de a PAGINA filas porque PostgREST corta en 1000 por consulta y un
-// supermercado tiene muchas mas ventas que eso.
+// Se lee de a paginas (lib/server/leer-todo.ts): PostgREST corta en 1000 por
+// consulta y un supermercado tiene muchas mas ventas que eso.
 import * as XLSX from "xlsx-js-style";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { leerTodo } from "@/lib/server/leer-todo";
 import {
   HOJAS, filasDeHoja, filasDetalleVentas, nombreArchivoBackup, valorCelda, type Celda, type Hoja,
 } from "@/lib/backup-hojas";
-
-const PAGINA = 1000;
 
 const ESTILO_TITULO = {
   font: { bold: true, color: { rgb: "FFFFFF" } },
@@ -19,21 +18,18 @@ const ESTILO_TITULO = {
 };
 
 async function leerTabla(tabla: string, comercioId: string, columnas: string[], orden: string): Promise<Record<string, any>[]> {
-  const filas: Record<string, any>[] = [];
-  // Se avanza por lo que REALMENTE vino y se corta recien con una pagina vacia:
-  // si el proyecto tiene un tope de filas menor a PAGINA, igual sale completo
-  // (cortar con "vino menos que PAGINA" daria un backup incompleto sin avisar).
-  for (;;) {
-    const { data, error } = await supabaseAdmin
-      .from(tabla)
-      .select(columnas.join(", "))
-      .eq("comercio_id", comercioId)
-      .order(orden, { ascending: true })
-      .order(columnas.includes("id") ? "id" : orden, { ascending: true }) // desempate estable entre paginas
-      .range(filas.length, filas.length + PAGINA - 1);
-    if (error) throw new Error(`No se pudo leer ${tabla}: ${error.message}`);
-    if (!data || data.length === 0) return filas;
-    filas.push(...(data as unknown as Record<string, any>[]));
+  try {
+    return await leerTodo<Record<string, any>>((desde, hasta) =>
+      supabaseAdmin
+        .from(tabla)
+        .select(columnas.join(", "))
+        .eq("comercio_id", comercioId)
+        .order(orden, { ascending: true })
+        .order(columnas.includes("id") ? "id" : orden, { ascending: true }) // desempate estable entre paginas
+        .range(desde, hasta) as unknown as PromiseLike<{ data: Record<string, any>[] | null; error: { message: string } | null }>,
+    );
+  } catch (e) {
+    throw new Error(`No se pudo leer ${tabla}: ${e instanceof Error ? e.message : e}`);
   }
 }
 

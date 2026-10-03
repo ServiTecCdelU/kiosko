@@ -110,6 +110,7 @@ export async function POST(req: Request) {
       const { data, error } = await supabaseAdmin
         .from("sync_log")
         .select("*")
+        .eq("comercio_id", comercioId) // antes devolvia el historial de TODOS los comercios
         .order("started_at", { ascending: false })
         .limit(acotar(body?.limit, 20));
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });

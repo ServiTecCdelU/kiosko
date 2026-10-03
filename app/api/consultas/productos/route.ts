@@ -4,6 +4,7 @@
 // no duplicar mapRow.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { leerTodo } from "@/lib/server/leer-todo";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { historialOfertas, ofertasConResultados, sugerenciasOfertas } from "@/lib/server/ofertas";
 
@@ -11,6 +12,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const LIMITE_MAX = 5000;
+/** Tope del catalogo offline (IndexedDB aguanta mucho mas; esto es por memoria del POS). */
+const MAX_CATALOGO_OFFLINE = 50_000;
 
 function acotar(valor: unknown, porDefecto: number, max = LIMITE_MAX): number {
   const n = Number(valor);
@@ -150,14 +153,20 @@ export async function POST(req: Request) {
     }
 
     case "catalogo": {
-      const { data, error } = await supabaseAdmin
-        .from("productos")
-        .select("*")
-        .eq("comercio_id", comercioId)
-        .eq("disabled", false)
-        .limit(5000);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ productos: data ?? [] });
+      // Catalogo completo para vender sin internet (lib/offline). Paginado:
+      // un .limit(5000) devolvia solo 1000 (tope de PostgREST) y en un super
+      // el escaner offline no encontraba el resto.
+      const productos = await leerTodo<Record<string, any>>((desde, hasta) =>
+        supabaseAdmin
+          .from("productos")
+          .select("*")
+          .eq("comercio_id", comercioId)
+          .eq("disabled", false)
+          .order("id", { ascending: true })
+          .range(desde, hasta),
+        MAX_CATALOGO_OFFLINE,
+      );
+      return NextResponse.json({ productos });
     }
 
     case "favoritos": {

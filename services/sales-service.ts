@@ -68,7 +68,8 @@ export async function createSale(input: CreateSaleInput): Promise<ProcessSaleRes
   const data = await res.json().catch(() => null);
   // Sesion vencida o comercio en modo consulta: la venta no es invalida, solo
   // no se puede registrar AHORA. Quien la tenga en cola offline la conserva.
-  if (res.status === 401 || data?.soloLectura) {
+  // 5xx / 429: el servidor esta caido o saturado; la venta no tiene nada malo.
+  if (res.status === 401 || data?.soloLectura || res.status >= 500 || res.status === 429) {
     throw new VentaRetenidaError(data?.error ?? "No se pudo registrar la venta por ahora");
   }
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la venta");
