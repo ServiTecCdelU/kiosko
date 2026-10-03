@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/usuarios-service.ts — administracion de empleados (client, service role via API)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { Usuario, UserRol } from "@/lib/types";
 
 function mapUsuario(d: Record<string, any>): Usuario {
@@ -39,7 +38,7 @@ export async function crearUsuario(input: CrearUsuarioInput): Promise<void> {
   const res = await fetch(apiUrl("/api/usuarios"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input, comercioId: getComercioId() }),
+    body: JSON.stringify({ input }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -60,7 +59,7 @@ export async function actualizarUsuario(id: string, input: ActualizarUsuarioInpu
   const res = await fetch(apiUrl("/api/usuarios"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usuarioId: id, input, comercioId: getComercioId() }),
+    body: JSON.stringify({ usuarioId: id, input }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);

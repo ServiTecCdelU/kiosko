@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/sales-service.ts — alta de ventas (client helper hacia /api/ventas)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { PaymentMethod, Sale } from "@/lib/types";
 
 export interface CreateSaleItem {
@@ -49,7 +48,7 @@ export async function createSale(input: CreateSaleInput): Promise<ProcessSaleRes
     res = await fetch(apiUrl("/api/ventas"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+      body: JSON.stringify(input),
     });
   } catch {
     throw new NetworkUnavailableError();
@@ -124,7 +123,7 @@ export async function anularVenta(input: AnularVentaInput): Promise<AnularVentaR
   const res = await fetch(apiUrl("/api/ventas/anular"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo anular la venta");
@@ -146,7 +145,7 @@ export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolu
   const res = await fetch(apiUrl("/api/ventas/devolver"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la devolución");

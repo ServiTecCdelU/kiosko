@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/products-service.ts — lectura del catalogo (client, anon)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { ResultadoOferta } from "@/lib/oferta-resultados";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
@@ -109,7 +108,7 @@ export async function updateProduct(productId: string, input: UpdateProductInput
   const res = await fetch(apiUrl("/api/productos"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ productId, input, comercioId: getComercioId() }),
+    body: JSON.stringify({ productId, input }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -138,7 +137,6 @@ export async function logCambioPrecio(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       productId, campo, valorAnterior, valorNuevo, usuarioNombre,
-      comercioId: getComercioId(),
     }),
   });
   if (!res.ok) {
@@ -319,7 +317,7 @@ export async function setOferta(productId: string, oferta: SetOfertaInput): Prom
   const res = await fetch(apiUrl("/api/productos"), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ productId, oferta, comercioId: getComercioId() }),
+    body: JSON.stringify({ productId, oferta }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -348,7 +346,7 @@ export async function createProduct(input: CreateProductInput): Promise<string> 
   const res = await fetch(apiUrl("/api/productos"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input, comercioId: getComercioId() }),
+    body: JSON.stringify({ input }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);

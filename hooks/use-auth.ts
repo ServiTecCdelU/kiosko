@@ -47,10 +47,8 @@ export function getCurrentUser(): Usuario | null {
   return readStored();
 }
 
-/** Comercio (tenant) del usuario actual. Base para scopear toda consulta. */
-export function getComercioId(): string {
-  return readStored()?.comercioId ?? DEFAULT_COMERCIO_ID;
-}
+// El comercio de cada request lo decide el servidor con la cookie de sesion
+// (lib/server/sesion.ts): el cliente nunca lo manda.
 
 // Una sola validacion por carga de pagina aunque varios componentes usen el hook.
 let validacion: Promise<void> | null = null;

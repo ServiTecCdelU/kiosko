@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/stock-service.ts — movimientos de stock
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { StockMovimiento, StockMovTipo } from "@/lib/types";
 
 export interface AjusteStockInput {
@@ -22,7 +21,7 @@ export async function ajustarStock(input: AjusteStockInput): Promise<AjusteStock
   const res = await fetch(apiUrl("/api/stock"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo ajustar el stock");

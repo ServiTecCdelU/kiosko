@@ -169,7 +169,6 @@ demo con datos; panel por slug.
 | 5.3 | Backup / exportación de datos por comercio | — |
 | 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
-| — | Sacar `comercioId` del body de los `fetch` de `services/*` | El servidor lo ignora (usa la sesión); es limpieza. |
 
 Criterio adoptado: no planificar en el vacío — priorizar según el dolor real
 del primer comercio en producción.

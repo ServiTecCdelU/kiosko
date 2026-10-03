@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/clientes-service.ts — clientes y cuenta corriente (client, anon)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { Cliente, CuentaMov } from "@/lib/types";
 
 function mapCliente(d: Record<string, any>): Cliente {
@@ -76,7 +75,7 @@ export async function crearCliente(input: CrearClienteInput): Promise<Cliente> {
   const res = await fetch(apiUrl("/api/clientes"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, nombre, comercioId: getComercioId() }),
+    body: JSON.stringify({ ...input, nombre }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el cliente");
@@ -106,7 +105,7 @@ export async function registrarPago(
   const res = await fetch(apiUrl("/api/clientes/pago"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clienteId, monto, usuario, referencia, comercioId: getComercioId() }),
+    body: JSON.stringify({ clienteId, monto, usuario, referencia }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");
@@ -129,7 +128,7 @@ export async function canjearPuntos(
   const res = await fetch(apiUrl("/api/clientes/canjear-puntos"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clienteId, puntos, usuario, motivo, comercioId: getComercioId() }),
+    body: JSON.stringify({ clienteId, puntos, usuario, motivo }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo canjear los puntos");

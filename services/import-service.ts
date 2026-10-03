@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/import-service.ts — importación masiva de productos desde lista de precios (Excel)
 import * as XLSX from "xlsx-js-style";
-import { getComercioId } from "@/hooks/use-auth";
 import { mapRow } from "@/services/products-service";
 import type { Product } from "@/lib/types";
 
@@ -234,7 +233,6 @@ export async function importProducts(
   options: ImportOptions,
   onProgress?: (done: number, total: number) => void,
 ): Promise<ImportSummary> {
-  const comercioId = getComercioId();
   const summary: ImportSummary = { creados: 0, actualizados: 0, omitidos: 0, conAdvertencias: 0 };
 
   const usable = rows.filter((r) => {
@@ -256,7 +254,6 @@ export async function importProducts(
       body: JSON.stringify({
         filas: lote,
         estrategia: options.stockStrategy,
-        comercioId,
       }),
     });
     const data = await res.json();

@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/compras-service.ts — proveedores y recepcion de mercaderia (client)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 
 export interface Proveedor {
   id: string;
@@ -77,7 +76,7 @@ export async function crearProveedor(input: {
   const res = await fetch(apiUrl("/api/proveedores"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el proveedor");
@@ -90,7 +89,7 @@ export async function actualizarProveedor(
   const res = await fetch(apiUrl("/api/proveedores"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, ...cambios, comercioId: getComercioId() }),
+    body: JSON.stringify({ id, ...cambios }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo actualizar el proveedor");
@@ -111,7 +110,7 @@ export async function recibirCompra(input: RecibirCompraInput): Promise<{ compra
   const res = await fetch(apiUrl("/api/compras"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la compra");
@@ -122,7 +121,7 @@ export async function anularCompra(compraId: string, usuarioId?: string): Promis
   const res = await fetch(apiUrl("/api/compras/anular"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ compraId, usuarioId, comercioId: getComercioId() }),
+    body: JSON.stringify({ compraId, usuarioId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo anular la compra");

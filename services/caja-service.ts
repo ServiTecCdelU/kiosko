@@ -1,7 +1,6 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/caja-service.ts — caja diaria (client, anon)
 import { consultar } from "@/services/api-client";
-import { getComercioId } from "@/hooks/use-auth";
 import type { Caja, CajaMovimiento, CajaMovTipo, Puesto } from "@/lib/types";
 import type { CajaDelDia } from "@/lib/consolidado";
 
@@ -119,7 +118,7 @@ export async function crearPuesto(nombre: string): Promise<void> {
   const res = await fetch(apiUrl("/api/puestos"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nombre, comercioId: getComercioId() }),
+    body: JSON.stringify({ nombre }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el puesto");
@@ -132,7 +131,7 @@ export async function actualizarPuesto(
   const res = await fetch(apiUrl("/api/puestos"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, ...cambios, comercioId: getComercioId() }),
+    body: JSON.stringify({ id, ...cambios }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo actualizar el puesto");
@@ -158,7 +157,7 @@ export async function registrarMovimientoCaja(input: RegistrarMovimientoInput): 
   const res = await fetch(apiUrl("/api/caja/movimiento"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, comercioId: getComercioId() }),
+    body: JSON.stringify(input),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el movimiento");
@@ -200,7 +199,7 @@ export async function abrirCaja(
   const res = await fetch(apiUrl("/api/caja"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ montoApertura, puestoId, usuarioId, usuarioNombre, comercioId: getComercioId() }),
+    body: JSON.stringify({ montoApertura, puestoId, usuarioId, usuarioNombre }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo abrir la caja");
@@ -221,7 +220,7 @@ export async function cerrarCaja(
   const res = await fetch(apiUrl("/api/caja"), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cajaId, montoCierreContado, usuarioId, notas, comercioId: getComercioId() }),
+    body: JSON.stringify({ cajaId, montoCierreContado, usuarioId, notas }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo cerrar la caja");
