@@ -3,6 +3,7 @@
 import { generarImagenOferta, type FormatoImagen } from "@/lib/imagen-oferta";
 import type { TemaCartelId } from "@/lib/cartel-temas";
 import type { Product } from "@/lib/types";
+import { descargarBlob } from "@/lib/utils/descargar";
 
 export type ResultadoCompartir = "compartida" | "descargada" | "cancelada";
 
@@ -28,13 +29,6 @@ export async function compartirImagenOferta(
     }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = archivo.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  descargarBlob(blob, archivo.name);
   return "descargada";
 }

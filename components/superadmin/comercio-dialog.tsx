@@ -2,7 +2,9 @@
 // components/superadmin/comercio-dialog.tsx — "Administrar" un comercio:
 // estado, plan, pago del mes y correos con acceso de Google.
 import { toast } from "sonner";
-import { Check, CircleDollarSign, LogIn } from "lucide-react";
+import { useState } from "react";
+import { Check, CircleDollarSign, Download, Loader2, LogIn } from "lucide-react";
+import { descargarBackupDeComercio } from "@/services/backup-service";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -65,6 +67,29 @@ function FinDePrueba({ trialHasta, onCambiar }: { trialHasta: string | null; onC
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Excel con todos los datos del comercio (lib/server/backup.ts). */
+function BotonBackup({ comercioId }: { comercioId: string }) {
+  const [descargando, setDescargando] = useState(false);
+
+  const descargar = async () => {
+    setDescargando(true);
+    try {
+      await descargarBackupDeComercio(comercioId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo descargar el backup");
+    } finally {
+      setDescargando(false);
+    }
+  };
+
+  return (
+    <Button variant="outline" className="rounded-xl" onClick={descargar} disabled={descargando}>
+      {descargando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+      Backup
+    </Button>
   );
 }
 
@@ -156,9 +181,12 @@ export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: C
 
           <AccesosGoogle comercioId={comercio.id} onCambio={onCambio} />
 
-          <Button className="w-full rounded-xl" onClick={() => onEntrar(comercio)}>
-            <LogIn className="mr-2 h-4 w-4" /> Entrar al panel de {comercio.nombre}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <BotonBackup comercioId={comercio.id} />
+            <Button className="flex-1 rounded-xl" onClick={() => onEntrar(comercio)}>
+              <LogIn className="mr-2 h-4 w-4" /> Entrar al panel de {comercio.nombre}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

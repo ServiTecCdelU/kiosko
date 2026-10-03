@@ -146,5 +146,5 @@ Detalle de cada una en `docs/CONTEXTO.md` §5.
 
 ## Roadmap
 Referencia viva: `docs/PLAN-MAESTRO-2026-09-18.md` (fases 0–4 prácticamente completas).
-Pendientes actuales resumidos en `docs/CONTEXTO.md` §6: backup por comercio,
+Pendientes actuales resumidos en `docs/CONTEXTO.md` §6:
 facturación electrónica AFIP/ARCA, billing de suscripción.

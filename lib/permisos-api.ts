@@ -30,6 +30,7 @@ const RUTAS_ADMIN = [
   "/api/sync",
   "/api/consultas/reportes",
   "/api/mercadopago/conexion",
+  "/api/backup",
 ];
 
 /** Metodos puntuales de admin en rutas que el mostrador tambien usa. */

@@ -19,6 +19,7 @@ import {
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { MercadoPagoCard } from "@/components/home/mercadopago-card";
 import { PrimerosPasosCard } from "@/components/home/primeros-pasos-card";
+import { BackupCard } from "@/components/home/backup-card";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
@@ -168,6 +169,7 @@ function HomeContent() {
         </div>
 
         {rol === "admin" && <MercadoPagoCard />}
+        {rol === "admin" && <BackupCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
           Demo · Punto de venta

@@ -32,7 +32,7 @@ describe("reglaDeRuta", () => {
     for (const ruta of [
       "/api/usuarios", "/api/consultas/usuarios", "/api/compras", "/api/compras/anular",
       "/api/proveedores", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
-      "/api/consultas/reportes", "/api/mercadopago/conexion",
+      "/api/consultas/reportes", "/api/mercadopago/conexion", "/api/backup",
     ]) {
       assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
     }

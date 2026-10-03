@@ -48,6 +48,12 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   por IP por hora. Rubro, WhatsApp y origen quedan en `comercios.config`. El panel
   nuevo muestra la tarjeta "Primeros pasos" y el superadmin ve el badge "nuevo".
   Spec: `docs/superpowers/specs/2026-10-03-autoregistro-design.md`.
+- **Backup por comercio**: el admin descarga "Copia de tus datos" desde su panel y el
+  superadmin el de cualquier comercio (botón Backup en Administrar). Es un Excel con una
+  hoja por tema; las hojas y columnas están en `lib/backup-hojas.ts` (solo se leen esas
+  columnas, nunca `*`: el PIN y el token de MP no salen). Lo arma `lib/server/backup.ts`
+  paginando de a 1000 filas. Es una lectura (GET), así que anda en modo consulta. No hay
+  restauración: para desastres están los backups diarios de Supabase.
 - **Demo pública**: comercio con slug `demo`, PIN `1234` (publicado a propósito
   en el login, `lib/demo.ts`). Datos de 15 días regenerables con
   `supabase/38_demo_datos.sql` (solo toca filas `demo_*`).
@@ -182,7 +188,6 @@ demo con datos; panel por slug.
 | # | Ítem | Nota |
 |---|---|---|
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
-| 5.3 | Backup / exportación de datos por comercio | — |
 | 5.4 | **Facturación electrónica AFIP/ARCA** (Factura C) | Diferencial principal para un plan "Pro". |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
 
