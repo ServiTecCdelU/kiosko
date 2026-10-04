@@ -36,6 +36,7 @@ import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 import { diasHastaVencimiento, textoVencimiento } from "@/lib/oferta-vencimiento";
+import { PedirMas } from "@/components/stock/pedir-mas";
 
 const PAGE_SIZE = 30;
 
@@ -318,6 +319,8 @@ export default function StockPage() {
           </button>
         ))}
       </div>
+
+      <PedirMas />
 
       {cambiosPrecio.length > 0 && (
         <div id="cambios-precio" className="card-premium mb-4 scroll-mt-4 rounded-2xl p-5">

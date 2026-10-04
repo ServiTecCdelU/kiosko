@@ -210,6 +210,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ productos: data ?? [] });
     }
 
+    // "Pedí más": ritmo de venta reciente vs anterior y ultima compra por producto
+    case "ritmoVenta": {
+      const dias = acotar(body?.dias, 14, 30);
+      const { data, error } = await supabaseAdmin.rpc("productos_ritmo_venta", {
+        p_comercio_id: comercioId,
+        p_dias: dias,
+      });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ productos: data ?? [], dias });
+    }
+
     case "porCodigo": {
       const c = String(body?.code ?? "").trim();
       if (!c) return NextResponse.json({ producto: null });

@@ -6,6 +6,7 @@ import type { ResultadoOferta } from "@/lib/oferta-resultados";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 import type { RegistroOferta } from "@/lib/oferta-historial";
 import { fechaDeDia } from "@/lib/oferta-vencimiento";
+import type { RitmoProducto } from "@/lib/pedir-mas";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -243,6 +244,32 @@ export async function getReposicionPredictiva(dias = 14): Promise<ReposicionItem
     "/api/consultas/productos", "reposicion", { dias },
   );
   return productos.map(mapReposicion);
+}
+
+/** Ritmo de venta por producto para la seccion "Pedí más" del stock. */
+export async function getRitmoVenta(dias = 14): Promise<{ productos: RitmoProducto[]; dias: number }> {
+  const res = await consultar<{ productos: Record<string, any>[]; dias: number }>(
+    "/api/consultas/productos", "ritmoVenta", { dias },
+  );
+  return {
+    dias: res.dias,
+    productos: res.productos.map((d) => ({
+      id: d.producto_id,
+      nombre: d.nombre,
+      unidad: d.unidad === "kg" ? "kg" : "un",
+      stock: Number(d.stock_actual) || 0,
+      stockMinimo: Number(d.stock_minimo) || 0,
+      vendidoReciente: Number(d.vendido_reciente) || 0,
+      vendidoAnterior: Number(d.vendido_anterior) || 0,
+      ultimaCompra: d.ultima_compra_fecha && Number(d.ultima_compra_cantidad) > 0
+        ? {
+            fecha: d.ultima_compra_fecha,
+            cantidad: Number(d.ultima_compra_cantidad),
+            vendidoDesde: Number(d.vendido_desde_compra) || 0,
+          }
+        : null,
+    })),
+  };
 }
 
 export interface OfertaConResultado {
