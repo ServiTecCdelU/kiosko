@@ -16,6 +16,9 @@ import {
   CalendarClock,
   Megaphone,
   FileText,
+  Receipt,
+  Truck,
+  UserCog,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { MercadoPagoCard } from "@/components/home/mercadopago-card";
@@ -51,6 +54,9 @@ const ICONS: Record<string, typeof ShoppingCart> = {
   "/reportes": BarChart3,
   "/sincronizacion": RefreshCw,
   "/facturacion": FileText,
+  "/ventas": Receipt,
+  "/compras": Truck,
+  "/usuarios": UserCog,
 };
 
 const SUBTITLES: Record<string, string> = {
@@ -62,6 +68,9 @@ const SUBTITLES: Record<string, string> = {
   "/reportes": "Ventas, márgenes y más vendidos",
   "/sincronizacion": "Catálogo de la distribuidora",
   "/facturacion": "Factura C con CAE de AFIP/ARCA",
+  "/ventas": "Historial, anulaciones y devoluciones",
+  "/compras": "Proveedores y mercadería recibida",
+  "/usuarios": "Cajeros, encargados y sus PIN",
 };
 
 // Fondo atmosférico: mesh de gradientes teal/lima muy sutil.
@@ -347,7 +356,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
 
       {/* Stock bajo (solo admin) */}
       {showStock && (
-        <Link href="/stock" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
+        <Link href="/stock?filtro=stockBajo" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
           <div className="eyebrow flex items-center gap-1.5">
             <AlertTriangle className={`h-4 w-4 ${stockBajo && stockBajo > 0 ? "text-warning" : "text-primary"}`} />
             Stock bajo
@@ -365,7 +374,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
 
       {/* Vencimientos proximos (solo admin) */}
       {showStock && (
-        <Link href="/stock" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
+        <Link href="/stock?filtro=vencen" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
           <div className="eyebrow flex items-center gap-1.5">
             <CalendarClock className={`h-4 w-4 ${vencimientos && vencimientos > 0 ? "text-warning" : "text-primary"}`} />
             Vencen esta semana

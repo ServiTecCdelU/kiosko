@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import type { Product } from "@/lib/types";
 import { getHistorialPrecio, type UpdateProductInput, type CambioPrecio } from "@/services/products-service";
+import { aDiaIso } from "@/lib/oferta-vencimiento";
 
 type AjusteTipo = "entrada" | "ajuste" | "rotura";
 
@@ -67,7 +68,7 @@ export function EditarProductoDialog({
       setDisabled(product.disabled);
       setRevisar(product.revisar);
       setFavorito(product.favorito);
-      setFechaVencimiento(product.fechaVencimiento ? product.fechaVencimiento.toISOString().slice(0, 10) : "");
+      setFechaVencimiento(product.fechaVencimiento ? aDiaIso(product.fechaVencimiento) : "");
       setUnidad(product.unidad);
       setStockControlado(product.stockControlado);
       getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));

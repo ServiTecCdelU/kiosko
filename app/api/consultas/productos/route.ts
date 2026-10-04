@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { leerTodo } from "@/lib/server/leer-todo";
+import { hoyArgentinaISO, sumarDias } from "@/lib/oferta-vigencia";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { historialOfertas, ofertasConResultados, sugerenciasOfertas } from "@/lib/server/ofertas";
 
@@ -184,15 +185,15 @@ export async function POST(req: Request) {
 
     case "vencimientos": {
       const dias = acotar(body?.dias, 7, 365);
-      const limite = new Date();
-      limite.setDate(limite.getDate() + dias);
+      // "Hoy" argentino: en UTC, despues de las 21 hs ya es mañana y la ventana se corria un dia.
+      const limite = sumarDias(hoyArgentinaISO(), dias);
       const { data, error } = await supabaseAdmin
         .from("productos")
         .select("*")
         .eq("comercio_id", comercioId)
         .eq("disabled", false)
         .not("fecha_vencimiento", "is", null)
-        .lte("fecha_vencimiento", limite.toISOString().slice(0, 10))
+        .lte("fecha_vencimiento", limite)
         .order("fecha_vencimiento", { ascending: true })
         .limit(100);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });

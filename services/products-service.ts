@@ -5,6 +5,7 @@ import type { OfertaTipo, Product } from "@/lib/types";
 import type { ResultadoOferta } from "@/lib/oferta-resultados";
 import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 import type { RegistroOferta } from "@/lib/oferta-historial";
+import { fechaDeDia } from "@/lib/oferta-vencimiento";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -22,7 +23,7 @@ export function mapRow(d: Record<string, any>): Product {
     lote: d.lote != null ? Number(d.lote) : undefined,
     revisar: d.revisar ?? false,
     favorito: d.favorito ?? false,
-    fechaVencimiento: d.fecha_vencimiento ? new Date(d.fecha_vencimiento) : undefined,
+    fechaVencimiento: fechaDeDia(d.fecha_vencimiento),
     unidad: d.unidad === "kg" ? "kg" : "un",
     stockControlado: d.stock_controlado ?? true,
     disabled: d.disabled ?? false,

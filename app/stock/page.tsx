@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
   Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown, Megaphone,
+  CalendarClock,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
-  logCambioPrecio, getCambiosPrecioRecientes,
+  logCambioPrecio, getCambiosPrecioRecientes, getVencimientosProximos,
   type SetOfertaInput, type StockStats, type UpdateProductInput, type CambioPrecioReciente,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -34,10 +35,14 @@ import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/p
 import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
+import { diasHastaVencimiento, textoVencimiento } from "@/lib/oferta-vencimiento";
 
 const PAGE_SIZE = 30;
 
-type QuickFilter = "todos" | "stockBajo" | "agotados" | "revisar";
+type QuickFilter = "todos" | "stockBajo" | "agotados" | "revisar" | "vencen";
+const FILTROS: QuickFilter[] = ["todos", "stockBajo", "agotados", "revisar", "vencen"];
+/** Dias hacia adelante del filtro "Vencen esta semana" (el mismo que el inicio). */
+const DIAS_VENCEN = 7;
 
 export default function StockPage() {
   const [search, setSearch] = useState("");
@@ -46,6 +51,7 @@ export default function StockPage() {
   const [categoria, setCategoria] = useState("");
   const [categorias, setCategorias] = useState<string[]>([]);
   const [stats, setStats] = useState<StockStats | null>(null);
+  const [vencenCount, setVencenCount] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -73,6 +79,12 @@ export default function StockPage() {
     setPage(0);
   }, [debounced, quickFilter, categoria]);
 
+  // Las tarjetas del inicio llegan con el filtro en el link: /stock?filtro=vencen
+  useEffect(() => {
+    const filtro = new URLSearchParams(window.location.search).get("filtro") as QuickFilter | null;
+    if (filtro && FILTROS.includes(filtro)) setQuickFilter(filtro);
+  }, []);
+
   // La seleccion solo tiene los datos de los productos de la pagina actual
   // (`products`): si se arrastrara entre paginas, al imprimir se perderian en
   // silencio los seleccionados de una pagina anterior. Mas simple y predecible:
@@ -83,7 +95,9 @@ export default function StockPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      setStats(await getStockStats());
+      const [s, vencen] = await Promise.all([getStockStats(), getVencimientosProximos(DIAS_VENCEN)]);
+      setStats(s);
+      setVencenCount(vencen.length);
     } catch {
       // no crítico, no bloquea la pantalla
     }
@@ -105,9 +119,26 @@ export default function StockPage() {
     }
   }, []);
 
+  // Solo se aplica la ultima carga: si cambia el filtro con una en vuelo, la vieja se descarta.
+  const ultimaCarga = useRef(0);
   const load = useCallback(async () => {
+    const carga = ++ultimaCarga.current;
+    const vigente = () => carga === ultimaCarga.current;
     setLoading(true);
     try {
+      // Vencimientos: la lista viene ordenada por fecha (lo mas urgente arriba).
+      if (quickFilter === "vencen") {
+        const lista = await getVencimientosProximos(DIAS_VENCEN);
+        const q = debounced.trim().toLowerCase();
+        const filtrada = lista.filter((x) =>
+          (!categoria || x.category === categoria) &&
+          (!q || x.name.toLowerCase().includes(q) || x.codigo?.toLowerCase().includes(q) || x.codigoBarras?.includes(q)),
+        );
+        if (!vigente()) return;
+        setProducts(filtrada);
+        setTotal(filtrada.length);
+        return;
+      }
       const res = await getProductsPage({
         search: debounced,
         soloStockBajo: quickFilter === "stockBajo",
@@ -117,12 +148,13 @@ export default function StockPage() {
         page,
         pageSize: PAGE_SIZE,
       });
+      if (!vigente()) return;
       setProducts(res.products);
       setTotal(res.total);
     } catch {
-      toast.error("No se pudo cargar el stock");
+      if (vigente()) toast.error("No se pudo cargar el stock");
     } finally {
-      setLoading(false);
+      if (vigente()) setLoading(false);
     }
   }, [debounced, quickFilter, categoria, page]);
 
@@ -198,8 +230,9 @@ export default function StockPage() {
       { key: "stockBajo" as QuickFilter, label: "Stock bajo", value: stats?.stockBajo ?? "—", icon: Package, color: "text-warning" },
       { key: "agotados" as QuickFilter, label: "Agotados", value: stats?.agotados ?? "—", icon: PackageX, color: "text-destructive" },
       { key: "revisar" as QuickFilter, label: "A revisar", value: stats?.revisar ?? "—", icon: ClipboardList, color: "text-warning" },
+      { key: "vencen" as QuickFilter, label: "Vencen esta semana", value: vencenCount ?? "—", icon: CalendarClock, color: "text-warning" },
     ],
-    [stats],
+    [stats, vencenCount],
   );
 
   const idsPagina = products.map((p) => p.id);
@@ -269,7 +302,7 @@ export default function StockPage() {
 
   return (
     <AppShell title="Stock">
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((c) => (
           <button
             key={c.key}
@@ -475,6 +508,7 @@ export default function StockPage() {
                       <TableCell className="text-xs text-muted-foreground">{p.codigo || "—"}</TableCell>
                       <TableCell>
                         <p className="line-clamp-1 font-medium">{p.name}</p>
+                        <EtiquetaVencimiento fecha={p.fechaVencimiento} />
                         {p.revisar && (
                           <Badge variant="outline" className="mt-1 border-warning text-warning">
                             <AlertTriangle className="mr-1 h-3 w-3" />A revisar
@@ -621,5 +655,18 @@ export default function StockPage() {
       <EtiquetasPrint productos={productosEtiqueta} />
       {impresion}
     </AppShell>
+  );
+}
+
+/** "Vence mañana", "Vencido hace 2 días"... solo si falta una semana o menos. */
+function EtiquetaVencimiento({ fecha }: { fecha?: Date }) {
+  if (!fecha) return null;
+  const dias = diasHastaVencimiento(fecha);
+  const texto = textoVencimiento(dias);
+  if (!texto) return null;
+  return (
+    <Badge variant="outline" className={dias < 0 ? "mt-1 border-destructive text-destructive" : "mt-1 border-warning text-warning"}>
+      <CalendarClock className="mr-1 h-3 w-3" />{texto}
+    </Badge>
   );
 }
