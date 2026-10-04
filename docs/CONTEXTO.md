@@ -48,7 +48,9 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   por IP por hora. Rubro, WhatsApp y origen quedan en `comercios.config`. El panel
   nuevo muestra la tarjeta "Primeros pasos" y el superadmin ve el badge "nuevo".
   Spec: `docs/superpowers/specs/2026-10-03-autoregistro-design.md`.
-- **Facturación electrónica AFIP/ARCA** (`/facturacion`, solo admin; spec
+- **Facturación electrónica AFIP/ARCA** (`/facturacion`, solo admin: **tutorial de 7 pasos** en
+  `components/facturacion/tutorial/`, con lo de ARCA como lista para tildar y los errores de ARCA
+  explicados en `lib/afip/explicar-error.ts`; spec
   `docs/superpowers/specs/2026-10-03-facturacion-afip-design.md`): Factura C y Nota de
   crédito C con certificado propio de cada comercio. El sistema genera la clave (cifrada
   con `AFIP_CERT_KEY`) y el CSR; el dueño sube el `.crt`. Emisión manual (botón Facturar

@@ -1,231 +1,155 @@
 "use client";
 
-// components/facturacion/asistente-afip.tsx — alta de la facturacion electronica
-// en 5 pasos: datos fiscales, pedido de certificado, certificado, punto de venta
-// y modo, prueba y activacion. Spec: 2026-10-03-facturacion-afip-design.md
-import { useState } from "react";
+// components/facturacion/asistente-afip.tsx — tutorial paso a paso para que el
+// comerciante active la facturacion electronica solo. Una pantalla por paso,
+// barra de progreso, lo de ARCA como lista para tildar y, si la prueba falla,
+// el error explicado con un boton al paso donde se arregla.
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, Download, FileKey2, Loader2, PlugZap, Power, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe, MessageCircle, MonitorSmartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils/format";
-import { InstruccionesCertificado, InstruccionesPuntoVenta } from "@/components/facturacion/instrucciones-afip";
-import {
-  descargarPedidoCertificado, desactivarAfip, generarPedidoCertificado, guardarDatosFiscales, guardarOperacionAfip,
-  probarAfip, subirCertificadoAfip, type EstadoConfigAfip, type PasoPrueba,
-} from "@/services/facturacion-service";
+import { CONTACT } from "@/lib/marketing/contact";
+import type { PasoTutorial } from "@/lib/afip/explicar-error";
+import type { EstadoConfigAfip } from "@/services/facturacion-service";
+import { PasoAmbiente, PasoDatos, PasoPedido, type Ambiente } from "./tutorial/pasos-sistema";
+import { PasoAutorizar, PasoCertificado, PasoProbar, PasoPuntoVenta, TAREAS_AUTORIZAR } from "./tutorial/pasos-arca";
+import { useTildes } from "./tutorial/tareas-arca";
 
-type Ambiente = "homologacion" | "produccion";
-
-function Paso({ n, titulo, listo, children }: { n: number; titulo: string; listo: boolean; children: React.ReactNode }) {
-  return (
-    <section className="card-premium rounded-2xl p-5" aria-labelledby={`paso-${n}`}>
-      <h2 id={`paso-${n}`} className="mb-3 flex items-center gap-2 font-semibold">
-        {listo ? <CheckCircle2 className="h-5 w-5 text-success" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
-        {n}. {titulo}
-      </h2>
-      {children}
-    </section>
-  );
+interface DefPaso {
+  id: PasoTutorial;
+  titulo: string;
+  bajada: string;
+  enArca: boolean;
 }
 
-function useAccion(onEstado: (e: EstadoConfigAfip) => void) {
+const PASOS: DefPaso[] = [
+  { id: "ambiente", titulo: "¿Probar o facturar de verdad?", bajada: "Elegí cómo arrancar. Lo podés cambiar después.", enArca: false },
+  { id: "datos", titulo: "Tus datos fiscales", bajada: "Los que van impresos en cada factura.", enArca: false },
+  { id: "pedido", titulo: "Pedido de certificado", bajada: "Lo generamos nosotros con un clic.", enArca: false },
+  { id: "certificado", titulo: "Sacar el certificado", bajada: "En la web de ARCA, con tu clave fiscal.", enArca: true },
+  { id: "autorizar", titulo: "Autorizar la facturación", bajada: "En ARCA: darle permiso al certificado.", enArca: true },
+  { id: "punto-venta", titulo: "Punto de venta", bajada: "El número que va en tus facturas.", enArca: true },
+  { id: "probar", titulo: "Probar y activar", bajada: "Comprobamos que todo funcione.", enArca: false },
+];
+
+export function AsistenteAfip({ estado, onEstado }: { estado: EstadoConfigAfip; onEstado: (e: EstadoConfigAfip) => void }) {
+  const [ambiente, setAmbiente] = useState<Ambiente>(estado.ambiente ?? "homologacion");
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const correr = async (clave: string, fn: () => Promise<EstadoConfigAfip>, exito: string) => {
+  const [tildesCert, alternarCert] = useTildes(`certificado-${ambiente}`);
+  const [tildesAut, alternarAut] = useTildes(`autorizar-${ambiente}`);
+  const [tildesPv, alternarPv] = useTildes(`punto-venta-${ambiente}`);
+
+  const listo: Record<PasoTutorial, boolean> = {
+    ambiente: estado.configurado,
+    datos: estado.configurado,
+    pedido: !!estado.tienePedido,
+    certificado: !!estado.tieneCertificado,
+    autorizar: !!estado.activo || TAREAS_AUTORIZAR[ambiente].every((t) => tildesAut[t.id]),
+    "punto-venta": !!estado.puntoVenta && estado.ambiente === ambiente,
+    probar: !!estado.activo,
+  };
+
+  // Arranca en el primer paso sin hacer (retoma donde quedo); todo hecho = el final ("¡Listo!").
+  const pasoInicial = useMemo(() => {
+    const i = PASOS.findIndex((p) => !listo[p.id]);
+    return i === -1 ? PASOS.length - 1 : i;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [indice, setIndice] = useState(pasoInicial);
+  const paso = PASOS[indice];
+  const hechos = PASOS.filter((p) => listo[p.id]).length;
+
+  const correr = async (clave: string, fn: () => Promise<EstadoConfigAfip>, exito: string): Promise<boolean> => {
     setOcupado(clave);
     try {
       onEstado(await fn());
       toast.success(exito);
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+      return false;
     } finally {
       setOcupado(null);
     }
   };
-  return { ocupado, correr };
-}
 
-export function AsistenteAfip({ estado, onEstado }: { estado: EstadoConfigAfip; onEstado: (e: EstadoConfigAfip) => void }) {
-  const { ocupado, correr } = useAccion(onEstado);
-  const ambiente: Ambiente = estado.ambiente ?? "homologacion";
-
-  // Paso 1
-  const [cuit, setCuit] = useState(estado.cuit ?? "");
-  const [razonSocial, setRazonSocial] = useState(estado.razonSocial ?? "");
-  const [domicilio, setDomicilio] = useState(estado.domicilio ?? "");
-  const [inicio, setInicio] = useState(estado.inicioActividades ?? "");
-  const [iibb, setIibb] = useState(estado.ingresosBrutos ?? "");
-  // Paso 3
-  const [certificado, setCertificado] = useState("");
-  // Paso 4
-  const [puntoVenta, setPuntoVenta] = useState(String(estado.puntoVenta ?? ""));
-  const [ambienteSel, setAmbienteSel] = useState<Ambiente>(ambiente);
-  const [modo, setModo] = useState<"manual" | "automatico">(estado.modo ?? "manual");
-  // Paso 5
-  const [prueba, setPrueba] = useState<PasoPrueba[] | null>(null);
-
-  const leerArchivo = async (archivo: File | undefined) => {
-    if (archivo) setCertificado(await archivo.text());
-  };
-
-  const probar = async (activar: boolean) => {
-    setPrueba(null);
-    await correr(activar ? "activar" : "probar", async () => {
-      const r = await probarAfip(activar);
-      setPrueba(r.pasos);
-      if (!r.ok) throw new Error("La prueba falló: revisá el detalle");
-      return r.estado;
-    }, activar ? "Facturación electrónica activada" : "Conexión con AFIP OK");
-  };
-
-  const datosListos = estado.configurado;
-  const pedidoListo = !!estado.tienePedido;
-  const certListo = !!estado.tieneCertificado;
-  const operacionLista = !!estado.puntoVenta;
+  const irA = (id: PasoTutorial) => setIndice(PASOS.findIndex((p) => p.id === id));
+  // Los pasos que guardan algo en el sistema hay que completarlos para seguir.
+  const bloqueaSiguiente = ["datos", "pedido", "certificado", "punto-venta"].includes(paso.id) && !listo[paso.id];
+  const props = { estado, ambiente, correr, ocupado };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <Paso n={1} titulo="Datos fiscales" listo={datosListos}>
-        <form
-          className="grid gap-3 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            correr("datos", () => guardarDatosFiscales({ cuit, razonSocial, domicilio, inicioActividades: inicio, ingresosBrutos: iibb }), "Datos fiscales guardados");
-          }}
-        >
-          <div className="space-y-1"><Label htmlFor="cuit">CUIT</Label><Input id="cuit" value={cuit} onChange={(e) => setCuit(e.target.value)} placeholder="20-12345678-6" inputMode="numeric" className="rounded-xl" /></div>
-          <div className="space-y-1"><Label htmlFor="razon">Razón social (como en AFIP)</Label><Input id="razon" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} className="rounded-xl" /></div>
-          <div className="space-y-1 sm:col-span-2"><Label htmlFor="domicilio">Domicilio comercial</Label><Input id="domicilio" value={domicilio} onChange={(e) => setDomicilio(e.target.value)} className="rounded-xl" /></div>
-          <div className="space-y-1"><Label htmlFor="inicio">Inicio de actividades</Label><Input id="inicio" type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="rounded-xl" /></div>
-          <div className="space-y-1"><Label htmlFor="iibb">Ingresos Brutos (opcional)</Label><Input id="iibb" value={iibb} onChange={(e) => setIibb(e.target.value)} className="rounded-xl" /></div>
-          <p className="text-xs text-muted-foreground sm:col-span-2">Condición: Responsable Monotributo (emite Factura C). Si cambiás el CUIT, hay que generar un pedido de certificado nuevo.</p>
-          <Button type="submit" className="rounded-xl sm:col-span-2 sm:w-fit" disabled={ocupado === "datos"}>
-            {ocupado === "datos" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar datos
-          </Button>
-        </form>
-      </Paso>
+    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      {/* Progreso */}
+      <div className="card-premium rounded-2xl p-4">
+        <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Paso {indice + 1} de {PASOS.length}</span>
+          <span>{hechos} de {PASOS.length} listos</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
+          <div className="grad-brand h-full rounded-full transition-[width] duration-500" style={{ width: `${(hechos / PASOS.length) * 100}%` }} />
+        </div>
+        <ol className="mt-3 flex flex-wrap gap-1.5">
+          {PASOS.map((p, i) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => setIndice(i)}
+                aria-current={i === indice ? "step" : undefined}
+                className={cn(
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs transition-colors",
+                  i === indice ? "border-primary bg-primary text-primary-foreground" : listo[p.id] ? "border-success/40 text-success" : "text-muted-foreground hover:border-primary/50",
+                )}
+              >
+                {listo[p.id] && i !== indice ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}
+                <span className="hidden sm:inline">{p.titulo}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
 
-      <Paso n={2} titulo="Pedido de certificado" listo={pedidoListo}>
-        <p className="mb-3 text-sm text-muted-foreground">
-          El sistema genera tu clave privada (queda guardada y cifrada acá, nunca la ves ni la descargás) y el pedido de certificado para AFIP.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={pedidoListo ? "outline" : "default"}
-            className="rounded-xl"
-            disabled={!datosListos || ocupado === "pedido"}
-            onClick={() => correr("pedido", generarPedidoCertificado, "Pedido generado: descargalo y subilo en AFIP")}
-          >
-            {ocupado === "pedido" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileKey2 className="mr-2 h-4 w-4" />}
-            {pedidoListo ? "Generar uno nuevo" : "Generar pedido"}
+      {/* Paso actual */}
+      <section className="card-premium rounded-2xl p-5 sm:p-6" aria-labelledby="titulo-paso">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 id="titulo-paso" className="text-xl font-bold tracking-tight">{indice + 1}. {paso.titulo}</h2>
+            <p className="text-sm text-muted-foreground">{paso.bajada}</p>
+          </div>
+          <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium", paso.enArca ? "bg-warning/15 text-warning" : "bg-primary/10 text-primary")}>
+            {paso.enArca ? <Globe className="h-3.5 w-3.5" /> : <MonitorSmartphone className="h-3.5 w-3.5" />}
+            {paso.enArca ? "Se hace en la web de ARCA" : "Se hace acá"}
+          </span>
+        </div>
+
+        {paso.id === "ambiente" && <PasoAmbiente ambiente={ambiente} setAmbiente={setAmbiente} tieneCertificado={!!estado.tieneCertificado} />}
+        {paso.id === "datos" && <PasoDatos {...props} />}
+        {paso.id === "pedido" && <PasoPedido {...props} />}
+        {paso.id === "certificado" && <PasoCertificado {...props} hechas={tildesCert} onAlternar={alternarCert} />}
+        {paso.id === "autorizar" && <PasoAutorizar ambiente={ambiente} hechas={tildesAut} onAlternar={alternarAut} />}
+        {paso.id === "punto-venta" && <PasoPuntoVenta {...props} hechas={tildesPv} onAlternar={alternarPv} />}
+        {paso.id === "probar" && <PasoProbar {...props} irA={irA} />}
+
+        <div className="mt-6 flex items-center justify-between gap-2 border-t pt-4">
+          <Button variant="ghost" className="rounded-xl" disabled={indice === 0} onClick={() => setIndice(indice - 1)}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Anterior
           </Button>
-          {pedidoListo && (
-            <Button variant="outline" className="rounded-xl" onClick={() => descargarPedidoCertificado().catch((e) => toast.error(e.message))}>
-              <Download className="mr-2 h-4 w-4" /> Descargar .csr
+          {indice < PASOS.length - 1 && (
+            <Button className="rounded-xl" disabled={bloqueaSiguiente} onClick={() => setIndice(indice + 1)}
+              title={bloqueaSiguiente ? "Completá este paso para seguir" : undefined}>
+              Siguiente <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
           )}
         </div>
-        {pedidoListo && (
-          <div className="mt-4 space-y-2">
-            <p className="text-sm font-medium">Qué hacer en AFIP/ARCA ({ambiente === "homologacion" ? "pruebas" : "producción"}):</p>
-            <InstruccionesCertificado ambiente={ambiente} />
-            {pedidoListo && certListo && <p className="text-xs text-warning">Generar uno nuevo invalida el certificado actual.</p>}
-          </div>
-        )}
-      </Paso>
+      </section>
 
-      <Paso n={3} titulo="Certificado de AFIP" listo={certListo}>
-        {certListo && <p className="mb-2 text-sm text-success">Certificado cargado · vence el {formatDate(estado.certVence)}</p>}
-        <div className="space-y-2">
-          <Input type="file" accept=".crt,.pem,.cer,text/plain" onChange={(e) => leerArchivo(e.target.files?.[0])} className="rounded-xl" disabled={!pedidoListo} />
-          <textarea
-            value={certificado}
-            onChange={(e) => setCertificado(e.target.value)}
-            placeholder="…o pegá acá el certificado (-----BEGIN CERTIFICATE-----)"
-            rows={4}
-            disabled={!pedidoListo}
-            className="w-full rounded-xl border bg-transparent p-2 font-mono text-xs"
-          />
-          <Button
-            className="rounded-xl"
-            disabled={!pedidoListo || !certificado.trim() || ocupado === "cert"}
-            onClick={() => correr("cert", () => subirCertificadoAfip(certificado), "Certificado guardado").then(() => setCertificado(""))}
-          >
-            {ocupado === "cert" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar certificado
-          </Button>
-        </div>
-      </Paso>
-
-      <Paso n={4} titulo="Punto de venta y modo" listo={operacionLista}>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1">
-            <Label htmlFor="ambiente">Ambiente</Label>
-            <select id="ambiente" value={ambienteSel} onChange={(e) => setAmbienteSel(e.target.value as Ambiente)} className="h-9 w-full rounded-xl border bg-transparent px-2 text-sm">
-              <option value="homologacion">Homologación (pruebas)</option>
-              <option value="produccion">Producción (facturas reales)</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="pv">Punto de venta</Label>
-            <Input id="pv" value={puntoVenta} onChange={(e) => setPuntoVenta(e.target.value)} inputMode="numeric" className="rounded-xl" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="modo">Cuándo facturar</Label>
-            <select id="modo" value={modo} onChange={(e) => setModo(e.target.value as "manual" | "automatico")} className="h-9 w-full rounded-xl border bg-transparent px-2 text-sm">
-              <option value="manual">Cuando lo pida (botón Facturar)</option>
-              <option value="automatico">Todas las ventas, solas</option>
-            </select>
-          </div>
-        </div>
-        <div className="mt-2"><InstruccionesPuntoVenta ambiente={ambienteSel} /></div>
-        {ambienteSel !== ambiente && certListo && (
-          <p className="mt-2 text-xs text-warning">Cada ambiente usa su propio certificado: al cambiarlo vas a tener que cargar el certificado de {ambienteSel === "produccion" ? "producción" : "homologación"}.</p>
-        )}
-        <Button
-          className="mt-3 rounded-xl"
-          disabled={!datosListos || ocupado === "operacion"}
-          onClick={() => correr("operacion", () => guardarOperacionAfip({ puntoVenta, ambiente: ambienteSel, modo }), "Guardado")}
-        >
-          {ocupado === "operacion" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar
-        </Button>
-      </Paso>
-
-      <Paso n={5} titulo="Probar y activar" listo={!!estado.activo}>
-        {estado.activo ? (
-          <p className="mb-3 text-sm text-success">
-            Facturación activa en {estado.ambiente === "produccion" ? "producción" : "homologación (pruebas, sin validez fiscal)"} ·{" "}
-            {estado.modo === "automatico" ? "todas las ventas se facturan solas" : "se factura con el botón Facturar"}.
-          </p>
-        ) : (
-          <p className="mb-3 text-sm text-muted-foreground">Probá la conexión con AFIP. Si todo da bien, activá la facturación.</p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="rounded-xl" disabled={!certListo || !operacionLista || !!ocupado} onClick={() => probar(false)}>
-            {ocupado === "probar" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlugZap className="mr-2 h-4 w-4" />} Probar conexión
-          </Button>
-          {!estado.activo ? (
-            <Button className="rounded-xl" disabled={!certListo || !operacionLista || !!ocupado} onClick={() => probar(true)}>
-              {ocupado === "activar" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Power className="mr-2 h-4 w-4" />} Probar y activar
-            </Button>
-          ) : (
-            <Button variant="ghost" className="rounded-xl text-muted-foreground" disabled={!!ocupado} onClick={() => correr("desactivar", desactivarAfip, "Facturación desactivada")}>
-              Desactivar
-            </Button>
-          )}
-        </div>
-        {prueba && (
-          <ul className="mt-3 space-y-1 text-sm">
-            {prueba.map((p, i) => (
-              <li key={i} className={cn("flex items-start gap-2", p.ok ? "text-foreground" : "text-destructive")}>
-                {p.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0" />}
-                <span><b>{p.paso}:</b> {p.detalle}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Paso>
+      <p className="text-center text-xs text-muted-foreground">
+        ¿Te trabaste en algún paso?{" "}
+        <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+          <MessageCircle className="h-3.5 w-3.5" /> Escribinos por WhatsApp
+        </a>
+        {" "}y te ayudamos a terminarlo.
+      </p>
     </div>
   );
 }

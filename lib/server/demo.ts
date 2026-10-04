@@ -69,10 +69,10 @@ export async function errorPinRepetido(comercioId: string, pin: string | null | 
   return null;
 }
 
-/** Slug del comercio: el panel del cliente vive en /<slug>. */
-export async function slugDeComercio(comercioId: string): Promise<string | undefined> {
-  const { data } = await supabaseAdmin.from("comercios").select("slug").eq("id", comercioId).maybeSingle();
-  return data?.slug ?? undefined;
+/** Slug (el panel vive en /<slug>) y nombre del comercio (menu y panel). */
+export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string }> {
+  const { data } = await supabaseAdmin.from("comercios").select("slug, nombre").eq("id", comercioId).maybeSingle();
+  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined };
 }
 
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */
@@ -85,7 +85,7 @@ export async function respuestaLoginPin(
     nombre: usuario.nombre,
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
-    comercioSlug: await slugDeComercio(usuario.comercio_id),
+    ...(await datosDeComercio(usuario.comercio_id)),
     ...extra,
   });
   // La cookie firmada es la fuente de verdad del comercioId para toda ruta API.

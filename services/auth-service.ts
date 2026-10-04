@@ -17,6 +17,7 @@ async function entrarConPin(ruta: string, pin: string): Promise<Usuario> {
     rol: data.rol,
     comercioId: data.comercioId ?? DEFAULT_COMERCIO_ID,
     comercioSlug: data.comercioSlug,
+    comercioNombre: data.comercioNombre,
     debeCambiarPin: data.debeCambiarPin === true,
     puestoId: data.puestoId,
     puestoNombre: data.puestoNombre,

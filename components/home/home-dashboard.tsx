@@ -175,7 +175,7 @@ function HomeContent() {
         {rol === "admin" && <BackupCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
-          Demo · Punto de venta
+          {user?.comercioNombre ?? "Tu comercio"} · Punto de venta
         </p>
       </div>
     </main>

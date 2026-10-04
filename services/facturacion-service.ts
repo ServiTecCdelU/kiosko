@@ -83,6 +83,13 @@ export async function descargarPedidoCertificado(): Promise<void> {
   descargarBlob(await res.blob(), nombre);
 }
 
+/** Texto del pedido (.csr): en WSASS (pruebas) ARCA pide pegarlo, no subirlo. */
+export async function textoPedidoCertificado(): Promise<string> {
+  const res = await fetch(apiUrl("/api/afip/pedido"));
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "No se pudo leer el pedido");
+  return res.text();
+}
+
 // ── Emision (cualquier rol) ──
 export const facturarVenta = (ventaId: string, documento?: string) =>
   pedir<{ factura: FacturaResumen }>("/api/afip/facturar", "POST", { ventaId, documento }).then((r) => r.factura);

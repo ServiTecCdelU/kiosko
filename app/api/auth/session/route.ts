@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { patronCorreoExacto } from "@/lib/correo";
 import { getSesion } from "@/lib/server/sesion";
-import { slugDeComercio } from "@/lib/server/demo";
+import { datosDeComercio } from "@/lib/server/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
     nombre: usuario.nombre,
     rol: usuario.rol,
     comercioId: usuario.comercio_id,
-    comercioSlug: await slugDeComercio(usuario.comercio_id),
+    ...(await datosDeComercio(usuario.comercio_id)),
     debeCambiarPin: usuario.debe_cambiar_pin === true,
   });
 }

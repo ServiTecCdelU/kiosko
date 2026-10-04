@@ -57,7 +57,7 @@ export function AppShell({ title, children }: AppShellProps) {
           <span className="grad-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30">
             <Store className="h-5 w-5" />
           </span>
-          {!colapsado && <span className="text-base font-bold tracking-tight">Demo</span>}
+          {!colapsado && <span className="truncate text-base font-bold tracking-tight">{user?.comercioNombre ?? "Mi comercio"}</span>}
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {items.map((item) => {
