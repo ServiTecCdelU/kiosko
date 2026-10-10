@@ -31,8 +31,11 @@ activo que no pagaba seguía operando igual.
 | Plan | Precio | Cajas incluidas | Caja extra | Tope |
 |---|---|---|---|---|
 | Free | $0 | 1 | — | sin tope |
-| Básico | $20.000 | 1 | no disponible | 1 caja |
-| Pro | $40.000 | 1 | $10.000 por mes | sin tope |
+| Básico | $30.000 | 1 | no disponible | 1 caja |
+| Pro | $60.000 | 1 | $10.000 por mes | sin tope |
+
+(Precios actualizados por la migración 55 el 2026-10-10; antes $20.000 / $40.000. El
+superadmin los puede seguir editando.)
 
 - El monto del mes es `precio del plan + (cajas activas − incluidas) × precio por caja extra`
   (`montoMensual` en `lib/suscripcion.ts`). Las cajas son los puestos activos del comercio.
@@ -49,6 +52,25 @@ activo que no pagaba seguía operando igual.
   completo; las demás pagan `plan + cajas extra` con el descuento. Así no hay que marcar una
   "principal" a mano y nadie termina con todas las sucursales descontadas.
 - El descuento aplicado queda en cada pago (`saas_pagos.descuento_pct`) y se ve en Suscripción.
+
+## Cambio de plan por el comercio (decidido 2026-10-10, sin migración)
+
+El dueño cambia solo entre Básico y Pro desde `/suscripcion` (`POST /api/billing/plan`,
+`cambiarPlan` en `lib/server/billing.ts`, regla pura `validarCambioDePlan` en
+`lib/suscripcion.ts`). "Free" lo asigna únicamente el superadmin.
+
+- **Aplica al instante y no toca lo ya pagado**: `suscripcion_hasta` queda igual, el mes
+  siguiente se cobra al precio del plan nuevo. No hay prorrateo ni cobro de diferencia
+  (simple de explicar; subir a Pro a mitad de mes regala ese resto de mes).
+- **Bajar a Básico** exige una sola caja activa: si hay más, se rechaza y se pide
+  desactivar las que sobran (Caja → Cajas).
+- Los links de pago de Mercado Pago **pendientes** quedaron con el precio viejo: se marcan
+  rechazados con nota "Anulado por cambio de plan". Si igual se pagan, el webhook los
+  acredita (la RPC aplica cualquier pago no aprobado), así que la plata nunca se pierde.
+- Con **débito automático** autorizado, la ruta llama a `sincronizarDebito` y el monto del
+  preapproval se actualiza en Mercado Pago en el acto.
+- El cache de acceso se invalida (`olvidarAcceso`): el modo consulta y los avisos dependen
+  del precio del plan.
 
 ## Débito automático (migración 54, decidido 2026-10-10)
 
@@ -94,13 +116,16 @@ existiendo como alternativa; con el débito autorizado no se ofrece, para no cob
 
 ## Pantallas
 
-- `/suscripcion` (admin): tarjeta de estado + historial + botón de pago. Tarjeta resumida
-  en el inicio. Los carteles de acceso y de pago mensual llevan ahí.
+- `/suscripcion` (admin): tarjeta de estado + bloque "Tu plan" (Básico / Pro con precio,
+  plan actual y botón de cambio) + débito automático + historial + botón de pago. Se
+  llega desde la tarjeta "Suscripción" del inicio. Los carteles de acceso y de pago
+  mensual llevan ahí.
 - Superadmin: botón **Planes** (precios), y en Administrar comercio: historial de pagos y
   "Registrar pago manual".
 
 ## Tests
 
-- `lib/suscripcion.test.ts`: período y fecha que cubre un pago, textos.
+- `lib/suscripcion.test.ts`: período y fecha que cubre un pago, textos, monto por cajas y
+  validación del cambio de plan.
 - `lib/acceso-comercio.test.ts`: aviso, gracia y bloqueo por pago; precio 0 y sin fecha no bloquean.
 - `lib/permisos-api.test.ts`: webhook público, `/api/billing` admin y permitido en modo consulta.

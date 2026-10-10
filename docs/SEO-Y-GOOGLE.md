@@ -144,7 +144,7 @@ Títulos (máx. 30 caracteres):
 - Factura Electrónica ARCA
 - Cobrá con QR Mercado Pago
 - Funciona Sin Internet
-- Desde $20.000 por Mes
+- Desde $30.000 por Mes
 - Soporte por WhatsApp
 - Hecho en Argentina
 
@@ -157,7 +157,7 @@ Descripciones (máx. 90 caracteres):
 Extensiones (activos): enlaces de sitio a `/comercio/#modulos` (Módulos),
 `/comercio/#faq` (Preguntas frecuentes), `/comercio/registro` (Probar gratis);
 texto destacado "14 días gratis", "Sin instalación", "Factura electrónica";
-llamada con el WhatsApp de ServiTec; precio: Básico $20.000 / Pro $40.000 por mes.
+llamada con el WhatsApp de ServiTec; precio: Básico $30.000 / Pro $60.000 por mes.
 
 ### 4.5 Antes de activar
 

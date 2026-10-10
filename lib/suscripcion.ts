@@ -118,3 +118,36 @@ export function esPrincipalDelGrupo(comercioId: string, miembros: MiembroGrupo[]
 export function puedeSumarCaja(t: TarifaPlan, cajasActivas: number): boolean {
   return t.maxCajas === null || cajasActivas < t.maxCajas;
 }
+
+// ---- Cambio de plan por el propio comercio (decidido 2026-10-10) ----
+
+/** Planes que el comercio puede elegir solo. "free" lo asigna el superadmin. */
+export const PLANES_CONTRATABLES: Plan[] = ["basico", "pro"];
+
+export interface CambioDePlan {
+  actual: Plan;
+  nuevo: unknown;
+  cajasActivas: number;
+  tarifaNueva: TarifaPlan;
+}
+
+export type ResultadoCambioDePlan = { ok: true; plan: Plan } | { ok: false; error: string };
+
+/**
+ * Si el comercio puede pasar a ese plan. El cambio aplica al instante y no toca
+ * lo ya pagado (suscripcion_hasta); el mes siguiente se cobra al precio nuevo.
+ * Bajar a un plan con tope de cajas exige desactivar antes las que sobran.
+ */
+export function validarCambioDePlan(c: CambioDePlan): ResultadoCambioDePlan {
+  if (!esPlan(c.nuevo) || !PLANES_CONTRATABLES.includes(c.nuevo)) return { ok: false, error: "Ese plan no se puede elegir" };
+  if (c.nuevo === c.actual) return { ok: false, error: `Ya estás en el plan ${PLAN_LABEL[c.nuevo]}` };
+  const tope = c.tarifaNueva.maxCajas;
+  const cajas = Math.max(0, Math.floor(c.cajasActivas));
+  if (tope !== null && cajas > tope) {
+    return {
+      ok: false,
+      error: `El plan ${PLAN_LABEL[c.nuevo]} incluye ${tope} caja${tope === 1 ? "" : "s"} y tenés ${cajas} activas. Desactivá las que sobran desde Caja → Cajas y volvé a intentar.`,
+    };
+  }
+  return { ok: true, plan: c.nuevo };
+}

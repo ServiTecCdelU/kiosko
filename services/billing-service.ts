@@ -15,6 +15,16 @@ export interface PagoSuscripcion {
   aprobadoAt: string | null;
 }
 
+export interface PlanContratable {
+  plan: Plan;
+  nombre: string;
+  descripcion: string | null;
+  precioMensual: number;
+  cajasIncluidas: number;
+  precioCajaExtra: number;
+  maxCajas: number | null;
+}
+
 export interface EstadoSuscripcion {
   demo?: boolean;
   plan: Plan;
@@ -30,6 +40,8 @@ export interface EstadoSuscripcion {
   proximo: { periodo: string; hasta: string };
   mpDisponible: boolean;
   pagos: PagoSuscripcion[];
+  /** Planes que el comercio puede elegir solo (Básico y Pro), con precios vigentes. */
+  planes: PlanContratable[];
   /** Debito automatico con Mercado Pago (54), si se activo alguna vez. */
   debito: {
     preapprovalId: string; estado: "pending" | "authorized" | "paused" | "cancelled"; monto: number;
@@ -48,6 +60,17 @@ export async function cancelarDebito(): Promise<void> {
   const res = await fetch(apiUrl("/api/billing/debito"), { method: "DELETE" });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error ?? "No se pudo cancelar el débito automático");
+}
+
+export async function cambiarPlan(plan: Plan): Promise<{ plan: Plan; nombre: string }> {
+  const res = await fetch(apiUrl("/api/billing/plan"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo cambiar el plan");
+  return data;
 }
 
 export async function getSuscripcion(confirmar = false): Promise<EstadoSuscripcion> {

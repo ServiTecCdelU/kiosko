@@ -62,8 +62,8 @@ export function jsonLdLanding(urlLanding: string, urlImagen: string): Record<str
     author: { "@type": "Organization", name: MARCA },
     offers: [
       { "@type": "Offer", name: "Prueba gratis", price: "0", priceCurrency: "ARS", description: `${TRIAL_DAYS} días gratis, sin tarjeta` },
-      { "@type": "Offer", name: "Plan Básico", price: "20000", priceCurrency: "ARS", description: "Por mes, una caja" },
-      { "@type": "Offer", name: "Plan Pro", price: "40000", priceCurrency: "ARS", description: "Por mes, varias cajas" },
+      { "@type": "Offer", name: "Plan Básico", price: "30000", priceCurrency: "ARS", description: "Por mes, una caja" },
+      { "@type": "Offer", name: "Plan Pro", price: "60000", priceCurrency: "ARS", description: "Por mes, varias cajas" },
     ],
     featureList: [
       "Punto de venta con lector de código de barras", "Caja, cierre y arqueo", "Control de stock y vencimientos",

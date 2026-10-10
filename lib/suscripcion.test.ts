@@ -1,7 +1,10 @@
 // lib/suscripcion.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coberturaDelPago, descripcionPago, esPrincipalDelGrupo, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo } from "./suscripcion.ts";
+import {
+  coberturaDelPago, descripcionPago, esPrincipalDelGrupo, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo,
+  validarCambioDePlan,
+} from "./suscripcion.ts";
 
 describe("periodos y fin de mes en hora argentina", () => {
   test("periodo y fin de mes", () => {
@@ -64,5 +67,27 @@ describe("textos", () => {
     assert.equal(textoPeriodo("2026-10"), "octubre 2026");
     assert.equal(textoPeriodo("raro"), "raro");
     assert.equal(descripcionPago("pro", "2026-10", "Súper Ñandú"), "Suscripción Pro octubre 2026 · Súper Ñandú");
+  });
+});
+
+describe("validarCambioDePlan (el comercio elige su plan)", () => {
+  const basico = { precioMensual: 30000, cajasIncluidas: 1, precioCajaExtra: 0, maxCajas: 1 };
+  const pro = { precioMensual: 60000, cajasIncluidas: 1, precioCajaExtra: 10000, maxCajas: null };
+  test("subir a Pro siempre se puede", () => {
+    assert.deepEqual(validarCambioDePlan({ actual: "basico", nuevo: "pro", cajasActivas: 1, tarifaNueva: pro }), { ok: true, plan: "pro" });
+    assert.deepEqual(validarCambioDePlan({ actual: "free", nuevo: "pro", cajasActivas: 4, tarifaNueva: pro }), { ok: true, plan: "pro" });
+  });
+  test("bajar a Basico solo con una caja activa", () => {
+    assert.deepEqual(validarCambioDePlan({ actual: "pro", nuevo: "basico", cajasActivas: 1, tarifaNueva: basico }), { ok: true, plan: "basico" });
+    assert.deepEqual(validarCambioDePlan({ actual: "pro", nuevo: "basico", cajasActivas: 0, tarifaNueva: basico }), { ok: true, plan: "basico" });
+    const r = validarCambioDePlan({ actual: "pro", nuevo: "basico", cajasActivas: 3, tarifaNueva: basico });
+    assert.equal(r.ok, false);
+    assert.match((r as { error: string }).error, /incluye 1 caja y tenés 3 activas/);
+  });
+  test("mismo plan, free o basura: no", () => {
+    assert.equal(validarCambioDePlan({ actual: "pro", nuevo: "pro", cajasActivas: 1, tarifaNueva: pro }).ok, false);
+    assert.equal(validarCambioDePlan({ actual: "basico", nuevo: "free", cajasActivas: 1, tarifaNueva: basico }).ok, false);
+    assert.equal(validarCambioDePlan({ actual: "basico", nuevo: "premium", cajasActivas: 1, tarifaNueva: basico }).ok, false);
+    assert.equal(validarCambioDePlan({ actual: "basico", nuevo: undefined, cajasActivas: 1, tarifaNueva: basico }).ok, false);
   });
 });

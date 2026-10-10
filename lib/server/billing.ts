@@ -9,8 +9,8 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPagoMP } from "@/lib/server/mercadopago";
 import {
-  coberturaDelPago, descripcionPago, esPlan, esPrincipalDelGrupo, montoMensual, PLAN_LABEL, puedeSumarCaja,
-  type MontoMensual, type Plan, type TarifaPlan,
+  coberturaDelPago, descripcionPago, esPlan, esPrincipalDelGrupo, montoMensual, PLAN_LABEL, PLANES_CONTRATABLES, puedeSumarCaja,
+  validarCambioDePlan, type MontoMensual, type Plan, type TarifaPlan,
 } from "@/lib/suscripcion";
 
 // ---- Grupos de sucursales (53) ----
@@ -207,6 +207,8 @@ export interface EstadoSuscripcion {
   /** Hay token de la plataforma: se puede pagar con Mercado Pago. */
   mpDisponible: boolean;
   pagos: PagoSaas[];
+  /** Planes que el comercio puede elegir solo (Basico y Pro), con sus precios. */
+  planes: PlanSaas[];
 }
 
 async function tarifaYMonto(comercioId: string, plan: Plan): Promise<{ tarifa: TarifaPlan; monto: MontoMensual; grupo: GrupoDeComercio | null }> {
@@ -220,7 +222,8 @@ export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscr
   if (error) throw new Error(error.message);
   if (!c) throw new Error("Comercio inexistente");
   const plan = (esPlan(c.plan) ? c.plan : "free") as Plan;
-  const info = (await listarPlanes()).find((p) => p.plan === plan);
+  const planes = await listarPlanes();
+  const info = planes.find((p) => p.plan === plan);
   const { tarifa, monto, grupo } = await tarifaYMonto(comercioId, plan);
   return {
     plan,
@@ -234,7 +237,34 @@ export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscr
     proximo: coberturaDelPago(c.suscripcion_hasta),
     mpDisponible: !!tokenSaas(),
     pagos: await pagosDeComercio(comercioId),
+    planes: planes.filter((p) => PLANES_CONTRATABLES.includes(p.plan)),
   };
+}
+
+/**
+ * El dueño cambia el plan de su comercio (Basico <-> Pro). Aplica al instante:
+ * lo ya pagado (suscripcion_hasta) no se toca y el mes siguiente se cobra al
+ * precio nuevo. Bajar a Basico exige tener una sola caja activa. Los links de
+ * pago pendientes quedaron con el precio viejo: se anulan (si igual se pagan,
+ * el webhook los acredita, la plata no se pierde). El debito automatico lo
+ * actualiza el que llama (sincronizarDebito) para no acoplar los modulos.
+ */
+export async function cambiarPlan(comercioId: string, nuevo: unknown): Promise<{ plan: Plan; nombre: string }> {
+  const { data: c, error } = await supabaseAdmin.from("comercios").select("plan, estado").eq("id", comercioId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new Error("Comercio inexistente");
+  if (c.estado === "baja") throw new Error("El comercio está dado de baja");
+  const actual = (esPlan(c.plan) ? c.plan : "free") as Plan;
+  const tarifaNueva = await tarifaDelPlan(String(nuevo));
+  const v = validarCambioDePlan({ actual, nuevo, cajasActivas: await cajasActivas(comercioId), tarifaNueva });
+  if (!v.ok) throw new Error(v.error);
+  const { error: e2 } = await supabaseAdmin.from("comercios").update({ plan: v.plan, updated_at: new Date().toISOString() }).eq("id", comercioId);
+  if (e2) throw new Error(e2.message);
+  await supabaseAdmin.from("saas_pagos")
+    .update({ estado: "rechazado", nota: "Anulado por cambio de plan" })
+    .eq("comercio_id", comercioId).eq("estado", "pendiente").eq("metodo", "mercadopago");
+  const nombre = (await listarPlanes()).find((p) => p.plan === v.plan)?.nombre ?? PLAN_LABEL[v.plan];
+  return { plan: v.plan, nombre };
 }
 
 /** Crea el pago pendiente y el link de Checkout Pro de Mercado Pago (cuenta de la plataforma). */

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Check, CircleDollarSign, Clock, ExternalLink, Loader2, MessageCircle, RefreshCw, Repeat, XCircle } from "lucide-react";
+import { ArrowRightLeft, Check, CircleDollarSign, Clock, ExternalLink, Loader2, MessageCircle, RefreshCw, Repeat, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,8 +15,10 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { CONTACT } from "@/lib/marketing/contact";
 import { trackWhatsAppClick } from "@/lib/analytics";
-import { METODO_PAGO_LABEL, textoPeriodo } from "@/lib/suscripcion";
-import { activarDebito, cancelarDebito, crearLinkDePago, getSuscripcion, type EstadoSuscripcion } from "@/services/billing-service";
+import { METODO_PAGO_LABEL, montoMensual, textoPeriodo } from "@/lib/suscripcion";
+import {
+  activarDebito, cambiarPlan, cancelarDebito, crearLinkDePago, getSuscripcion, type EstadoSuscripcion, type PlanContratable,
+} from "@/services/billing-service";
 
 function situacion(s: EstadoSuscripcion): { texto: string; clase: string; icono: typeof Check } {
   if (s.precioMensual <= 0) return { texto: "Sin cargo", clase: "border-success/50 text-success", icono: Check };
@@ -33,6 +35,7 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
   const [pagando, setPagando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [debitando, setDebitando] = useState(false);
+  const [cambiando, setCambiando] = useState(false);
 
   const cargar = useCallback(async (confirmar = false) => {
     try {
@@ -109,6 +112,30 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
     setConfirmando(false);
   };
 
+  // Lo que pagaria por mes con otro plan, con sus cajas activas y su descuento de grupo.
+  const montoCon = (p: PlanContratable) => montoMensual(p, estado.monto.cajas, estado.grupo?.descuentoAplicado ?? 0).total;
+  const vigente = !!estado.suscripcionHasta && new Date(estado.suscripcionHasta).getTime() >= Date.now();
+
+  const cambiar = async (p: PlanContratable) => {
+    const nuevo = montoCon(p);
+    const detalle = estado.estado === "prueba"
+      ? "Durante la prueba no se cobra nada."
+      : vigente
+        ? `Lo que ya pagaste sigue vigente hasta el ${formatDate(estado.suscripcionHasta!)}; desde el mes siguiente se cobra ${formatCurrency(nuevo)} por mes.`
+        : `Desde ahora la suscripción cuesta ${formatCurrency(nuevo)} por mes.`;
+    if (!window.confirm(`¿Cambiar al plan ${p.nombre}? El cambio aplica al instante. ${detalle}`)) return;
+    setCambiando(true);
+    try {
+      const r = await cambiarPlan(p.plan);
+      toast.success(`Listo: ahora estás en el plan ${r.nombre}`);
+      await cargar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cambiar el plan");
+    } finally {
+      setCambiando(false);
+    }
+  };
+
   const pagos = completa ? estado.pagos : estado.pagos.slice(0, 3);
 
   return (
@@ -161,6 +188,53 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
           Cada pago cubre un mes: el próximo cubre {textoPeriodo(estado.proximo.periodo)} y deja la suscripción pagada hasta el {formatDate(estado.proximo.hasta)}.
           Si no pagás, 10 días después del vencimiento el sistema pasa a modo consulta (podés ver todo, pero no vender) hasta que pagues. Tus datos no se tocan.
         </p>
+      )}
+
+      {completa && estado.planes.length > 0 && (
+        <div className="mt-4">
+          <p className="flex items-center gap-1.5 text-sm font-medium"><ArrowRightLeft className="h-4 w-4 text-primary" /> Tu plan</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Podés cambiarlo cuando quieras: aplica al instante y no toca lo que ya pagaste.
+            {estado.estado === "prueba" ? " Durante la prueba no se cobra nada." : " El mes siguiente se cobra al precio del plan nuevo."}
+            {debitoActivo && " El débito automático se actualiza solo."}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {estado.planes.map((p) => {
+              const actual = p.plan === estado.plan;
+              const bloqueo = !actual && p.maxCajas !== null && estado.monto.cajas > p.maxCajas
+                ? `Tenés ${estado.monto.cajas} cajas activas y este plan incluye ${p.maxCajas}. Desactivá las que sobran desde Caja → Cajas.`
+                : null;
+              return (
+                <div key={p.plan} className={cn("rounded-2xl border p-3", actual ? "border-primary bg-primary/5" : "border-border")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold">Plan {p.nombre}</p>
+                    {actual && <Badge className="rounded-full">Plan actual</Badge>}
+                  </div>
+                  <p className="mt-1">
+                    <span className="cifra text-lg font-semibold">{formatCurrency(p.precioMensual)}</span>
+                    <span className="text-xs text-muted-foreground"> por mes</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.maxCajas === p.cajasIncluidas
+                      ? `${p.cajasIncluidas} caja${p.cajasIncluidas === 1 ? "" : "s"}`
+                      : `${p.cajasIncluidas} caja${p.cajasIncluidas === 1 ? "" : "s"} incluida${p.cajasIncluidas === 1 ? "" : "s"}; cada caja extra ${formatCurrency(p.precioCajaExtra)} por mes`}
+                    {p.descripcion && ` · ${p.descripcion}`}
+                  </p>
+                  {!actual && (
+                    <>
+                      <Button variant="outline" size="sm" className="mt-2 rounded-2xl" disabled={cambiando || !!bloqueo} onClick={() => cambiar(p)}>
+                        {cambiando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                        Cambiar a {p.nombre}
+                        {montoCon(p) !== p.precioMensual && <span className="ml-1 text-muted-foreground">({formatCurrency(montoCon(p))} con tus cajas)</span>}
+                      </Button>
+                      {bloqueo && <p className="mt-1 text-xs text-warning">{bloqueo}</p>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {sePuedeDebitar && (
