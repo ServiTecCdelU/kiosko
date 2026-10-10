@@ -1,6 +1,6 @@
 // lib/nav.ts — items de navegacion del kiosko
 import type { LucideIcon } from "lucide-react";
-import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp } from "lucide-react";
+import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign } from "lucide-react";
 import type { UserRol } from "@/lib/types";
 import { panelHref } from "@/lib/panel";
 
@@ -27,6 +27,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Facturación", href: "/facturacion", icon: FileText },
   { label: "Sincronización y reportes", href: "/sincronizacion", icon: RefreshCw },
   { label: "Ayuda", href: "/ayuda", icon: CircleHelp, roles: ["encargado", "cajero"] },
+  // Solo el dueño: plan, pagos y debito automatico (app/suscripcion).
+  { label: "Suscripción", href: "/suscripcion", icon: CircleDollarSign },
 ];
 
 /** href real del item: "Inicio" apunta al panel del comercio (/<slug>). */

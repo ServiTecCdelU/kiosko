@@ -38,7 +38,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
     `/promociones`, `/reportes`, `/usuarios`, `/facturacion` (incluye Cobros con Mercado Pago),
     `/sincronizacion` (Sincronización y reportes: catálogo + copia de datos en Excel),
     `/suscripcion`, `/ayuda` (tutorial por pantalla, todos los roles).
-  - Inicio del admin: Primeros pasos, tarjetas de hoy y "Cuenta y suscripción"
+  - Inicio del admin: Primeros pasos, tarjetas de hoy, accesos (incluye la tarjeta "Suscripción",
+    al lado de Ayuda, que lleva a `/suscripcion`) y "Cuenta"
     (`components/home/cuenta-card.tsx`).
   - `/superadmin` → panel del dueño del SaaS (todos los comercios).
   - `/pantalla-cliente` y `/ofertas-tv` → pantallas secundarias (visor del

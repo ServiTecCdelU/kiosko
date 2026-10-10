@@ -20,11 +20,11 @@ import {
   Truck,
   UserCog,
   CircleHelp,
+  CircleDollarSign,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { PrimerosPasosCard } from "@/components/home/primeros-pasos-card";
 import { CuentaCard } from "@/components/home/cuenta-card";
-import { SuscripcionCard } from "@/components/home/suscripcion-card";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
@@ -55,6 +55,7 @@ const ICONS: Record<string, typeof ShoppingCart> = {
   "/compras": Truck,
   "/usuarios": UserCog,
   "/ayuda": CircleHelp,
+  "/suscripcion": CircleDollarSign,
 };
 
 const SUBTITLES: Record<string, string> = {
@@ -70,6 +71,7 @@ const SUBTITLES: Record<string, string> = {
   "/compras": "Proveedores, mercadería y cuenta corriente",
   "/usuarios": "Cajeros, encargados y sus PIN",
   "/ayuda": "Tutorial paso a paso de cada pantalla",
+  "/suscripcion": "Plan, pagos y débito automático",
 };
 
 // Fondo atmosférico: mesh de gradientes teal/lima muy sutil.
@@ -180,7 +182,6 @@ function HomeContent() {
         </div>
 
         {rol === "admin" && <CuentaCard />}
-        {rol === "admin" && <SuscripcionCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
           {user?.comercioNombre ?? "Tu comercio"} · Punto de venta
