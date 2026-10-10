@@ -205,8 +205,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras` (+ `proveedor_pagos`),
   `inventarios` (+ items), `producto_lotes`, `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`54_*.sql`**. Las **44 a 53** (cuenta corriente de proveedores y
-  categoría de gastos, inventario, lotes de vencimiento, IVA, Factura A/B, billing, descuento de lotes, CAEA, precio por caja, grupos de sucursales) se corren **antes**
+- La siguiente migración es **`55_*.sql`**. Las **44 a 54** (cuenta corriente de proveedores y
+  categoría de gastos, inventario, lotes de vencimiento, IVA, Factura A/B, billing, descuento de lotes, CAEA, precio por caja, grupos de sucursales, débito automático) se corren **antes**
   de deployar el código que las usa, en ese orden (la 46 redefine funciones que la 44 ya tocó).
   La **42** (`42_aislamiento_saas.sql`) se corre
   **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
@@ -226,7 +226,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 | `NEXT_PUBLIC_APP_URL` | URL técnica del deploy (webhooks de Mercado Pago) |
 | `AFIP_CERT_KEY` | Clave AES-256 (32 bytes base64) que cifra la clave privada AFIP y el acceso WSAA de cada comercio. **Si se pierde, cada comercio genera un pedido de certificado nuevo.** Local y producción usan la misma base: tiene que ser el mismo valor en `.env.local` y en Vercel. |
 | `MP_TOKEN_KEY` | Clave AES-256 (32 bytes base64) que cifra el token de MP de cada comercio. **Si se pierde, cada comercio vuelve a cargar su token.** `MP_ACCESS_TOKEN` ya no se usa. |
-| `MP_SAAS_TOKEN` | Access Token de **producción** de la cuenta de Mercado Pago de ServiTec: cobra las suscripciones (`/suscripcion`, webhook `/api/billing/webhook`). Sin ella no aparece el botón de pago y el billing sigue con pagos manuales desde el superadmin. |
+| `MP_SAAS_TOKEN` | Access Token de **producción** de la cuenta de Mercado Pago de ServiTec: cobra las suscripciones (`/suscripcion`, webhook `/api/billing/webhook`). Sin ella no aparecen el botón de pago ni el débito automático, y el billing sigue con pagos manuales desde el superadmin. |
 | `IMPRESORA_ZPL_RAW` | Destino RAW de la Zebra |
 | `DISTRIBUIDORA_API_URL` | Sincronización de catálogo |
 
@@ -266,7 +266,7 @@ pendiente de ese relevamiento.
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
 | — | ~~CAEA (contingencia)~~ | Hecho (migración 51, spec `2026-10-10-caea-design.md`): opcional por comercio; el sistema pide el CAEA de cada quincena solo, factura con él si AFIP no responde y lo informa después. Falta probarlo en homologación, igual que Factura A/B. |
 | — | **Probar la facturación con una CUIT real en homologación** | Lo que no se pudo probar sin certificado: CAE real, NC real, impresión con QR. |
-| — | ~~Billing de suscripción automático~~ | Hecho (migraciones 49 y 52, spec `2026-10-10-billing-suscripcion-design.md`): Básico $20.000 (1 caja), Pro $40.000 + $10.000 por caja extra, editables en el superadmin; grupos de sucursales del mismo dueño con descuento (migración 53); pago de un mes con Mercado Pago de ServiTec (`MP_SAAS_TOKEN`), pagos manuales, 10 días de gracia y modo consulta por falta de pago. Falta: cargar `MP_SAAS_TOKEN` en Vercel y probar un pago real. |
+| — | ~~Billing de suscripción automático~~ | Hecho (migraciones 49 y 52, spec `2026-10-10-billing-suscripcion-design.md`): Básico $20.000 (1 caja), Pro $40.000 + $10.000 por caja extra, editables en el superadmin; grupos de sucursales del mismo dueño con descuento (migración 53); pago de un mes con Mercado Pago de ServiTec (`MP_SAAS_TOKEN`), débito automático mensual con la API de suscripciones de MP (migración 54, `lib/server/billing-debito.ts`), pagos manuales, 10 días de gracia y modo consulta por falta de pago. Falta: probar un pago real y una autorización real de débito. |
 
 Criterio adoptado: no planificar en el vacío — priorizar según el dolor real
 del primer comercio en producción.

@@ -30,6 +30,24 @@ export interface EstadoSuscripcion {
   proximo: { periodo: string; hasta: string };
   mpDisponible: boolean;
   pagos: PagoSuscripcion[];
+  /** Debito automatico con Mercado Pago (54), si se activo alguna vez. */
+  debito: {
+    preapprovalId: string; estado: "pending" | "authorized" | "paused" | "cancelled"; monto: number;
+    payerEmail: string | null; initPoint: string | null; proximoCobro: string | null; creadoAt: string; canceladoAt: string | null;
+  } | null;
+}
+
+export async function activarDebito(): Promise<{ initPoint: string }> {
+  const res = await fetch(apiUrl("/api/billing/debito"), { method: "POST" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo activar el débito automático");
+  return data;
+}
+
+export async function cancelarDebito(): Promise<void> {
+  const res = await fetch(apiUrl("/api/billing/debito"), { method: "DELETE" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo cancelar el débito automático");
 }
 
 export async function getSuscripcion(confirmar = false): Promise<EstadoSuscripcion> {

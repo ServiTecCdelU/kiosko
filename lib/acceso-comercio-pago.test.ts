@@ -52,5 +52,7 @@ describe("esLectura y billing", () => {
   test("pagar la suscripcion pasa aunque el comercio este en solo lectura", () => {
     assert.equal(esLectura("/api/billing/pagar", "POST"), true);
     assert.equal(esLectura("/api/billing", "GET"), true);
+    assert.equal(esLectura("/api/billing/debito", "POST"), true);
+    assert.equal(esLectura("/api/billing/debito", "DELETE"), true);
   });
 });

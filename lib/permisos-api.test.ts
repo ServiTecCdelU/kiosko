@@ -37,7 +37,7 @@ describe("reglaDeRuta", () => {
       "/api/usuarios", "/api/consultas/usuarios", "/api/compras", "/api/compras/anular",
       "/api/proveedores", "/api/proveedores/pagos", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
       "/api/consultas/reportes", "/api/mercadopago/conexion", "/api/backup",
-      "/api/inventario", "/api/consultas/inventario", "/api/lotes", "/api/billing", "/api/billing/pagar",
+      "/api/inventario", "/api/consultas/inventario", "/api/lotes", "/api/billing", "/api/billing/pagar", "/api/billing/debito",
     ]) {
       assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
     }

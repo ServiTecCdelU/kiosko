@@ -50,6 +50,30 @@ activo que no pagaba seguía operando igual.
   "principal" a mano y nadie termina con todas las sucursales descontadas.
 - El descuento aplicado queda en cada pago (`saas_pagos.descuento_pct`) y se ve en Suscripción.
 
+## Débito automático (migración 54, decidido 2026-10-10)
+
+El dueño puede autorizar **una vez** con su tarjeta y Mercado Pago cobra solo cada mes
+(API de suscripciones, `preapproval`, con la cuenta de ServiTec). El link mensual sigue
+existiendo como alternativa; con el débito autorizado no se ofrece, para no cobrar dos veces.
+
+- `saas_debitos (comercio_id pk, preapproval_id único, estado pending|authorized|paused|cancelled,
+  monto, payer_email, init_point, proximo_cobro, cancelado_at)`: una por comercio, se
+  reemplaza al reactivar después de cancelar. `saas_pagos.mp_preapproval_id` liga cada cobro.
+- `POST /api/billing/debito` (admin, pasa en modo consulta): crea la suscripción en MP con
+  `status: pending`, `auto_recurring {1 month, monto de hoy}`, `payer_email` del usuario
+  (correo de Google), `external_reference = saas-sub:<comercioId>`, `back_url = /suscripcion`.
+  Devuelve `init_point`; el dueño la autoriza ahí. `DELETE` la cancela en MP (lo pagado
+  sigue vigente hasta fin de mes).
+- Cada cobro mensual aprobado se aplica como un pago más: fila en `saas_pagos`
+  (`metodo mercadopago`, nota "Débito automático", `mp_payment_id` único = idempotente) y
+  `aplicar_pago_saas` → un mes más de `suscripcion_hasta`. Misma gracia de 10 días si el
+  débito falla (MP lo deja `paused` y se avisa en la tarjeta).
+- **Sincronización** (`sincronizarDebito`): trae el estado real de MP, actualiza
+  `transaction_amount` si el monto de hoy cambió (cajas, plan, descuento) y aplica los
+  cobros aprobados que falten (`/authorized_payments/search`). Corre en cada
+  `GET /api/billing` y en el webhook (`subscription_preapproval`,
+  `subscription_authorized_payment`), así no depende de que MP avise.
+
 ## Flujo de pago
 
 1. Admin → `/suscripcion` (o el botón "Pagar" de los carteles): ve plan, precio, hasta cuándo
