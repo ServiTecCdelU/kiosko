@@ -9,9 +9,61 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPagoMP } from "@/lib/server/mercadopago";
 import {
-  coberturaDelPago, descripcionPago, esPlan, montoMensual, PLAN_LABEL, puedeSumarCaja,
+  coberturaDelPago, descripcionPago, esPlan, esPrincipalDelGrupo, montoMensual, PLAN_LABEL, puedeSumarCaja,
   type MontoMensual, type Plan, type TarifaPlan,
 } from "@/lib/suscripcion";
+
+// ---- Grupos de sucursales (53) ----
+
+export interface GrupoSaas {
+  id: string;
+  nombre: string;
+  descuentoPct: number;
+  /** Comercios del grupo (para el panel). */
+  comercios?: number;
+}
+
+export async function listarGrupos(): Promise<GrupoSaas[]> {
+  const { data, error } = await supabaseAdmin.from("saas_grupos").select("id, nombre, descuento_pct").order("nombre");
+  if (error) throw new Error(error.message);
+  const { data: miembros } = await supabaseAdmin.from("comercios").select("grupo_id").not("grupo_id", "is", null);
+  const cuenta = new Map<string, number>();
+  for (const m of miembros ?? []) cuenta.set(m.grupo_id, (cuenta.get(m.grupo_id) ?? 0) + 1);
+  return (data ?? []).map((g) => ({ id: g.id, nombre: g.nombre, descuentoPct: Number(g.descuento_pct) || 0, comercios: cuenta.get(g.id) ?? 0 }));
+}
+
+export async function guardarGrupo(id: string | null, nombre: string, descuentoPct: number): Promise<GrupoSaas> {
+  const n = nombre.trim();
+  if (!n) throw new Error("El grupo necesita un nombre");
+  if (!Number.isFinite(descuentoPct) || descuentoPct < 0 || descuentoPct > 100) throw new Error("El descuento va de 0 a 100 %");
+  const fila = { id: id ?? `grupo_${randomUUID().replace(/-/g, "").slice(0, 10)}`, nombre: n, descuento_pct: descuentoPct };
+  const { error } = await supabaseAdmin.from("saas_grupos").upsert(fila, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+  return { id: fila.id, nombre: n, descuentoPct };
+}
+
+export interface GrupoDeComercio {
+  id: string;
+  nombre: string;
+  descuentoPct: number;
+  /** Paga completo: es la sucursal mas antigua del grupo. */
+  esPrincipal: boolean;
+  /** Descuento que le toca a ESTE comercio (0 si es la principal). */
+  descuentoAplicado: number;
+}
+
+export async function grupoDeComercio(comercioId: string): Promise<GrupoDeComercio | null> {
+  const { data: c } = await supabaseAdmin.from("comercios").select("grupo_id").eq("id", comercioId).maybeSingle();
+  if (!c?.grupo_id) return null;
+  const [{ data: g }, { data: miembros }] = await Promise.all([
+    supabaseAdmin.from("saas_grupos").select("id, nombre, descuento_pct").eq("id", c.grupo_id).maybeSingle(),
+    supabaseAdmin.from("comercios").select("id, created_at").eq("grupo_id", c.grupo_id).neq("estado", "baja"),
+  ]);
+  if (!g) return null;
+  const esPrincipal = esPrincipalDelGrupo(comercioId, (miembros ?? []).map((m) => ({ id: m.id, createdAt: m.created_at })));
+  const pct = Number(g.descuento_pct) || 0;
+  return { id: g.id, nombre: g.nombre, descuentoPct: pct, esPrincipal, descuentoAplicado: esPrincipal ? 0 : pct };
+}
 
 const MP_API = "https://api.mercadopago.com";
 const PREFIJO_REF = "saas:";
@@ -146,6 +198,8 @@ export interface EstadoSuscripcion {
   /** Desglose del mes: plan + cajas extra activas. */
   monto: MontoMensual;
   tarifa: TarifaPlan;
+  /** Grupo de sucursales del mismo dueño (53), si pertenece a uno. */
+  grupo: GrupoDeComercio | null;
   estado: string;
   suscripcionHasta: string | null;
   /** Mes que cubriria el proximo pago y hasta cuando dejaria la suscripcion. */
@@ -155,9 +209,9 @@ export interface EstadoSuscripcion {
   pagos: PagoSaas[];
 }
 
-async function tarifaYMonto(comercioId: string, plan: Plan): Promise<{ tarifa: TarifaPlan; monto: MontoMensual }> {
-  const tarifa = await tarifaDelPlan(plan);
-  return { tarifa, monto: montoMensual(tarifa, await cajasActivas(comercioId)) };
+async function tarifaYMonto(comercioId: string, plan: Plan): Promise<{ tarifa: TarifaPlan; monto: MontoMensual; grupo: GrupoDeComercio | null }> {
+  const [tarifa, cajas, grupo] = await Promise.all([tarifaDelPlan(plan), cajasActivas(comercioId), grupoDeComercio(comercioId)]);
+  return { tarifa, monto: montoMensual(tarifa, cajas, grupo?.descuentoAplicado ?? 0), grupo };
 }
 
 export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscripcion> {
@@ -167,13 +221,14 @@ export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscr
   if (!c) throw new Error("Comercio inexistente");
   const plan = (esPlan(c.plan) ? c.plan : "free") as Plan;
   const info = (await listarPlanes()).find((p) => p.plan === plan);
-  const { tarifa, monto } = await tarifaYMonto(comercioId, plan);
+  const { tarifa, monto, grupo } = await tarifaYMonto(comercioId, plan);
   return {
     plan,
     nombrePlan: info?.nombre ?? PLAN_LABEL[plan],
     precioMensual: tarifa.precioMensual,
     monto,
     tarifa,
+    grupo,
     estado: c.estado,
     suscripcionHasta: c.suscripcion_hasta,
     proximo: coberturaDelPago(c.suscripcion_hasta),
@@ -195,8 +250,8 @@ export async function crearPagoMercadoPago(comercioId: string, usuarioNombre: st
 
   const pagoId = `spago_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const { error } = await supabaseAdmin.from("saas_pagos").insert({
-    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, periodo: cobertura.periodo,
-    metodo: "mercadopago", estado: "pendiente", usuario_nombre: usuarioNombre,
+    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, descuento_pct: monto.descuentoPct || null,
+    periodo: cobertura.periodo, metodo: "mercadopago", estado: "pendiente", usuario_nombre: usuarioNombre,
   });
   if (error) throw new Error(error.message);
 
@@ -291,8 +346,8 @@ export async function registrarPagoManual(comercioId: string, nota: string | nul
   const { monto } = await tarifaYMonto(comercioId, plan);
   const pagoId = `spago_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const { error } = await supabaseAdmin.from("saas_pagos").insert({
-    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, periodo: coberturaDelPago(c.suscripcion_hasta).periodo,
-    metodo: "manual", estado: "pendiente", nota, usuario_nombre: usuarioNombre,
+    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, descuento_pct: monto.descuentoPct || null,
+    periodo: coberturaDelPago(c.suscripcion_hasta).periodo, metodo: "manual", estado: "pendiente", nota, usuario_nombre: usuarioNombre,
   });
   if (error) throw new Error(error.message);
   return aplicar(pagoId, null);

@@ -1,7 +1,7 @@
 // lib/suscripcion.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coberturaDelPago, descripcionPago, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo } from "./suscripcion.ts";
+import { coberturaDelPago, descripcionPago, esPrincipalDelGrupo, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo } from "./suscripcion.ts";
 
 describe("periodos y fin de mes en hora argentina", () => {
   test("periodo y fin de mes", () => {
@@ -31,9 +31,22 @@ describe("montoMensual y tope de cajas", () => {
   const basico = { precioMensual: 20000, cajasIncluidas: 1, precioCajaExtra: 0, maxCajas: 1 };
   const pro = { precioMensual: 40000, cajasIncluidas: 1, precioCajaExtra: 10000, maxCajas: null };
   test("Pro: 1 caja incluida, cada extra suma", () => {
-    assert.deepEqual(montoMensual(pro, 1), { base: 40000, cajas: 1, cajasExtra: 0, extra: 0, total: 40000 });
-    assert.deepEqual(montoMensual(pro, 3), { base: 40000, cajas: 3, cajasExtra: 2, extra: 20000, total: 60000 });
+    assert.deepEqual(montoMensual(pro, 1), { base: 40000, cajas: 1, cajasExtra: 0, extra: 0, descuentoPct: 0, descuento: 0, total: 40000 });
+    assert.deepEqual(montoMensual(pro, 3), { base: 40000, cajas: 3, cajasExtra: 2, extra: 20000, descuentoPct: 0, descuento: 0, total: 60000 });
     assert.equal(montoMensual(pro, 0).total, 40000);
+  });
+  test("descuento por sucursal sobre plan + cajas extra", () => {
+    const m = montoMensual(pro, 3, 25);
+    assert.equal(m.descuento, 15000);
+    assert.equal(m.total, 45000);
+    assert.equal(montoMensual(pro, 1, 150).total, 0, "tope 100 %");
+    assert.equal(montoMensual(pro, 1, -5).total, 40000, "negativo = sin descuento");
+  });
+  test("la sucursal principal del grupo es la mas antigua", () => {
+    const miembros = [{ id: "b", createdAt: "2026-05-01" }, { id: "a", createdAt: "2026-01-01" }, { id: "c", createdAt: "2026-09-01" }];
+    assert.equal(esPrincipalDelGrupo("a", miembros), true);
+    assert.equal(esPrincipalDelGrupo("b", miembros), false);
+    assert.equal(esPrincipalDelGrupo("x", []), true);
   });
   test("Basico: no cobra extra y no deja sumar cajas", () => {
     assert.equal(montoMensual(basico, 3).total, 20000);

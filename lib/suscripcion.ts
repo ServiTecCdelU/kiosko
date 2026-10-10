@@ -82,15 +82,36 @@ export interface MontoMensual {
   cajas: number;
   cajasExtra: number;
   extra: number;
+  /** Descuento por sucursal de un grupo (53): porcentaje y plata. */
+  descuentoPct: number;
+  descuento: number;
+  /** Lo que se cobra: base + extra - descuento. */
   total: number;
 }
 
-/** Cuanto paga por mes un comercio con esas cajas activas. */
-export function montoMensual(t: TarifaPlan, cajasActivas: number): MontoMensual {
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Cuanto paga por mes un comercio con esas cajas activas y ese descuento. */
+export function montoMensual(t: TarifaPlan, cajasActivas: number, descuentoPct = 0): MontoMensual {
   const cajas = Math.max(0, Math.floor(cajasActivas));
   const cajasExtra = Math.max(0, cajas - Math.max(1, t.cajasIncluidas));
-  const extra = Math.round(cajasExtra * (t.precioCajaExtra || 0) * 100) / 100;
-  return { base: t.precioMensual, cajas, cajasExtra, extra, total: Math.round((t.precioMensual + extra) * 100) / 100 };
+  const extra = r2(cajasExtra * (t.precioCajaExtra || 0));
+  const bruto = r2(t.precioMensual + extra);
+  const pct = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
+  const descuento = r2(bruto * pct / 100);
+  return { base: t.precioMensual, cajas, cajasExtra, extra, descuentoPct: pct, descuento, total: r2(bruto - descuento) };
+}
+
+export interface MiembroGrupo {
+  id: string;
+  createdAt: Date | string;
+}
+
+/** La sucursal "principal" (paga completo) es la mas antigua del grupo. */
+export function esPrincipalDelGrupo(comercioId: string, miembros: MiembroGrupo[]): boolean {
+  if (miembros.length === 0) return true;
+  const principal = [...miembros].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
+  return principal.id === comercioId;
 }
 
 /** Si el plan deja sumar una caja mas (tope de cajas). */

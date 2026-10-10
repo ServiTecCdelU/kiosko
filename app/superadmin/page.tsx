@@ -20,7 +20,7 @@ import { panelHref } from "@/lib/panel";
 import { ComercioFila } from "@/components/superadmin/comercio-fila";
 import { ComercioDialog } from "@/components/superadmin/comercio-dialog";
 import { NuevoComercioDialog } from "@/components/superadmin/nuevo-comercio-dialog";
-import { superadminApi, type Comercio } from "@/components/superadmin/comun";
+import { superadminApi, type Comercio, type GrupoSaas } from "@/components/superadmin/comun";
 
 export default function SuperadminPage() {
   const { user, ready, logout } = useSuperadmin();
@@ -76,6 +76,7 @@ export default function SuperadminPage() {
 function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
   const router = useRouter();
   const [comercios, setComercios] = useState<Comercio[]>([]);
+  const [grupos, setGrupos] = useState<GrupoSaas[]>([]);
   const [loading, setLoading] = useState(true);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [planesOpen, setPlanesOpen] = useState(false);
@@ -85,8 +86,9 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const { comercios } = await superadminApi<{ comercios: Comercio[] }>({ accion: "listar" });
+      const { comercios, grupos } = await superadminApi<{ comercios: Comercio[]; grupos?: GrupoSaas[] }>({ accion: "listar" });
       setComercios(comercios ?? []);
+      setGrupos(grupos ?? []);
     } catch {
       toast.error("No se pudieron cargar los comercios");
     } finally {
@@ -171,6 +173,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
 
       <ComercioDialog
         comercio={seleccionado}
+        grupos={grupos}
         onOpenChange={(o) => !o && setAdministrando(null)}
         onCambio={load}
         onEntrar={entrar}

@@ -91,6 +91,14 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
               {" "}({estado.monto.cajas} cajas activas, {estado.tarifa.cajasIncluidas} incluida{estado.tarifa.cajasIncluidas === 1 ? "" : "s"})
             </p>
           )}
+          {estado.grupo && (
+            <p className="text-xs text-muted-foreground">
+              Sucursal del grupo {estado.grupo.nombre}:{" "}
+              {estado.grupo.esPrincipal
+                ? "es la principal y paga completo"
+                : `${estado.grupo.descuentoPct}% de descuento (${formatCurrency(estado.monto.descuento)} menos por mes)`}
+            </p>
+          )}
           <Badge variant="outline" className={cn("mt-1", sit.clase)}><Icono className="mr-1 h-3 w-3" /> {sit.texto}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">

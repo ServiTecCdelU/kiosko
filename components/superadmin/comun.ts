@@ -23,7 +23,16 @@ export interface Comercio {
   created_at: string;
   /** Datos del alta self-service (40_autoregistro.sql). */
   config: { origen?: string; rubro?: string | null; telefono?: string | null } | null;
+  /** Grupo de sucursales del mismo dueño (53). */
+  grupo_id: string | null;
   uso: ComercioUso;
+}
+
+export interface GrupoSaas {
+  id: string;
+  nombre: string;
+  descuentoPct: number;
+  comercios?: number;
 }
 
 export interface AccesoGoogle {

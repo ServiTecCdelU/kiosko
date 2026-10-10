@@ -21,8 +21,10 @@ export interface EstadoSuscripcion {
   nombrePlan: string;
   precioMensual: number;
   /** Desglose del mes: plan + cajas extra activas (52). */
-  monto: { base: number; cajas: number; cajasExtra: number; extra: number; total: number };
+  monto: { base: number; cajas: number; cajasExtra: number; extra: number; descuentoPct: number; descuento: number; total: number };
   tarifa: { precioMensual: number; cajasIncluidas: number; precioCajaExtra: number; maxCajas: number | null };
+  /** Grupo de sucursales del mismo dueño (53). */
+  grupo: { id: string; nombre: string; descuentoPct: number; esPrincipal: boolean; descuentoAplicado: number } | null;
   estado: string;
   suscripcionHasta: string | null;
   proximo: { periodo: string; hasta: string };

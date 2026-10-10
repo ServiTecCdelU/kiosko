@@ -38,9 +38,17 @@ activo que no pagaba seguía operando igual.
   (`montoMensual` en `lib/suscripcion.ts`). Las cajas son los puestos activos del comercio.
 - El tope se aplica al crear o reactivar un puesto (`/api/puestos`): el Básico no deja pasar
   de 1 y avisa que hay que pasar a Pro.
-- Las sucursales son comercios distintos (stock y caja propios) y pagan cada una. Un descuento
-  por varias sucursales del mismo dueño queda para cuando aparezca el primer caso.
+- Las sucursales son comercios distintos (stock y caja propios) y pagan cada una.
 - Cada pago guarda cuántas cajas se cobraron (`saas_pagos.cajas`).
+
+## Sucursales del mismo dueño (migración 53)
+
+- Tabla `saas_grupos` (nombre, `descuento_pct`) y `comercios.grupo_id`. El superadmin arma el grupo
+  desde Administrar comercio ("Sucursales"): crea el grupo con su porcentaje y asigna cada comercio.
+- La sucursal **más antigua** del grupo (por fecha de alta, sin contar las dadas de baja) paga
+  completo; las demás pagan `plan + cajas extra` con el descuento. Así no hay que marcar una
+  "principal" a mano y nadie termina con todas las sucursales descontadas.
+- El descuento aplicado queda en cada pago (`saas_pagos.descuento_pct`) y se ve en Suscripción.
 
 ## Flujo de pago
 

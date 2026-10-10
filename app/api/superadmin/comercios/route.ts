@@ -9,13 +9,13 @@ import { patronCorreoExacto } from "@/lib/correo";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { esSlugReservado } from "@/lib/panel";
 import { olvidarAcceso } from "@/lib/server/acceso";
-import { guardarPlan, listarPlanes, pagosDeComercio, registrarPagoManual } from "@/lib/server/billing";
+import { guardarGrupo, guardarPlan, listarGrupos, listarPlanes, pagosDeComercio, registrarPagoManual } from "@/lib/server/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ESTADOS = ["activo", "prueba", "suspendido", "baja"];
-const COLUMNAS_PANEL = "id, nombre, slug, estado, plan, trial_hasta, suscripcion_hasta, created_at, config";
+const COLUMNAS_PANEL = "id, nombre, slug, estado, plan, trial_hasta, suscripcion_hasta, created_at, config, grupo_id";
 const PLANES = ["free", "basico", "pro"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -74,7 +74,24 @@ export async function POST(req: Request) {
       })),
     );
 
-    return NextResponse.json({ comercios: conUso });
+    return NextResponse.json({ comercios: conUso, grupos: await listarGrupos().catch(() => []) });
+  }
+
+  // Grupos de sucursales (53): mismo dueño, descuento para las sucursales que no son la principal.
+  if (accion === "grupos") {
+    try {
+      return NextResponse.json({ grupos: await listarGrupos() });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron leer los grupos" }, { status: 400 });
+    }
+  }
+  if (accion === "guardarGrupo") {
+    try {
+      const grupo = await guardarGrupo(body?.id ? String(body.id) : null, String(body?.nombre ?? ""), Number(body?.descuentoPct));
+      return NextResponse.json({ grupo });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo guardar el grupo" }, { status: 400 });
+    }
   }
 
   if (accion === "crear") {
@@ -311,6 +328,14 @@ export async function PATCH(req: Request) {
   }
   if (body?.suscripcionHasta !== undefined) {
     cambios.suscripcion_hasta = body.suscripcionHasta || null;
+  }
+  if (body?.grupoId !== undefined) {
+    const grupoId = body.grupoId ? String(body.grupoId) : null;
+    if (grupoId) {
+      const { data: g } = await supabaseAdmin.from("saas_grupos").select("id").eq("id", grupoId).maybeSingle();
+      if (!g) return NextResponse.json({ error: "Grupo inexistente" }, { status: 400 });
+    }
+    cambios.grupo_id = grupoId;
   }
   if (Object.keys(cambios).length === 0) {
     return NextResponse.json({ error: "Nada para cambiar" }, { status: 400 });
