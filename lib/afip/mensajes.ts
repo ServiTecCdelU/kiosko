@@ -51,11 +51,14 @@ export class ErrorAfip extends Error {
   readonly reintentable: boolean;
   /** AFIP no acepto el acceso guardado (error 600): hay que pedir uno nuevo a WSAA. */
   readonly accesoInvalido: boolean;
-  constructor(mensaje: string, reintentable = false, accesoInvalido = false) {
+  /** CAEA: la quincena ya fue pedida (15008); hay que consultarla en vez de pedirla. */
+  readonly caeaYaPedido: boolean;
+  constructor(mensaje: string, reintentable = false, accesoInvalido = false, caeaYaPedido = false) {
     super(mensaje);
     this.name = "ErrorAfip";
     this.reintentable = reintentable;
     this.accesoInvalido = accesoInvalido;
+    this.caeaYaPedido = caeaYaPedido;
   }
 }
 
@@ -142,11 +145,11 @@ export interface DetalleComprobante {
 }
 
 /**
- * FECAESolicitar de un comprobante. El ORDEN de los elementos es el del XSD de
- * WSFEv1 (si no, AFIP rechaza el XML): ... MonId, MonCotiz,
- * CondicionIVAReceptorId, CbtesAsoc, Iva.
+ * Detalle de un comprobante (FECAEDetRequest / FECAEADetRequest). El ORDEN de
+ * los elementos es el del XSD de WSFEv1 (si no, AFIP rechaza el XML): ...
+ * MonId, MonCotiz, CondicionIVAReceptorId, CbtesAsoc, Iva [, CAEA].
  */
-export function sobreSolicitarCAE(auth: Auth, d: DetalleComprobante): string {
+function detalleXml(d: DetalleComprobante, caea?: string): string {
   const total = importeAfip(d.total);
   const asociado = d.asociado
     ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${d.asociado.cbteTipo}</ar:Tipo><ar:PtoVta>${d.asociado.puntoVenta}</ar:PtoVta><ar:Nro>${d.asociado.numero}</ar:Nro><ar:Cuit>${d.asociado.cuit}</ar:Cuit><ar:CbteFch>${fechaAfip(d.asociado.fecha)}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>`
@@ -168,13 +171,103 @@ export function sobreSolicitarCAE(auth: Auth, d: DetalleComprobante): string {
     `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz>` +
     `<ar:CondicionIVAReceptorId>${d.condicionIva}</ar:CondicionIVAReceptorId>` +
     asociado +
-    iva;
+    iva +
+    (caea ? `<ar:CAEA>${escaparXml(caea)}</ar:CAEA>` : "");
+  return detalle;
+}
+
+const cabecera = (d: DetalleComprobante) =>
+  `<ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${d.puntoVenta}</ar:PtoVta><ar:CbteTipo>${d.cbteTipo}</ar:CbteTipo></ar:FeCabReq>`;
+
+/** FECAESolicitar: pide el CAE de un comprobante. */
+export function sobreSolicitarCAE(auth: Auth, d: DetalleComprobante): string {
   return sobreWsfe(
     "FECAESolicitar",
     auth,
-    `<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${d.puntoVenta}</ar:PtoVta><ar:CbteTipo>${d.cbteTipo}</ar:CbteTipo></ar:FeCabReq>` +
-      `<ar:FeDetReq><ar:FECAEDetRequest>${detalle}</ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`,
+    `<ar:FeCAEReq>${cabecera(d)}<ar:FeDetReq><ar:FECAEDetRequest>${detalleXml(d)}</ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`,
   );
+}
+
+// ------------------------------------------------------------------ CAEA (contingencia)
+
+/** FECAEASolicitar: pide el CAEA de una quincena (periodo "YYYYMM", orden 1 o 2). */
+export function sobreCAEASolicitar(auth: Auth, periodo: string, orden: number): string {
+  return sobreWsfe("FECAEASolicitar", auth, `<ar:Periodo>${escaparXml(periodo)}</ar:Periodo><ar:Orden>${orden}</ar:Orden>`);
+}
+
+/** FECAEAConsultar: el CAEA ya pedido de una quincena. */
+export function sobreCAEAConsultar(auth: Auth, periodo: string, orden: number): string {
+  return sobreWsfe("FECAEAConsultar", auth, `<ar:Periodo>${escaparXml(periodo)}</ar:Periodo><ar:Orden>${orden}</ar:Orden>`);
+}
+
+/** FECAEARegInformativo: informa un comprobante emitido con CAEA. */
+export function sobreCAEAInformar(auth: Auth, d: DetalleComprobante, caea: string): string {
+  return sobreWsfe(
+    "FECAEARegInformativo",
+    auth,
+    `<ar:FeCAEARegInfReq>${cabecera(d)}<ar:FeDetReq><ar:FECAEADetRequest>${detalleXml(d, caea)}</ar:FECAEADetRequest></ar:FeDetReq></ar:FeCAEARegInfReq>`,
+  );
+}
+
+/** FECAEASinMovimientoInformar: la quincena termino sin comprobantes CAEA en ese punto de venta. */
+export function sobreCAEASinMovimiento(auth: Auth, puntoVenta: number, caea: string): string {
+  return sobreWsfe("FECAEASinMovimientoInformar", auth, `<ar:PtoVta>${puntoVenta}</ar:PtoVta><ar:CAEA>${escaparXml(caea)}</ar:CAEA>`);
+}
+
+export interface ResultadoCAEA {
+  caea: string;
+  periodo: string;
+  orden: number;
+  vigDesde: string;   // YYYY-MM-DD
+  vigHasta: string;
+  fchTopeInf: string;
+}
+
+/** 15008 = el CAEA de esa quincena ya fue pedido: hay que consultarlo. */
+export const COD_CAEA_YA_PEDIDO = "15008";
+
+const isoDeAfip = (s: string) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+
+/** Lee FECAEASolicitar y FECAEAConsultar (misma estructura ResultGet). */
+export function leerCAEA(xml: string): ResultadoCAEA {
+  const errores = erroresWsfe(xml);
+  siAccesoInvalido(errores);
+  if (errores.some((e) => e.codigo === COD_CAEA_YA_PEDIDO)) {
+    throw new ErrorAfip(`AFIP: ${textoMensajes(errores)}`, false, false, true);
+  }
+  if (errores.length) throw new ErrorAfip(`AFIP: ${textoMensajes(errores)}`);
+  const r = bloques(xml, "ResultGet")[0] ?? "";
+  const caea = extraer(r, "CAEA");
+  const desde = extraer(r, "FchVigDesde");
+  const hasta = extraer(r, "FchVigHasta");
+  const tope = extraer(r, "FchTopeInf");
+  if (!caea || !desde || !hasta || !tope) throw new ErrorAfip("Respuesta de CAEA de AFIP incompleta", true);
+  return {
+    caea, periodo: extraer(r, "Periodo") ?? "", orden: Number(extraer(r, "Orden")) || 0,
+    vigDesde: isoDeAfip(desde), vigHasta: isoDeAfip(hasta), fchTopeInf: isoDeAfip(tope),
+  };
+}
+
+export type ResultadoInformarCAEA = { aceptado: true; observaciones: Mensaje[] } | { aceptado: false; motivo: string };
+
+/** Lee FECAEARegInformativo: aceptado (A) o rechazado con el motivo. */
+export function leerCAEAInformar(xml: string): ResultadoInformarCAEA {
+  siAccesoInvalido(erroresWsfe(xml));
+  const det = bloques(xml, "FECAEADetResponse")[0] ?? "";
+  const resultado = extraer(det, "Resultado") ?? extraer(xml, "Resultado");
+  const observaciones = mensajes(det, "Observaciones", "Obs");
+  if (resultado === "A") return { aceptado: true, observaciones };
+  const motivos = [...erroresWsfe(xml), ...observaciones];
+  if (!resultado && !motivos.length) throw new ErrorAfip("Respuesta ilegible de AFIP al informar el CAEA", true);
+  return { aceptado: false, motivo: textoMensajes(motivos) || "AFIP rechazó el comprobante sin detallar el motivo" };
+}
+
+/** Lee FECAEASinMovimientoInformar. */
+export function leerCAEASinMovimiento(xml: string): boolean {
+  const errores = erroresWsfe(xml);
+  siAccesoInvalido(errores);
+  if (errores.length) throw new ErrorAfip(`AFIP: ${textoMensajes(errores)}`);
+  return (extraer(xml, "Resultado") ?? "") === "A";
 }
 
 export interface Mensaje {

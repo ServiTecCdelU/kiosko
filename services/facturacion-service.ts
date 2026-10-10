@@ -19,6 +19,10 @@ export interface FacturaResumen {
   error: string | null;
   cae: string | null;
   ambiente: "homologacion" | "produccion";
+  /** Contingencia (51): salio con CAEA y, si ya se informo a AFIP. */
+  tipo_autorizacion?: "CAE" | "CAEA";
+  caea?: string | null;
+  caea_informada?: boolean;
 }
 
 export interface EstadoConfigAfip {
@@ -34,6 +38,7 @@ export interface EstadoConfigAfip {
   ambiente?: "homologacion" | "produccion";
   modo?: "manual" | "automatico";
   activo?: boolean;
+  caeaActivo?: boolean;
   tienePedido?: boolean;
   tieneCertificado?: boolean;
   certVence?: string | null;
@@ -48,7 +53,9 @@ export interface PasoPrueba {
 export interface Comprobante {
   comprobante: {
     id: string; cbteTipo: number; puntoVenta: number; numero: number; fecha: string; total: number;
-    docTipo: number; docNro: string; receptorNombre: string | null; receptorCondicion: number; cae: string; caeVto: string;
+    docTipo: number; docNro: string; receptorNombre: string | null; receptorCondicion: number;
+    /** "CAE" o "CAEA" (contingencia). `cae` trae el codigo que corresponda. */
+    tipoAutorizacion: "CAE" | "CAEA"; cae: string; caeVto: string;
     ambiente: "homologacion" | "produccion";
     asociado: { cbteTipo: number; puntoVenta: number; numero: number } | null;
     items: { nombre: string; cantidad: number; precio: number; subtotal: number }[];
@@ -97,6 +104,24 @@ export async function textoPedidoCertificado(): Promise<string> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "No se pudo leer el pedido");
   return res.text();
 }
+
+// ── Contingencia CAEA (solo admin) ──
+export interface CaeaGuardado {
+  periodo: string; orden: number; caea: string; vigDesde: string; vigHasta: string; fchTopeInf: string;
+}
+export interface EstadoCaea {
+  configurado: boolean;
+  demo?: boolean;
+  caeaActivo: boolean;
+  ambiente?: "homologacion" | "produccion";
+  hoy?: string;
+  quincenas: { periodo: string; orden: 1 | 2 }[];
+  caeas: CaeaGuardado[];
+  pendientes: { id: string; cbte_tipo: number; punto_venta: number; numero: number; fecha: string; total: number; caea: string; caea_error: string | null }[];
+}
+export const getCaea = () => pedir<EstadoCaea>("/api/afip/caea", "GET");
+export const setCaeaActivo = (activo: boolean) => pedir<{ estado: EstadoConfigAfip; caea: EstadoCaea }>("/api/afip/caea", "PATCH", { activo });
+export const accionCaea = (body: Record<string, unknown>) => pedir<{ mensaje: string; caea: EstadoCaea }>("/api/afip/caea", "POST", body);
 
 // ── Emision (cualquier rol) ──
 /** condicion: del cliente que recibe (solo cuenta si el emisor es responsable inscripto). */

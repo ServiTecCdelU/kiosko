@@ -24,6 +24,8 @@ export interface FilaConfigAfip {
   cert_pem: string | null;
   cert_vence: string | null;
   activo: boolean;
+  /** Contingencia CAEA (51): facturar con CAEA si AFIP no responde. */
+  caea_activo: boolean;
 }
 
 /** Config lista para operar con AFIP (clave descifrada en memoria). */
@@ -54,6 +56,7 @@ export function estadoPublico(fila: FilaConfigAfip | null) {
     ambiente: fila.ambiente,
     modo: fila.modo,
     activo: fila.activo,
+    caeaActivo: !!fila.caea_activo,
     tienePedido: !!fila.csr_pem,
     tieneCertificado: !!fila.cert_pem,
     certVence: fila.cert_vence,
@@ -145,4 +148,8 @@ export async function guardarOperacion(comercioId: string, o: Operacion): Promis
 
 export async function marcarActivo(comercioId: string, activo: boolean): Promise<FilaConfigAfip> {
   return actualizar(comercioId, { activo });
+}
+
+export async function marcarCaeaActivo(comercioId: string, caeaActivo: boolean): Promise<FilaConfigAfip> {
+  return actualizar(comercioId, { caea_activo: caeaActivo });
 }

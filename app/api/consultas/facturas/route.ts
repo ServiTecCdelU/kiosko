@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_VENTAS = 500;
-const COLUMNAS_RESUMEN = "id, venta_id, devolucion_id, cbte_tipo, punto_venta, numero, fecha, total, estado, error, cae, ambiente, created_at";
+const COLUMNAS_RESUMEN = "id, venta_id, devolucion_id, cbte_tipo, punto_venta, numero, fecha, total, estado, error, cae, ambiente, created_at, tipo_autorizacion, caea, caea_informada";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -79,10 +79,13 @@ export async function POST(req: Request) {
             receptorCondicion: Number(f.receptor_condicion) || 5,
             neto: f.neto != null ? Number(f.neto) : null, iva: f.iva != null ? Number(f.iva) : null,
             exento: f.exento != null ? Number(f.exento) : null, alicuotas: Array.isArray(f.alicuotas) ? f.alicuotas : [],
-            cae: f.cae, caeVto: f.cae_vto, ambiente: f.ambiente, asociado, items,
+            // Contingencia (51): el comprobante salio con CAEA; se imprime como tal y el QR lo marca.
+            tipoAutorizacion: f.tipo_autorizacion === "CAEA" ? "CAEA" : "CAE",
+            cae: f.tipo_autorizacion === "CAEA" ? f.caea : f.cae, caeVto: f.cae_vto, ambiente: f.ambiente, asociado, items,
             qr: urlQrAfip({
               fecha: f.fecha, cuit: cfg.cuit, puntoVenta: f.punto_venta, cbteTipo: f.cbte_tipo, numero: Number(f.numero),
-              total: Number(f.total), docTipo: f.doc_tipo, docNro: f.doc_nro, cae: f.cae,
+              total: Number(f.total), docTipo: f.doc_tipo, docNro: f.doc_nro,
+              cae: f.tipo_autorizacion === "CAEA" ? f.caea : f.cae, tipoCodAut: f.tipo_autorizacion === "CAEA" ? "A" : "E",
             }),
           },
           emisor: {

@@ -88,7 +88,10 @@ export interface DatosQr {
   total: number;
   docTipo: number;
   docNro: string;
+  /** CAE, o el CAEA si el comprobante salio en contingencia. */
   cae: string;
+  /** "E" = CAE (default), "A" = CAEA. */
+  tipoCodAut?: "E" | "A";
 }
 
 /** URL del QR que AFIP exige en el comprobante impreso (especificacion v1). */
@@ -105,7 +108,7 @@ export function urlQrAfip(d: DatosQr): string {
     ctz: 1,
     tipoDocRec: d.docTipo,
     nroDocRec: Number(d.docNro) || 0,
-    tipoCodAut: "E",
+    tipoCodAut: d.tipoCodAut ?? "E",
     codAut: Number(d.cae),
   };
   const b64 = typeof btoa === "function"

@@ -37,6 +37,7 @@ const RUTAS_ADMIN = [
   "/api/afip/pedido",
   "/api/afip/certificado",
   "/api/afip/probar",
+  "/api/afip/caea",
   // PCs registradas: solo el dueño las registra o da de baja.
   "/api/dispositivos",
   // Recuento fisico de stock y lotes de vencimiento: pantallas de Stock (solo admin).

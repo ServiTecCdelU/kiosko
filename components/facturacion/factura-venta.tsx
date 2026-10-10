@@ -62,7 +62,16 @@ export function FacturaBadge({ facturas }: { facturas: FacturaResumen[] | undefi
   if (!f) return null;
   const letra = LETRA_CBTE[f.cbte_tipo] ?? "C";
   if (f.estado === "autorizada") {
-    return <Badge variant="outline" className="border-success/50 text-success" title={`CAE ${f.cae}`}>F{letra} {f.numero}</Badge>;
+    const caea = f.tipo_autorizacion === "CAEA";
+    return (
+      <Badge
+        variant="outline"
+        className={caea && !f.caea_informada ? "border-warning text-warning" : "border-success/50 text-success"}
+        title={caea ? `CAEA ${f.caea}${f.caea_informada ? " (informado a AFIP)" : " (contingencia: falta informar a AFIP)"}` : `CAE ${f.cae}`}
+      >
+        F{letra} {f.numero}{caea && " · CAEA"}
+      </Badge>
+    );
   }
   return <Badge variant="outline" className="border-destructive/50 text-destructive" title={f.error ?? ""}>F{letra} con error</Badge>;
 }

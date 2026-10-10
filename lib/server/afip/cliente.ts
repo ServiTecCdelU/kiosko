@@ -13,7 +13,8 @@ import { NS_WSFE, SERVICIO_WSFE, URL_WSAA, URL_WSFE, type Ambiente } from "@/lib
 import {
   ErrorAfip, armarTRA, leerConsultar, leerDummy, leerLoginCms, leerSolicitarCAE, leerUltimoAutorizado,
   sobreConsultar, sobreDummy, sobreLoginCms, sobreSolicitarCAE, sobreUltimoAutorizado,
-  type Auth, type DetalleComprobante, type ResultadoCAE, type ResultadoConsulta,
+  leerCAEA, leerCAEAInformar, leerCAEASinMovimiento, sobreCAEAConsultar, sobreCAEAInformar, sobreCAEASinMovimiento, sobreCAEASolicitar,
+  type Auth, type DetalleComprobante, type ResultadoCAE, type ResultadoCAEA, type ResultadoConsulta, type ResultadoInformarCAEA,
 } from "@/lib/afip/mensajes";
 
 const MARGEN_MS = 10 * 60_000;
@@ -100,4 +101,26 @@ export async function solicitarCAE(cfg: ConfigOperativa, auth: Auth, det: Detall
 export async function consultarComprobante(cfg: ConfigOperativa, auth: Auth, cbteTipo: number, numero: number): Promise<ResultadoConsulta> {
   const xml = await postSoap(URL_WSFE[cfg.ambiente], sobreConsultar(auth, cfg.punto_venta, cbteTipo, numero), accion("FECompConsultar"));
   return leerConsultar(xml);
+}
+
+// ---- CAEA (contingencia) ----
+
+export async function solicitarCAEA(cfg: ConfigOperativa, auth: Auth, periodo: string, orden: number): Promise<ResultadoCAEA> {
+  const xml = await postSoap(URL_WSFE[cfg.ambiente], sobreCAEASolicitar(auth, periodo, orden), accion("FECAEASolicitar"));
+  return leerCAEA(xml);
+}
+
+export async function consultarCAEA(cfg: ConfigOperativa, auth: Auth, periodo: string, orden: number): Promise<ResultadoCAEA> {
+  const xml = await postSoap(URL_WSFE[cfg.ambiente], sobreCAEAConsultar(auth, periodo, orden), accion("FECAEAConsultar"));
+  return leerCAEA(xml);
+}
+
+export async function informarCAEA(cfg: ConfigOperativa, auth: Auth, det: DetalleComprobante, caea: string): Promise<ResultadoInformarCAEA> {
+  const xml = await postSoap(URL_WSFE[cfg.ambiente], sobreCAEAInformar(auth, det, caea), accion("FECAEARegInformativo"));
+  return leerCAEAInformar(xml);
+}
+
+export async function informarCAEASinMovimiento(cfg: ConfigOperativa, auth: Auth, caea: string): Promise<boolean> {
+  const xml = await postSoap(URL_WSFE[cfg.ambiente], sobreCAEASinMovimiento(auth, cfg.punto_venta, caea), accion("FECAEASinMovimientoInformar"));
+  return leerCAEASinMovimiento(xml);
 }

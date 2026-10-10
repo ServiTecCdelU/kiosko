@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   armarTRA, leerLoginCms, sobreSolicitarCAE, leerSolicitarCAE, leerUltimoAutorizado, leerConsultar,
   sobreUltimoAutorizado, ErrorAfip, type Auth,
+  sobreCAEASolicitar, sobreCAEAConsultar, sobreCAEAInformar, sobreCAEASinMovimiento, leerCAEA, leerCAEAInformar, leerCAEASinMovimiento,
 } from "./mensajes.ts";
 
 const auth: Auth = { token: "TOK", sign: "SIG&<", cuit: "20123456786" };
@@ -79,6 +80,46 @@ describe("WSFEv1 — armado", () => {
 
   test("el sign se escapa (trae caracteres de base64 y podria traer otros)", () => {
     assert.match(sobreUltimoAutorizado(auth, 1, 11), /<ar:Sign>SIG&amp;&lt;<\/ar:Sign>/);
+  });
+});
+
+describe("CAEA (contingencia)", () => {
+  const base = { cbteTipo: 6, puntoVenta: 3, numero: 101, fecha: "2026-10-20", total: 1210, docTipo: 99, docNro: "0", condicionIva: 5 };
+
+  test("pedido y consulta de la quincena", () => {
+    assert.match(sobreCAEASolicitar(auth, "202610", 2), /<ar:FECAEASolicitar>[\s\S]*<ar:Periodo>202610<\/ar:Periodo><ar:Orden>2<\/ar:Orden><\/ar:FECAEASolicitar>/);
+    assert.match(sobreCAEAConsultar(auth, "202610", 1), /<ar:FECAEAConsultar>/);
+  });
+
+  test("informar un comprobante CAEA: mismo detalle que el CAE mas el CAEA al final", () => {
+    const x = sobreCAEAInformar(auth, { ...base, desglose: { neto: 1000, iva: 210, exento: 0, alicuotas: [{ id: 5, base: 1000, importe: 210 }] } }, "21234567890123");
+    assert.match(x, /<ar:FECAEARegInformativo>/);
+    assert.match(x, /<ar:FeCAEARegInfReq><ar:FeCabReq><ar:CantReg>1<\/ar:CantReg><ar:PtoVta>3<\/ar:PtoVta><ar:CbteTipo>6<\/ar:CbteTipo><\/ar:FeCabReq><ar:FeDetReq><ar:FECAEADetRequest>/);
+    assert.match(x, /<\/ar:Iva><ar:CAEA>21234567890123<\/ar:CAEA><\/ar:FECAEADetRequest>/);
+  });
+
+  test("lee el CAEA otorgado", () => {
+    const r = leerCAEA(`<FECAEASolicitarResult><ResultGet><CAEA>21234567890123</CAEA><Periodo>202610</Periodo><Orden>2</Orden>
+      <FchVigDesde>20261016</FchVigDesde><FchVigHasta>20261031</FchVigHasta><FchTopeInf>20261110</FchTopeInf><FchProceso>20261011103000</FchProceso></ResultGet></FECAEASolicitarResult>`);
+    assert.deepEqual(r, { caea: "21234567890123", periodo: "202610", orden: 2, vigDesde: "2026-10-16", vigHasta: "2026-10-31", fchTopeInf: "2026-11-10" });
+  });
+
+  test("15008 = ya pedido: error marcado para consultar en vez de pedir", () => {
+    assert.throws(
+      () => leerCAEA(`<Errors><Err><Code>15008</Code><Msg>Ya existe un CAEA otorgado para el periodo y orden</Msg></Err></Errors>`),
+      (e: unknown) => e instanceof ErrorAfip && e.caeaYaPedido,
+    );
+  });
+
+  test("informe aceptado y rechazado", () => {
+    assert.deepEqual(leerCAEAInformar(`<FeCabResp><Resultado>A</Resultado></FeCabResp><FeDetResp><FECAEADetResponse><Resultado>A</Resultado><CAEA>21234567890123</CAEA></FECAEADetResponse></FeDetResp>`), { aceptado: true, observaciones: [] });
+    const r = leerCAEAInformar(`<FeDetResp><FECAEADetResponse><Resultado>R</Resultado><Observaciones><Obs><Code>10063</Code><Msg>El CAEA informado no se encuentra vigente</Msg></Obs></Observaciones></FECAEADetResponse></FeDetResp>`);
+    assert.deepEqual(r, { aceptado: false, motivo: "10063: El CAEA informado no se encuentra vigente" });
+  });
+
+  test("sin movimiento", () => {
+    assert.match(sobreCAEASinMovimiento(auth, 3, "21234567890123"), /<ar:PtoVta>3<\/ar:PtoVta><ar:CAEA>21234567890123<\/ar:CAEA>/);
+    assert.equal(leerCAEASinMovimiento(`<FECAEASinMovimientoInformarResult><Resultado>A</Resultado></FECAEASinMovimientoInformarResult>`), true);
   });
 });
 

@@ -106,8 +106,8 @@ export function seccionesComprobante(datos: Comprobante, columnas = COLUMNAS_80M
     dos(columnas >= COLUMNAS_80MM ? "Otros impuestos nacionales indirectos" : "Otros imp. nacionales", formatearPesos(0));
   }
   linea(sep);
-  linea(`CAE ${c.cae}`);
-  linea(`Vto. CAE ${dia(c.caeVto)}`);
+  linea(`${c.tipoAutorizacion ?? "CAE"} ${c.cae}`);
+  linea(`Vto. ${c.tipoAutorizacion ?? "CAE"} ${dia(c.caeVto)}`);
   if (c.ambiente === "homologacion") {
     for (const l of partirLineas("PRUEBA (homologacion) - SIN VALIDEZ FISCAL", columnas)) centro(l, { negrita: true });
   }

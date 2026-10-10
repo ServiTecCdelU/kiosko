@@ -1,6 +1,7 @@
 // lib/server/afip/facturar.ts — emision de facturas y notas de credito (server-only).
 // Spec: docs/superpowers/specs/2026-10-03-facturacion-afip-design.md (Factura C)
 //       docs/superpowers/specs/2026-10-10-factura-a-b-design.md (Factura A/B)
+//       docs/superpowers/specs/2026-10-10-caea-design.md (contingencia CAEA)
 //
 // Reglas que este archivo garantiza:
 // - Numeros correlativos: lock por (comercio, ambiente, tipo, punto de venta)
@@ -11,14 +12,18 @@
 //   reintentar; no tira abajo el cobro, la anulacion ni la devolucion.
 // - El tipo (A, B o C) lo decide la condicion del emisor y la del receptor
 //   (lib/afip/iva.ts); el desglose de IVA se guarda en la fila y no cambia.
+// - Contingencia: si AFIP no responde y el comercio tiene CAEA vigente, el
+//   comprobante sale con el CAEA y numeracion local; se informa despues.
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { esFactura, notaCreditoDe, TIPOS_FACTURA, TIPOS_NOTA_CREDITO } from "@/lib/afip/constantes";
 import { hoyArgentinaIso, receptorDeVenta } from "@/lib/afip/comprobante";
 import { desglosarIva, esCondicionReceptor, prorratearDesglose, tipoComprobante, type CondicionReceptor, type Desglose } from "@/lib/afip/iva";
-import { ErrorAfip } from "@/lib/afip/mensajes";
+import { ErrorAfip, type DetalleComprobante } from "@/lib/afip/mensajes";
 import { configOperativa, leerConfigAfip, type ConfigOperativa } from "@/lib/server/afip/config";
 import { conAcceso, consultarComprobante, solicitarCAE, ultimoAutorizado } from "@/lib/server/afip/cliente";
+import { asegurarCaeas, caeaVigente, informarPendientes } from "@/lib/server/afip/caea";
 import { esComercioDemo } from "@/lib/server/demo";
 
 export interface FilaFactura {
@@ -43,6 +48,11 @@ export interface FilaFactura {
   alicuotas: Desglose["alicuotas"] | null;
   cae: string | null;
   cae_vto: string | null;
+  /** CAE normal o CAEA (contingencia, 51). */
+  tipo_autorizacion: "CAE" | "CAEA";
+  caea: string | null;
+  caea_informada: boolean;
+  caea_error: string | null;
   estado: "pendiente" | "autorizada" | "rechazada" | "error";
   error: string | null;
   intentos: number;
@@ -74,6 +84,10 @@ async function leerFactura(id: string): Promise<FilaFactura> {
     iva: data.iva === null || data.iva === undefined ? null : Number(data.iva),
     exento: data.exento === null || data.exento === undefined ? null : Number(data.exento),
     receptor_condicion: Number(data.receptor_condicion) || 5,
+    tipo_autorizacion: data.tipo_autorizacion === "CAEA" ? "CAEA" : "CAE",
+    caea: data.caea ?? null,
+    caea_informada: !!data.caea_informada,
+    caea_error: data.caea_error ?? null,
   };
 }
 
@@ -108,6 +122,78 @@ async function asociadoDe(f: FilaFactura, cfg: ConfigOperativa) {
   return { cbteTipo: original.cbte_tipo, puntoVenta: original.punto_venta, numero: original.numero, cuit: cfg.cuit, fecha: original.fecha };
 }
 
+/** Detalle que se manda a AFIP, para FECAESolicitar y para FECAEARegInformativo. */
+async function detalleDe(f: FilaFactura, numero: number, fecha: string, cfg: ConfigOperativa): Promise<DetalleComprobante> {
+  return {
+    cbteTipo: f.cbte_tipo, puntoVenta: f.punto_venta, numero, fecha, total: f.total,
+    docTipo: f.doc_tipo, docNro: f.doc_nro, condicionIva: f.receptor_condicion,
+    asociado: await asociadoDe(f, cfg),
+    desglose: desgloseDe(f),
+  };
+}
+
+/** Para informar comprobantes CAEA (lib/server/afip/caea.ts). */
+export async function detalleParaInformar(fila: Record<string, any>, cfg: ConfigOperativa): Promise<DetalleComprobante> {
+  const f = await leerFactura(fila.id);
+  return detalleDe(f, f.numero ?? 0, f.fecha, { ...cfg, punto_venta: f.punto_venta });
+}
+
+/** Mayor numero autorizado localmente (CAE o CAEA) para esa serie. */
+async function maximoLocal(f: FilaFactura): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from("facturas").select("numero")
+    .eq("comercio_id", f.comercio_id).eq("ambiente", f.ambiente).eq("cbte_tipo", f.cbte_tipo)
+    .eq("punto_venta", f.punto_venta).eq("estado", "autorizada").not("numero", "is", null)
+    .order("numero", { ascending: false }).limit(1).maybeSingle();
+  return data?.numero ? Number(data.numero) : 0;
+}
+
+/** Deja libre un numero en filas viejas que no llegaron a autorizarse. */
+async function liberarNumero(f: FilaFactura, numero: number): Promise<void> {
+  await supabaseAdmin
+    .from("facturas")
+    .update({ numero: null })
+    .eq("comercio_id", f.comercio_id).eq("ambiente", f.ambiente).eq("cbte_tipo", f.cbte_tipo)
+    .eq("punto_venta", f.punto_venta).eq("numero", numero).neq("estado", "autorizada").neq("id", f.id);
+}
+
+/** AFIP caido o inalcanzable (no un rechazo del comprobante ni un problema del certificado). */
+function esCaidaDeAfip(e: unknown): boolean {
+  return e instanceof ErrorAfip && e.reintentable && !e.accesoInvalido;
+}
+
+/** Mantenimiento de la contingencia cuando AFIP esta vivo: pedir CAEA que falten e informar lo pendiente. */
+function mantenerCaea(cfg: ConfigOperativa): void {
+  if (!cfg.caea_activo) return;
+  try {
+    after(async () => {
+      await asegurarCaeas(cfg).catch(() => {});
+      await informarPendientes(cfg, (fila) => detalleParaInformar(fila, cfg)).catch(() => {});
+    });
+  } catch {
+    // fuera de un request (tests): no hay after()
+  }
+}
+
+/**
+ * Contingencia: AFIP no respondio. Si hay CAEA vigente para hoy, el comprobante
+ * sale autorizado con el CAEA y numeracion local; se informa cuando AFIP vuelva.
+ */
+async function emitirConCaea(f: FilaFactura, cfg: ConfigOperativa, clave: string): Promise<FilaFactura | null> {
+  const hoy = hoyArgentinaIso();
+  const caea = await caeaVigente(f.comercio_id, f.ambiente, hoy);
+  if (!caea) return null;
+  return conLock(clave, async () => {
+    const numero = (await maximoLocal(f)) + 1;
+    await liberarNumero(f, numero);
+    return actualizar(f.id, {
+      numero, fecha: hoy, estado: "autorizada", intentos: f.intentos + 1,
+      tipo_autorizacion: "CAEA", caea: caea.caea, caea_informada: false, caea_error: null,
+      cae: null, cae_vto: caea.vig_hasta, error: null,
+    });
+  });
+}
+
 /** Pide (o recupera) el CAE de una factura pendiente o con error. */
 async function procesar(f: FilaFactura, cfgActual: ConfigOperativa): Promise<FilaFactura> {
   if (f.estado === "autorizada") return f;
@@ -119,7 +205,7 @@ async function procesar(f: FilaFactura, cfgActual: ConfigOperativa): Promise<Fil
     if (f.ambiente !== cfgActual.ambiente) {
       throw new Error(`Este comprobante es de ${f.ambiente} y la facturación ahora está en ${cfgActual.ambiente}: no se puede emitir`);
     }
-    return await conLock(clave, () => conAcceso(cfg, async (auth) => {
+    const resultado = await conLock(clave, () => conAcceso(cfg, async (auth) => {
 
       // Recuperacion: si quedo un numero sin respuesta, puede que AFIP lo haya autorizado.
       if (f.numero !== null) {
@@ -129,30 +215,33 @@ async function procesar(f: FilaFactura, cfgActual: ConfigOperativa): Promise<Fil
         }
       }
 
-      const numero = (await ultimoAutorizado(cfg, auth, f.cbte_tipo)) + 1;
+      // El maximo local cuenta comprobantes CAEA que AFIP todavia no tiene informados.
+      const numero = Math.max(await ultimoAutorizado(cfg, auth, f.cbte_tipo), await maximoLocal(f)) + 1;
       const fecha = hoyArgentinaIso();
-      // Una fila vieja que no llego a autorizarse puede tener ese numero guardado: se libera.
-      await supabaseAdmin
-        .from("facturas")
-        .update({ numero: null })
-        .eq("comercio_id", f.comercio_id).eq("ambiente", f.ambiente).eq("cbte_tipo", f.cbte_tipo)
-        .eq("punto_venta", f.punto_venta).eq("numero", numero).neq("estado", "autorizada").neq("id", f.id);
+      await liberarNumero(f, numero);
       await actualizar(f.id, { numero, fecha, estado: "pendiente", intentos: f.intentos + 1 });
 
-      const r = await solicitarCAE(cfg, auth, {
-        cbteTipo: f.cbte_tipo, puntoVenta: f.punto_venta, numero, fecha, total: f.total,
-        docTipo: f.doc_tipo, docNro: f.doc_nro, condicionIva: f.receptor_condicion,
-        asociado: await asociadoDe(f, cfg),
-        desglose: desgloseDe(f),
-      });
+      const r = await solicitarCAE(cfg, auth, await detalleDe(f, numero, fecha, cfg));
       if (r.aprobado) {
         const obs = r.observaciones.map((o) => `${o.codigo}: ${o.texto}`).join(" · ");
-        return actualizar(f.id, { estado: "autorizada", cae: r.cae, cae_vto: r.vencimiento, error: obs || null });
+        return actualizar(f.id, { estado: "autorizada", cae: r.cae, cae_vto: r.vencimiento, tipo_autorizacion: "CAE", error: obs || null });
       }
       // Rechazada: el numero no se uso; se puede corregir y volver a pedir.
       return actualizar(f.id, { estado: "rechazada", numero: null, error: r.motivo });
     }));
+    if (resultado.estado === "autorizada" && esFactura(resultado.cbte_tipo)) mantenerCaea(cfgActual);
+    return resultado;
   } catch (e) {
+    // Contingencia: solo si AFIP no responde y la factura no tiene un numero en
+    // juego (si lo tiene, AFIP puede haberla autorizado: se reintenta despues).
+    if (esCaidaDeAfip(e) && f.numero === null && cfgActual.caea_activo) {
+      try {
+        const conCaea = await emitirConCaea(f, cfg, clave);
+        if (conCaea) return conCaea;
+      } catch {
+        // sigue al error normal
+      }
+    }
     const fila = await leerFactura(f.id);
     return actualizar(f.id, { estado: "error", error: e instanceof Error ? e.message : "Error desconocido", intentos: fila.intentos });
   }
@@ -165,7 +254,7 @@ async function configActiva(comercioId: string): Promise<ConfigOperativa> {
   return configOperativa(fila);
 }
 
-type FilaNueva = Omit<FilaFactura, "id" | "numero" | "cae" | "cae_vto" | "estado" | "error" | "intentos">;
+type FilaNueva = Omit<FilaFactura, "id" | "numero" | "cae" | "cae_vto" | "estado" | "error" | "intentos" | "tipo_autorizacion" | "caea" | "caea_informada" | "caea_error">;
 
 async function crearOReusar(fila: FilaNueva, buscarExistente: () => Promise<FilaFactura | null>): Promise<FilaFactura> {
   const existente = await buscarExistente();

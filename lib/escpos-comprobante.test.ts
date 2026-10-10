@@ -7,7 +7,7 @@ import { CMD_CORTE } from "./escpos.ts";
 const base = {
   comprobante: {
     id: "fac_1", cbteTipo: 6, puntoVenta: 3, numero: 42, fecha: "2026-10-10", total: 1931,
-    docTipo: 99, docNro: "0", receptorNombre: null, receptorCondicion: 5, cae: "76401234567890", caeVto: "2026-10-20",
+    docTipo: 99, docNro: "0", receptorNombre: null, receptorCondicion: 5, tipoAutorizacion: "CAE" as const, cae: "76401234567890", caeVto: "2026-10-20",
     ambiente: "produccion" as const, asociado: null,
     items: [
       { nombre: "Leche saborizada 1L", cantidad: 1, precio: 1210, subtotal: 1210 },

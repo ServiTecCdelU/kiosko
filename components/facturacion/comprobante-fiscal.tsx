@@ -100,8 +100,8 @@ function ComprobanteFiscal({ datos, qr }: { datos: Comprobante; qr: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qr} alt="QR de AFIP" width={96} height={96} className="h-24 w-24" />
         <div>
-          <p>CAE {c.cae}</p>
-          <p>Vto. CAE {dia(c.caeVto)}</p>
+          <p>{c.tipoAutorizacion ?? "CAE"} {c.cae}</p>
+          <p>Vto. {c.tipoAutorizacion ?? "CAE"} {dia(c.caeVto)}</p>
           {c.ambiente === "homologacion" && <p className="font-bold">PRUEBA (homologación) · SIN VALIDEZ FISCAL</p>}
           <p>Comprobante autorizado por ARCA</p>
         </div>
