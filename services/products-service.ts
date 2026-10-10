@@ -27,6 +27,7 @@ export function mapRow(d: Record<string, any>): Product {
     fechaVencimiento: fechaDeDia(d.fecha_vencimiento),
     unidad: d.unidad === "kg" ? "kg" : "un",
     stockControlado: d.stock_controlado ?? true,
+    iva: d.iva != null ? Number(d.iva) : 21,
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
     ofertaTipo: d.oferta_tipo ?? undefined,
@@ -104,6 +105,8 @@ export interface UpdateProductInput {
   fechaVencimiento?: string; // YYYY-MM-DD
   unidad: "un" | "kg";
   stockControlado: boolean;
+  /** Alicuota de IVA (lib/iva.ts). Si no se manda, no se toca. */
+  iva?: number;
 }
 
 export async function updateProduct(productId: string, input: UpdateProductInput): Promise<void> {
@@ -368,6 +371,7 @@ export interface CreateProductInput {
   favorito?: boolean;
   revisar?: boolean;
   stockControlado?: boolean;
+  iva?: number;
 }
 
 export async function createProduct(input: CreateProductInput): Promise<string> {

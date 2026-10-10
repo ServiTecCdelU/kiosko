@@ -184,7 +184,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 43).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 47).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -192,9 +192,12 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   Authentication → Providers (sección 2 del spec de login Google).
 - Tablas principales: `comercios`, `usuarios`, `superadmins`, `puestos`,
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
-  `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras`,
-  `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`44_*.sql`**. La **42** (`42_aislamiento_saas.sql`) se corre
+  `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras` (+ `proveedor_pagos`),
+  `inventarios` (+ items), `producto_lotes`, `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
+- La siguiente migración es **`48_*.sql`**. Las **44 a 47** (cuenta corriente de proveedores y
+  categoría de gastos, inventario, lotes de vencimiento, IVA) se corren **antes** de deployar
+  el código que las usa, en ese orden (la 46 redefine funciones que la 44 ya tocó).
+  La **42** (`42_aislamiento_saas.sql`) se corre
   **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
 - Las claves reales están en `.env.local` y en `supabase.txt` (ambos en
@@ -230,16 +233,18 @@ vigencia, combos, simulador, historial y ranking, centro de ofertas, carteles,
 pantalla TV, premio por compras y sorteos; reportes con Excel/PDF; empleados;
 superadmin con modo soporte; aviso de pago mensual (día 7 al 10); landing;
 demo con datos; panel por slug; impresora térmica ESC/POS (USB o agente local)
-con cajón de dinero (2026-10-10).
+con cajón de dinero; cuenta corriente de proveedores con pagos parciales y bultos en
+la recepción; recuento físico de stock (`/stock/inventario`) y mermas con motivo;
+vencimientos por lote; IVA por producto; reportes por hora y día de la semana, gastos
+por categoría y pérdidas (todo 2026-10-10, specs en `docs/superpowers/specs/2026-10-10-*`).
 
-### Lo que falta para un supermercado (relevado 2026-10-10, en orden sugerido)
+### Lo que falta para un supermercado (relevado 2026-10-10)
 
-1. ~~Impresora térmica ESC/POS y cajón~~ (hecho).
-2. Cuenta corriente de proveedores (pagado/pendiente/pagos parciales) y unidades por bulto.
-3. Recuento físico de inventario por rubro con lector, y mermas como pérdida en reportes.
-4. Vencimientos por lote (hoy una sola fecha por producto).
-5. Alícuota de IVA por producto, y después Factura A/B.
-6. Reportes por hora y día de semana, gastos por categoría, método "Tarjeta (posnet externo)".
+Los seis puntos relevados ese día están hechos. Quedan como siguientes pasos naturales:
+- Factura A/B (responsable inscripto), ahora que cada producto tiene IVA.
+- Factura electrónica por ESC/POS (hoy sale por el navegador con su QR).
+- Recordatorios de vencimiento de pago a proveedores (`compras.vence` ya existe).
+- Descontar lotes al vender (hoy la cantidad del lote es informativa).
 
 ### Pendiente (lo que sigue del plan maestro)
 

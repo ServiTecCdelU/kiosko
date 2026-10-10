@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank, ArrowUpRight, QrCode } from "lucide-react";
+import { TrendingUp, Receipt, Banknote, CreditCard, Coins, PiggyBank, ArrowUpRight, QrCode, Clock, CalendarDays, PackageX, Wallet } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import { formatCurrency } from "@/lib/utils/format";
 import { getReporte, type Reporte } from "@/services/reportes-service";
 import { getMayoresAumentos, type AumentoPrecio } from "@/services/products-service";
 import { formatDateTime } from "@/lib/utils/format";
+import { DIAS_SEMANA_CORTO, etiquetaHora, horaPico } from "@/lib/reportes-tiempo";
 
 type Rango = "hoy" | "semana" | "mes";
 
@@ -34,6 +35,8 @@ const TABS: { value: Rango; label: string }[] = [
   { value: "semana", label: "7 dias" },
   { value: "mes", label: "Mes" },
 ];
+
+const compacto = (v: number) => new Intl.NumberFormat("es-AR", { notation: "compact" }).format(v);
 
 export default function ReportesPage() {
   const [rango, setRango] = useState<Rango>("hoy");
@@ -65,6 +68,23 @@ export default function ReportesPage() {
     })),
     [reporte],
   );
+
+  // Solo las horas con movimiento alrededor (de la primera a la ultima venta), para no dibujar 24 barras vacias.
+  const horasData = useMemo(() => {
+    const h = reporte?.porHora ?? [];
+    const conVentas = h.filter((x) => x.cantidad > 0).map((x) => x.hora);
+    if (conVentas.length === 0) return [];
+    const desde = Math.min(...conVentas);
+    const hasta = Math.max(...conVentas);
+    return h.slice(desde, hasta + 1).map((x) => ({ hora: `${x.hora}`, total: x.total, cantidad: x.cantidad }));
+  }, [reporte]);
+  const pico = useMemo(() => (reporte ? horaPico(reporte.porHora) : null), [reporte]);
+
+  const semanaData = useMemo(
+    () => (reporte?.porDiaSemana ?? []).map((d) => ({ dia: DIAS_SEMANA_CORTO[d.diaSemana], promedio: d.promedio, total: d.total, cantidad: d.cantidad })),
+    [reporte],
+  );
+  const hayVariosDias = (reporte?.porDia.length ?? 0) > 1;
 
   const r = reporte?.resumen;
 
@@ -98,7 +118,7 @@ export default function ReportesPage() {
             <Kpi label="Total vendido" value={formatCurrency(r?.totalVentas ?? 0)} icon={<TrendingUp className="h-4 w-4" />} highlight />
             <Kpi label="Ventas" value={String(r?.cantidad ?? 0)} icon={<Receipt className="h-4 w-4" />} />
             <Kpi label="Efectivo" value={formatCurrency(r?.efectivo ?? 0)} icon={<Banknote className="h-4 w-4" />} />
-            <Kpi label="Transferencia" value={formatCurrency(r?.transferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
+            <Kpi label="Transferencia y tarjeta" value={formatCurrency(r?.transferencia ?? 0)} icon={<CreditCard className="h-4 w-4" />} />
             <Kpi label="Mercado Pago" value={formatCurrency(r?.mercadoPago ?? 0)} icon={<QrCode className="h-4 w-4" />} />
             <Kpi label="Fiado" value={formatCurrency(r?.fiado ?? 0)} icon={<Coins className="h-4 w-4" />} />
             <Kpi
@@ -106,7 +126,8 @@ export default function ReportesPage() {
               value={r ? `${formatCurrency(r.margenBruto)} (${r.margenPct.toFixed(0)}%)` : "—"}
               icon={<PiggyBank className="h-4 w-4" />}
             />
-            <Kpi label="Gastos" value={formatCurrency(r?.gastosTotal ?? 0)} icon={<Receipt className="h-4 w-4" />} />
+            <Kpi label="Gastos" value={formatCurrency(r?.gastosTotal ?? 0)} icon={<Wallet className="h-4 w-4" />} />
+            <Kpi label="Pérdidas" value={formatCurrency(r?.perdidasTotal ?? 0)} icon={<PackageX className="h-4 w-4" />} />
             <Kpi
               label="Ganancia neta"
               value={formatCurrency(r?.gananciaNeta ?? 0)}
@@ -133,8 +154,7 @@ export default function ReportesPage() {
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                       <XAxis dataKey="dia" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis tickLine={false} axisLine={false} fontSize={12} width={48}
-                        tickFormatter={(v) => new Intl.NumberFormat("es-AR", { notation: "compact" }).format(v)} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} tickFormatter={compacto} />
                       <Tooltip
                         formatter={(v: number) => formatCurrency(v)}
                         contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }}
@@ -146,6 +166,64 @@ export default function ReportesPage() {
               )}
             </CardContent>
           </Card>
+
+          <div className={cn("grid gap-4", hayVariosDias && "lg:grid-cols-2")}>
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="h-4 w-4 text-primary" /> Ventas por hora
+                  {pico && <span className="ml-auto text-xs font-normal text-muted-foreground">Pico: {etiquetaHora(pico.hora)} · {formatCurrency(pico.total)}</span>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {horasData.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Sin ventas en el periodo</p>
+                ) : (
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={horasData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                        <XAxis dataKey="hora" tickLine={false} axisLine={false} fontSize={12} tickFormatter={(h) => `${h}h`} />
+                        <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} tickFormatter={compacto} />
+                        <Tooltip
+                          formatter={(v: number, name: string) => (name === "total" ? [formatCurrency(v), "Vendido"] : [v, "Ventas"])}
+                          labelFormatter={(h) => etiquetaHora(Number(h))}
+                          contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }}
+                        />
+                        <Bar dataKey="total" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">Para saber cuándo hace falta más gente en la caja. Hora argentina.</p>
+              </CardContent>
+            </Card>
+
+            {hayVariosDias && (
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-4 w-4 text-primary" /> Promedio por día de la semana</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={semanaData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                        <XAxis dataKey="dia" tickLine={false} axisLine={false} fontSize={12} />
+                        <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} tickFormatter={compacto} />
+                        <Tooltip
+                          formatter={(v: number) => [formatCurrency(v), "Promedio por día"]}
+                          contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }}
+                        />
+                        <Bar dataKey="promedio" fill="var(--money)" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Qué días se vende más, para armar turnos y pedidos.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           <Card className="rounded-2xl">
             <CardHeader>
@@ -189,45 +267,114 @@ export default function ReportesPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">Rentabilidad por rubro</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(reporte?.rentabilidadPorRubro.length ?? 0) === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">Sin datos</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rubro</TableHead>
-                        <TableHead className="text-right">Vendido</TableHead>
-                        <TableHead className="text-right">Margen</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reporte?.rentabilidadPorRubro.map((r) => (
-                        <TableRow key={r.rubro}>
-                          <TableCell className="line-clamp-1 font-medium">{r.rubro}</TableCell>
-                          <TableCell className="cifra text-right">{formatCurrency(r.total)}</TableCell>
-                          <TableCell className="cifra text-right text-xs">
-                            {r.margenPct !== undefined ? (
-                              <span className={r.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
-                                {formatCurrency(r.margen)} ({r.margenPct.toFixed(0)}%)
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="text-base">Rentabilidad por rubro</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(reporte?.rentabilidadPorRubro.length ?? 0) === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Sin datos</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Rubro</TableHead>
+                          <TableHead className="text-right">Vendido</TableHead>
+                          <TableHead className="text-right">Margen</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {reporte?.rentabilidadPorRubro.map((r) => (
+                          <TableRow key={r.rubro}>
+                            <TableCell className="line-clamp-1 font-medium">{r.rubro}</TableCell>
+                            <TableCell className="cifra text-right">{formatCurrency(r.total)}</TableCell>
+                            <TableCell className="cifra text-right text-xs">
+                              {r.margenPct !== undefined ? (
+                                <span className={r.margenPct < 0 ? "font-medium text-destructive" : "text-money"}>
+                                  {formatCurrency(r.margen)} ({r.margenPct.toFixed(0)}%)
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base"><Wallet className="h-4 w-4 text-primary" /> Gastos por categoría</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(reporte?.gastosPorCategoria.length ?? 0) === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Sin gastos en el periodo</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead className="text-right">Cant.</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reporte?.gastosPorCategoria.map((g) => (
+                          <TableRow key={g.categoria || "sin"}>
+                            <TableCell className="font-medium">{g.label}</TableCell>
+                            <TableCell className="cifra text-right text-muted-foreground">{g.cantidad}</TableCell>
+                            <TableCell className="cifra text-right font-semibold">{formatCurrency(g.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base"><PackageX className="h-4 w-4 text-destructive" /> Pérdidas (mermas y faltantes)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(reporte?.perdidas.porCausa.length ?? 0) === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Sin pérdidas registradas. Las mermas se cargan desde Editar producto → Ajustar stock → Merma.</p>
+                  ) : (
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Causa</TableHead>
+                            <TableHead className="text-right">Unidades</TableHead>
+                            <TableHead className="text-right">A costo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reporte?.perdidas.porCausa.map((p) => (
+                            <TableRow key={p.causa}>
+                              <TableCell className="font-medium">{p.label}</TableCell>
+                              <TableCell className="cifra text-right text-muted-foreground">{p.unidades}</TableCell>
+                              <TableCell className="cifra text-right font-semibold text-destructive">{formatCurrency(p.valor)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {(reporte?.perdidas.sinCosto ?? 0) > 0 && (
+                        <p className="mt-2 text-xs text-muted-foreground">{reporte?.perdidas.sinCosto} unidades perdidas sin costo cargado: no se pudieron valorizar.</p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           <Card className="rounded-2xl">
             <CardHeader>

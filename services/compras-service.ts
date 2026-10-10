@@ -23,6 +23,12 @@ export interface Compra {
   condicion: CompraCondicion;
   pagada: boolean;
   total: number;
+  /** Cuanto se pago hasta ahora (migracion 44). */
+  pagado: number;
+  /** total - pagado, nunca negativo. */
+  saldo: number;
+  /** Fecha pactada de pago (YYYY-MM-DD), si la hay. */
+  vence?: string;
   notas?: string;
   usuarioNombre?: string;
   createdAt: Date;
@@ -34,6 +40,21 @@ export interface CompraItem {
   cantidad: number;
   costoUnitario: number;
   subtotal: number;
+}
+
+export type PagoMetodo = "efectivo" | "transferencia" | "otro";
+
+export interface PagoProveedor {
+  id: string;
+  proveedorId: string;
+  monto: number;
+  metodo: PagoMetodo;
+  aplicado: { compraId: string; monto: number }[];
+  cajaId?: string;
+  nota?: string;
+  usuarioNombre?: string;
+  anuladoAt?: Date;
+  fecha: Date;
 }
 
 function mapProveedor(d: Record<string, any>): Proveedor {
@@ -57,9 +78,27 @@ function mapCompra(d: Record<string, any>): Compra {
     condicion: d.condicion === "cuenta_corriente" ? "cuenta_corriente" : "contado",
     pagada: !!d.pagada,
     total: Number(d.total) || 0,
+    pagado: Number(d.pagado) || 0,
+    saldo: Math.max(0, (Number(d.total) || 0) - (Number(d.pagado) || 0)),
+    vence: d.vence ? String(d.vence).slice(0, 10) : undefined,
     notas: d.notas ?? undefined,
     usuarioNombre: d.usuario_nombre ?? undefined,
     createdAt: new Date(d.created_at),
+  };
+}
+
+function mapPago(d: Record<string, any>): PagoProveedor {
+  return {
+    id: d.id,
+    proveedorId: d.proveedor_id,
+    monto: Number(d.monto) || 0,
+    metodo: d.metodo,
+    aplicado: Array.isArray(d.aplicado) ? d.aplicado.map((a: any) => ({ compraId: String(a.compraId), monto: Number(a.monto) || 0 })) : [],
+    cajaId: d.caja_id ?? undefined,
+    nota: d.nota ?? undefined,
+    usuarioNombre: d.usuario_nombre ?? undefined,
+    anuladoAt: d.anulado_at ? new Date(d.anulado_at) : undefined,
+    fecha: new Date(d.fecha),
   };
 }
 
@@ -97,7 +136,8 @@ export async function actualizarProveedor(
 
 export interface RecibirCompraInput {
   proveedorId: string;
-  items: { productoId: string; cantidad: number; costoUnitario: number }[];
+  /** fechaVencimiento (YYYY-MM-DD) crea un lote de vencimiento para ese item. */
+  items: { productoId: string; cantidad: number; costoUnitario: number; fechaVencimiento?: string }[];
   remito?: string;
   condicion: CompraCondicion;
   pagada: boolean;
@@ -132,6 +172,57 @@ export async function getCompras(proveedorId?: string, limit = 50): Promise<Comp
     "/api/consultas/compras", "compras", { proveedorId, limit },
   );
   return compras.map(mapCompra);
+}
+
+// ── Cuenta corriente de proveedores ───────────────────────────
+
+export async function getComprasConSaldo(proveedorId?: string): Promise<Compra[]> {
+  const { compras } = await consultar<{ compras: Record<string, any>[] }>(
+    "/api/consultas/compras", "comprasConSaldo", { proveedorId },
+  );
+  return compras.map(mapCompra);
+}
+
+export async function getPagosProveedor(proveedorId: string, limit = 50): Promise<PagoProveedor[]> {
+  const { pagos } = await consultar<{ pagos: Record<string, any>[] }>(
+    "/api/consultas/compras", "pagosProveedor", { proveedorId, limit },
+  );
+  return pagos.map(mapPago);
+}
+
+export interface RegistrarPagoInput {
+  proveedorId: string;
+  monto: number;
+  metodo: PagoMetodo;
+  /** Compra puntual; sin esto el pago es "a cuenta" (compras mas viejas primero). */
+  compraId?: string;
+  /** Caja abierta de la que sale el efectivo (queda como gasto de caja). */
+  cajaId?: string;
+  nota?: string;
+  usuarioId?: string;
+  usuarioNombre?: string;
+}
+
+export async function registrarPagoProveedor(input: RegistrarPagoInput): Promise<{ pagoId: string; cajaMovId?: string }> {
+  const res = await fetch(apiUrl("/api/proveedores/pagos"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");
+  return { pagoId: data.pagoId, cajaMovId: data.cajaMovId ?? undefined };
+}
+
+export async function anularPagoProveedor(pagoId: string, usuarioId?: string): Promise<{ gastoConservado: boolean }> {
+  const res = await fetch(apiUrl("/api/proveedores/pagos"), {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pagoId, usuarioId }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo anular el pago");
+  return { gastoConservado: !!data?.gastoConservado };
 }
 
 export async function getCompraDetalle(compraId: string): Promise<{ compra: Compra; items: CompraItem[] }> {

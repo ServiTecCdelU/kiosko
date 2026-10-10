@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
   Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown, Megaphone,
-  CalendarClock,
+  CalendarClock, ClipboardCheck,
 } from "lucide-react";
+import Link from "next/link";
+import type { MotivoMerma } from "@/lib/perdidas";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -210,11 +212,11 @@ export default function StockPage() {
     }
   };
 
-  const handleAjuste = async (tipo: "entrada" | "ajuste" | "rotura", cantidad: number) => {
+  const handleAjuste = async (tipo: "entrada" | "ajuste" | "rotura", cantidad: number, motivo?: MotivoMerma, nota?: string) => {
     if (!selected) return;
     try {
       const user = getCurrentUser();
-      const res = await ajustarStock({ productoId: selected.id, tipo, cantidad, usuario: user?.nombre });
+      const res = await ajustarStock({ productoId: selected.id, tipo, cantidad, usuario: user?.nombre, motivo, referencia: nota });
       toast.success(`Stock actualizado: ${res.stockNuevo}`);
       setSelected((s) => (s ? { ...s, stock: res.stockNuevo } : s));
       await refreshAll();
@@ -421,6 +423,9 @@ export default function StockPage() {
             ))}
           </select>
         )}
+        <Button variant="outline" className="rounded-2xl" asChild>
+          <Link href="/stock/inventario"><ClipboardCheck className="mr-2 h-4 w-4" /> Recuento</Link>
+        </Button>
         <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
           <PackagePlus className="mr-2 h-4 w-4" /> Nuevo producto
         </Button>

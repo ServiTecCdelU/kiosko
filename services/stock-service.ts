@@ -2,6 +2,7 @@ import { apiUrl } from "@/lib/utils/api-url"
 // services/stock-service.ts — movimientos de stock
 import { consultar } from "@/services/api-client";
 import type { StockMovimiento, StockMovTipo } from "@/lib/types";
+import type { MotivoMerma } from "@/lib/perdidas";
 
 export interface AjusteStockInput {
   productoId: string;
@@ -9,6 +10,8 @@ export interface AjusteStockInput {
   cantidad: number;
   usuario?: string;
   referencia?: string;
+  /** Merma (tipo rotura): por que se perdio. */
+  motivo?: MotivoMerma;
 }
 
 export interface AjusteStockResult {

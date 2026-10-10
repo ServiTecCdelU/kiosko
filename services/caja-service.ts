@@ -37,6 +37,7 @@ function mapCajaMov(d: Record<string, any>): CajaMovimiento {
     tipo: d.tipo,
     monto: Number(d.monto) || 0,
     concepto: d.concepto ?? "",
+    categoria: d.categoria ?? undefined,
     usuarioNombre: d.usuario_nombre ?? undefined,
     fecha: new Date(d.fecha),
   };
@@ -152,6 +153,8 @@ export interface RegistrarMovimientoInput {
   tipo: CajaMovTipo;
   monto: number;
   concepto?: string;
+  /** Solo gastos: una de lib/gastos.ts. */
+  categoria?: string;
   usuarioId?: string;
   usuarioNombre?: string;
 }

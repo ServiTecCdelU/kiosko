@@ -190,11 +190,11 @@ export default function CajaPage() {
     }
   };
 
-  const handleMovimiento = async (monto: number, concepto: string) => {
+  const handleMovimiento = async (monto: number, concepto: string, categoria?: string) => {
     if (!caja || !movTipo) return;
     try {
       await registrarMovimientoCaja({
-        cajaId: caja.id, tipo: movTipo, monto, concepto,
+        cajaId: caja.id, tipo: movTipo, monto, concepto, categoria,
         usuarioId: user?.id, usuarioNombre: user?.nombre,
       });
       toast.success("Movimiento registrado");

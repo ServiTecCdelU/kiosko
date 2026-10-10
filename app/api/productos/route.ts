@@ -15,6 +15,11 @@ export const dynamic = "force-dynamic";
 // y con OfertaTipo en lib/types.ts.
 const TIPOS_OFERTA = ["monto", "porcentaje", "combo"];
 
+// Debe coincidir con el CHECK de productos.iva (47_iva_producto.sql) y ALICUOTAS_IVA en lib/iva.ts.
+function esAlicuotaIva(valor: unknown): boolean {
+  return [0, 2.5, 5, 10.5, 21, 27].includes(Number(valor));
+}
+
 function errorOferta(oferta: any): string | null {
   if (!oferta.activa) return null;
   if (!TIPOS_OFERTA.includes(String(oferta.tipo))) return "Tipo de oferta invalido";
@@ -49,10 +54,14 @@ export async function PATCH(req: Request) {
   if (!Number.isFinite(price) || price < 0) {
     return NextResponse.json({ error: "Precio invalido" }, { status: 400 });
   }
+  if (input.iva !== undefined && !esAlicuotaIva(input.iva)) {
+    return NextResponse.json({ error: "Alicuota de IVA invalida" }, { status: 400 });
+  }
 
   const { error } = await supabaseAdmin
     .from("productos")
     .update({
+      ...(input.iva !== undefined ? { iva: Number(input.iva) } : {}),
       codigo: input.codigo || null,
       codigo_barras: input.codigoBarras || null,
       name: input.name,
@@ -96,12 +105,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Precio invalido" }, { status: 400 });
   }
   const stock = Number(input.stock) || 0;
+  if (input.iva !== undefined && !esAlicuotaIva(input.iva)) {
+    return NextResponse.json({ error: "Alicuota de IVA invalida" }, { status: 400 });
+  }
 
   const { data, error } = await supabaseAdmin
     .from("productos")
     .insert({
       id: crypto.randomUUID(),
       comercio_id: comercioId,
+      ...(input.iva !== undefined ? { iva: Number(input.iva) } : {}),
       codigo: input.codigo || null,
       codigo_barras: input.codigoBarras || null,
       name,

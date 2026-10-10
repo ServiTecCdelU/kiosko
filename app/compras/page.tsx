@@ -4,7 +4,8 @@
 // Spec: docs/superpowers/specs/2026-09-18-proveedores-compras-design.md
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Truck, Search, Trash2, History, Users, Plus, Ban } from "lucide-react";
+import { Truck, Search, Trash2, History, Users, Plus, Ban, Wallet } from "lucide-react";
+import { CuentaCorrienteTab } from "@/components/compras/cuenta-corriente-tab";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,14 +32,18 @@ import {
 import { getCurrentUser } from "@/hooks/use-auth";
 import type { Product } from "@/lib/types";
 
-type Tab = "recepcion" | "historial" | "proveedores";
+type Tab = "recepcion" | "cuenta" | "historial" | "proveedores";
 
 interface ItemCarrito {
   productoId: string;
   nombre: string;
   precioVenta: number;
+  /** Unidades por bulto (productos.lote): escribir bultos llena la cantidad. */
+  lote?: number;
   cantidad: string;       // texto del input, se valida al confirmar
   costoUnitario: string;
+  /** YYYY-MM-DD: crea un lote de vencimiento al recibir (migracion 46). */
+  fechaVencimiento: string;
 }
 
 export default function ComprasPage() {
@@ -66,6 +71,7 @@ export default function ComprasPage() {
       <div className="mb-4 inline-flex rounded-2xl border bg-card p-1">
         {([
           ["recepcion", "Recepción", Truck],
+          ["cuenta", "Cuenta corriente", Wallet],
           ["historial", "Historial", History],
           ["proveedores", "Proveedores", Users],
         ] as const).map(([key, label, Icon]) => (
@@ -86,6 +92,8 @@ export default function ComprasPage() {
         <Skeleton className="h-96 w-full rounded-2xl" />
       ) : tab === "recepcion" ? (
         <RecepcionTab proveedores={proveedores.filter((p) => p.activo)} />
+      ) : tab === "cuenta" ? (
+        <CuentaCorrienteTab proveedores={proveedores} />
       ) : tab === "historial" ? (
         <HistorialTab proveedores={proveedores} />
       ) : (
@@ -134,16 +142,28 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
           productoId: p.id,
           nombre: p.name,
           precioVenta: p.price,
+          lote: p.lote && p.lote > 1 ? p.lote : undefined,
           cantidad: "1",
           costoUnitario: p.precioBase ? String(p.precioBase) : "",
+          fechaVencimiento: "",
         },
       ];
     });
   };
 
-  const actualizarItem = (id: string, campo: "cantidad" | "costoUnitario", valor: string) => {
+  const actualizarItem = (id: string, campo: "cantidad" | "costoUnitario" | "fechaVencimiento", valor: string) => {
     setItems((prev) => prev.map((i) => (i.productoId === id ? { ...i, [campo]: valor } : i)));
   };
+
+  // Bultos: "3" en un producto de 12 por bulto deja 36 unidades.
+  const setBultos = (id: string, bultos: string) => {
+    setItems((prev) => prev.map((i) => {
+      if (i.productoId !== id || !i.lote) return i;
+      const n = Number(bultos);
+      return { ...i, cantidad: Number.isFinite(n) && bultos !== "" ? String(n * i.lote) : i.cantidad };
+    }));
+  };
+  const hayBultos = items.some((i) => i.lote);
 
   const quitar = (id: string) => setItems((prev) => prev.filter((i) => i.productoId !== id));
 
@@ -173,6 +193,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
           productoId: i.productoId,
           cantidad: i.cantidadNum,
           costoUnitario: i.costoNum,
+          fechaVencimiento: i.fechaVencimiento || undefined,
         })),
         remito: remito.trim() || undefined,
         condicion,
@@ -273,8 +294,10 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Producto</TableHead>
+                    {hayBultos && <TableHead className="w-20 text-right">Bultos</TableHead>}
                     <TableHead className="w-24 text-right">Cantidad</TableHead>
                     <TableHead className="w-32 text-right">Costo unit.</TableHead>
+                    <TableHead className="hidden w-36 lg:table-cell">Vence</TableHead>
                     <TableHead className="hidden text-right sm:table-cell">Subtotal</TableHead>
                     <TableHead className="hidden text-right md:table-cell">Margen</TableHead>
                     <TableHead className="w-10" />
@@ -285,7 +308,22 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
                     const margen = Number.isFinite(i.costoNum) ? margenPct(i.precioVenta, i.costoNum) : null;
                     return (
                       <TableRow key={i.productoId}>
-                        <TableCell className="font-medium">{i.nombre}</TableCell>
+                        <TableCell className="font-medium">
+                          {i.nombre}
+                          {i.lote && <span className="ml-1 text-xs text-muted-foreground">x{i.lote}</span>}
+                        </TableCell>
+                        {hayBultos && (
+                          <TableCell>
+                            {i.lote ? (
+                              <Input
+                                type="number" inputMode="numeric" placeholder={`x${i.lote}`}
+                                defaultValue={Number.isFinite(i.cantidadNum) && i.cantidadNum % i.lote === 0 ? i.cantidadNum / i.lote : ""}
+                                onChange={(e) => setBultos(i.productoId, e.target.value)}
+                                className="h-8 rounded-lg text-right"
+                              />
+                            ) : <span className="block text-right text-xs text-muted-foreground">—</span>}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Input
                             type="number" inputMode="decimal"
@@ -300,6 +338,15 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
                             value={i.costoUnitario}
                             onChange={(e) => actualizarItem(i.productoId, "costoUnitario", e.target.value)}
                             className="h-8 rounded-lg text-right"
+                          />
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Input
+                            type="date"
+                            value={i.fechaVencimiento}
+                            onChange={(e) => actualizarItem(i.productoId, "fechaVencimiento", e.target.value)}
+                            title="Vencimiento de esta partida (opcional): crea un lote"
+                            className="h-8 rounded-lg text-xs"
                           />
                         </TableCell>
                         <TableCell className="cifra hidden text-right sm:table-cell">
@@ -430,9 +477,13 @@ function HistorialTab({ proveedores }: { proveedores: Proveedor[] }) {
                       <TableCell>
                         <Badge variant="outline" className={cn(
                           c.estado === "anulada" && "border-destructive/50 text-destructive",
-                          c.estado === "recibida" && !c.pagada && "border-warning text-warning",
+                          c.estado === "recibida" && c.saldo > 0 && "border-warning text-warning",
                         )}>
-                          {c.estado === "anulada" ? "anulada" : c.pagada ? "recibida" : "impaga"}
+                          {c.estado === "anulada"
+                            ? "anulada"
+                            : c.saldo > 0
+                              ? `debe ${formatCurrency(c.saldo)}`
+                              : "pagada"}
                         </Badge>
                       </TableCell>
                       <TableCell className="cifra text-right font-medium">{formatCurrency(c.total)}</TableCell>

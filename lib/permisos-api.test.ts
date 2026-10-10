@@ -31,8 +31,9 @@ describe("reglaDeRuta", () => {
   test("empleados, compras, importacion, sincronizacion y reportes son solo admin", () => {
     for (const ruta of [
       "/api/usuarios", "/api/consultas/usuarios", "/api/compras", "/api/compras/anular",
-      "/api/proveedores", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
+      "/api/proveedores", "/api/proveedores/pagos", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
       "/api/consultas/reportes", "/api/mercadopago/conexion", "/api/backup",
+      "/api/inventario", "/api/consultas/inventario", "/api/lotes",
     ]) {
       assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
     }

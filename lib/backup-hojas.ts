@@ -41,7 +41,7 @@ export const HOJAS: Hoja[] = [
       c("codigo", "Código"), c("codigo_barras", "Código de barras"), c("name", "Nombre"), c("category", "Rubro"),
       c("price", "Precio", "numero"), c("precio_base", "Costo", "numero"), c("stock", "Stock", "numero"),
       c("stock_minimo", "Stock mínimo", "numero"), c("unidad", "Unidad"), c("lote", "Unidades por bulto", "numero"),
-      c("stock_controlado", "Controla stock", "bool"), c("fecha_vencimiento", "Vencimiento", "dia"),
+      c("stock_controlado", "Controla stock", "bool"), c("iva", "IVA %", "numero"), c("fecha_vencimiento", "Vencimiento", "dia"),
       c("favorito", "Favorito", "bool"), c("oferta_activa", "Oferta activa", "bool"), c("oferta_tipo", "Tipo de oferta"),
       c("oferta_valor", "Valor de oferta", "numero"), c("oferta_cantidad", "Cantidad de oferta", "numero"),
       c("oferta_desde", "Oferta desde", "dia"), c("oferta_hasta", "Oferta hasta", "dia"),
@@ -88,7 +88,7 @@ export const HOJAS: Hoja[] = [
     nombre: "Movimientos de caja", tabla: "caja_movimientos", orden: "fecha",
     columnas: [
       c("fecha", "Fecha", "fecha"), c("tipo", "Tipo"), c("monto", "Monto", "numero"), c("concepto", "Concepto"),
-      c("usuario_nombre", "Usuario"), c("caja_id", "ID caja"), c("id", "ID"),
+      c("categoria", "Categoría"), c("usuario_nombre", "Usuario"), c("caja_id", "ID caja"), c("id", "ID"),
     ],
   },
   {
@@ -111,6 +111,7 @@ export const HOJAS: Hoja[] = [
     columnas: [
       c("created_at", "Fecha", "fecha"), c("proveedor_id", "ID proveedor"), c("remito", "Remito"),
       c("condicion", "Condición"), c("pagada", "Pagada", "bool"), c("total", "Total", "numero"),
+      c("pagado", "Pagado", "numero"), c("vence", "Vence", "dia"),
       c("estado", "Estado"), c("usuario_nombre", "Cargó"), c("notas", "Notas"),
       c("anulada_at", "Anulada el", "fecha"), c("id", "ID"),
     ],
@@ -120,6 +121,29 @@ export const HOJAS: Hoja[] = [
     columnas: [
       c("compra_id", "ID compra"), c("producto_nombre", "Producto"), c("cantidad", "Cantidad", "numero"),
       c("costo_unitario", "Costo unitario", "numero"), c("subtotal", "Subtotal", "numero"), c("producto_id", "ID producto"),
+    ],
+  },
+  {
+    nombre: "Pagos a proveedores", tabla: "proveedor_pagos", orden: "fecha",
+    columnas: [
+      c("fecha", "Fecha", "fecha"), c("proveedor_id", "ID proveedor"), c("monto", "Monto", "numero"), c("metodo", "Forma de pago"),
+      c("nota", "Nota"), c("usuario_nombre", "Registró"), c("anulado_at", "Anulado el", "fecha"), c("caja_id", "ID caja"), c("id", "ID"),
+    ],
+  },
+  {
+    nombre: "Lotes de vencimiento", tabla: "producto_lotes", orden: "fecha_vencimiento",
+    columnas: [
+      c("producto_id", "ID producto"), c("fecha_vencimiento", "Vence", "dia"), c("cantidad", "Cantidad", "numero"),
+      c("activo", "Activo", "bool"), c("compra_id", "ID compra"), c("nota", "Nota"), c("created_at", "Cargado", "fecha"), c("id", "ID"),
+    ],
+  },
+  {
+    nombre: "Recuentos de stock", tabla: "inventarios", orden: "created_at",
+    columnas: [
+      c("created_at", "Abierto", "fecha"), c("cerrado_at", "Cerrado", "fecha"), c("estado", "Estado"), c("nombre", "Nombre"),
+      c("categoria", "Rubro"), c("productos", "Productos", "numero"), c("contados", "Contados", "numero"),
+      c("con_diferencia", "Con diferencia", "numero"), c("diferencia_valor", "Diferencia a costo", "numero"),
+      c("usuario_nombre", "Hizo"), c("id", "ID"),
     ],
   },
   {

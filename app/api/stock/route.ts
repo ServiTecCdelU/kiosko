@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { MOTIVOS_MERMA, referenciaMerma, type MotivoMerma } from "@/lib/perdidas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,9 @@ const ajusteSchema = z.object({
   tipo: z.enum(["entrada", "ajuste", "rotura"]),
   cantidad: z.number().finite(),
   usuario: z.string().optional().nullable(),
-  referencia: z.string().optional().nullable(),
+  referencia: z.string().max(200).optional().nullable(),
+  /** Solo para mermas (tipo rotura): queda en la referencia como "merma:<motivo>". */
+  motivo: z.enum(MOTIVOS_MERMA.map((m) => m.value) as [MotivoMerma, ...MotivoMerma[]]).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -29,13 +32,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: detalle }, { status: 400 });
   }
   const input = parsed.data;
+  const referencia =
+    input.tipo === "rotura"
+      ? referenciaMerma(input.motivo ?? "rotura", input.referencia ?? undefined)
+      : input.referencia ?? null;
 
   const { data, error } = await supabaseAdmin.rpc("ajustar_stock_kiosko", {
     p_producto_id: input.productoId,
     p_tipo: input.tipo,
     p_cantidad: input.cantidad,
     p_usuario: input.usuario ?? null,
-    p_referencia: input.referencia ?? null,
+    p_referencia: referencia,
     p_comercio_id: comercioIdDeSesion(req),
   });
 

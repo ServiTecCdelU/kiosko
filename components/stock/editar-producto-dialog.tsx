@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+// components/stock/editar-producto-dialog.tsx — datos del producto, ajuste de
+// stock con mermas por motivo, lotes de vencimiento e historial de precios.
+import { useCallback, useEffect, useState } from "react";
+import { CalendarClock, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -13,7 +16,10 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import type { Product } from "@/lib/types";
 import { getHistorialPrecio, type UpdateProductInput, type CambioPrecio } from "@/services/products-service";
-import { aDiaIso } from "@/lib/oferta-vencimiento";
+import { crearLote, darDeBajaLote, getLotes, type LoteProducto } from "@/services/lotes-service";
+import { aDiaIso, diasHastaVencimiento, fechaDeDia, textoVencimiento } from "@/lib/oferta-vencimiento";
+import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
+import { MOTIVOS_MERMA, type MotivoMerma } from "@/lib/perdidas";
 
 type AjusteTipo = "entrada" | "ajuste" | "rotura";
 
@@ -22,14 +28,16 @@ interface EditarProductoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (input: UpdateProductInput) => Promise<void>;
-  onAjustarStock: (tipo: AjusteTipo, cantidad: number) => Promise<void>;
+  onAjustarStock: (tipo: AjusteTipo, cantidad: number, motivo?: MotivoMerma, nota?: string) => Promise<void>;
 }
 
 const AJUSTE_TIPOS: { value: AjusteTipo; label: string }[] = [
   { value: "entrada", label: "Entrada" },
   { value: "ajuste", label: "Ajuste" },
-  { value: "rotura", label: "Rotura" },
+  { value: "rotura", label: "Merma" },
 ];
+
+const SELECT_CLASS = "border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function EditarProductoDialog({
   product, open, onOpenChange, onSave, onAjustarStock,
@@ -48,12 +56,24 @@ export function EditarProductoDialog({
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [unidad, setUnidad] = useState<"un" | "kg">("un");
   const [stockControlado, setStockControlado] = useState(true);
+  const [iva, setIva] = useState(IVA_DEFAULT);
   const [historial, setHistorial] = useState<CambioPrecio[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [ajusteTipo, setAjusteTipo] = useState<AjusteTipo>("entrada");
   const [ajusteCantidad, setAjusteCantidad] = useState("");
+  const [mermaMotivo, setMermaMotivo] = useState<MotivoMerma>("rotura");
+  const [mermaNota, setMermaNota] = useState("");
   const [ajustando, setAjustando] = useState(false);
+
+  const [lotes, setLotes] = useState<LoteProducto[] | null>(null);
+  const [loteFecha, setLoteFecha] = useState("");
+  const [loteCantidad, setLoteCantidad] = useState("");
+  const [loteGuardando, setLoteGuardando] = useState(false);
+
+  const cargarLotes = useCallback((id: string) => {
+    getLotes(id).then(setLotes).catch(() => setLotes([]));
+  }, []);
 
   useEffect(() => {
     if (open && product) {
@@ -71,11 +91,18 @@ export function EditarProductoDialog({
       setFechaVencimiento(product.fechaVencimiento ? aDiaIso(product.fechaVencimiento) : "");
       setUnidad(product.unidad);
       setStockControlado(product.stockControlado);
+      setIva(product.iva ?? IVA_DEFAULT);
       getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));
       setAjusteTipo("entrada");
       setAjusteCantidad("");
+      setMermaMotivo("rotura");
+      setMermaNota("");
+      setLotes(null);
+      setLoteFecha("");
+      setLoteCantidad("");
+      cargarLotes(product.id);
     }
-  }, [open, product]);
+  }, [open, product, cargarLotes]);
 
   if (!product) return null;
 
@@ -85,6 +112,7 @@ export function EditarProductoDialog({
   const stockMinimoNum = Number(stockMinimo) || 0;
   const loteNum = lote ? Number(lote) : undefined;
   const nombreInvalido = !name.trim();
+  const tieneLotes = (lotes?.length ?? 0) > 0;
 
   const handleSave = async () => {
     if (nombreInvalido) return;
@@ -102,9 +130,11 @@ export function EditarProductoDialog({
         disabled,
         revisar,
         favorito,
-        fechaVencimiento: fechaVencimiento || undefined,
+        // Con lotes, la fecha la manda el lote mas proximo: no se pisa a mano.
+        fechaVencimiento: tieneLotes ? (product.fechaVencimiento ? aDiaIso(product.fechaVencimiento) : undefined) : fechaVencimiento || undefined,
         unidad,
         stockControlado,
+        iva,
       });
       onOpenChange(false);
     } finally {
@@ -117,10 +147,37 @@ export function EditarProductoDialog({
     if (!Number.isFinite(n) || ajusteCantidad === "") return;
     setAjustando(true);
     try {
-      await onAjustarStock(ajusteTipo, n);
+      await onAjustarStock(ajusteTipo, n, ajusteTipo === "rotura" ? mermaMotivo : undefined, ajusteTipo === "rotura" ? mermaNota.trim() || undefined : undefined);
       setAjusteCantidad("");
+      setMermaNota("");
     } finally {
       setAjustando(false);
+    }
+  };
+
+  const handleCrearLote = async () => {
+    if (!loteFecha) return;
+    setLoteGuardando(true);
+    try {
+      await crearLote({ productoId: product.id, fechaVencimiento: loteFecha, cantidad: Number(loteCantidad) || 0 });
+      toast.success("Lote cargado");
+      setLoteFecha("");
+      setLoteCantidad("");
+      cargarLotes(product.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cargar el lote");
+    } finally {
+      setLoteGuardando(false);
+    }
+  };
+
+  const handleBajaLote = async (l: LoteProducto) => {
+    try {
+      await darDeBajaLote(l.id);
+      toast.success("Lote dado de baja. Si tiraste mercadería, registrala como merma.");
+      cargarLotes(product.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo dar de baja el lote");
     }
   };
 
@@ -159,7 +216,7 @@ export function EditarProductoDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Precio de venta</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
@@ -167,6 +224,12 @@ export function EditarProductoDialog({
             <div>
               <Label className="mb-1 block text-xs">Costo</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">IVA</Label>
+              <select value={iva} onChange={(e) => setIva(Number(e.target.value))} className={SELECT_CLASS} aria-label="Alícuota de IVA">
+                {ALICUOTAS_IVA.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
             </div>
           </div>
 
@@ -186,25 +249,67 @@ export function EditarProductoDialog({
               <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">Lote</Label>
-              <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} className="rounded-xl" />
+              <Label className="mb-1 block text-xs">Unidades por bulto</Label>
+              <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Ej: 12" className="rounded-xl" />
             </div>
             <div>
               <Label className="mb-1 block text-xs">Se vende por</Label>
-              <select
-                value={unidad}
-                onChange={(e) => setUnidad(e.target.value as "un" | "kg")}
-                className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-              >
+              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={SELECT_CLASS}>
                 <option value="un">Unidad</option>
                 <option value="kg">Peso (kg)</option>
               </select>
             </div>
           </div>
 
-          <div>
-            <Label className="mb-1 block text-xs">Fecha de vencimiento</Label>
-            <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="rounded-xl" />
+          <div className="rounded-xl border p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+              <CalendarClock className="h-4 w-4 text-warning" /> Vencimientos
+            </p>
+            {tieneLotes ? (
+              <ul className="mb-2 divide-y rounded-lg border text-sm">
+                {lotes!.map((l) => {
+                  const d = fechaDeDia(l.fechaVencimiento);
+                  const dias = d ? diasHastaVencimiento(d) : null;
+                  const texto = dias != null ? textoVencimiento(dias) : null;
+                  return (
+                    <li key={l.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                      <span>
+                        <b className={cn(dias != null && dias <= 7 && "text-warning", dias != null && dias < 0 && "text-destructive")}>
+                          {l.fechaVencimiento.split("-").reverse().join("/")}
+                        </b>
+                        {l.cantidad > 0 && <span className="text-muted-foreground"> · {l.cantidad} u.</span>}
+                        {texto && <span className="text-xs text-muted-foreground"> · {texto}</span>}
+                        {l.compraId && <span className="text-xs text-muted-foreground"> · de compra</span>}
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-7 rounded-lg text-muted-foreground" onClick={() => handleBajaLote(l)} title="Se terminó o se tiró este lote">
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Baja
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="mb-2">
+                <Label className="mb-1 block text-xs">Fecha de vencimiento</Label>
+                <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="rounded-xl" />
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label className="mb-1 block text-xs">{tieneLotes ? "Otro lote" : "Cargar por lote"}</Label>
+                <Input type="date" value={loteFecha} onChange={(e) => setLoteFecha(e.target.value)} className="h-9 rounded-xl" />
+              </div>
+              <div className="w-24">
+                <Label className="mb-1 block text-xs">Cantidad</Label>
+                <Input type="number" inputMode="decimal" value={loteCantidad} onChange={(e) => setLoteCantidad(e.target.value)} placeholder="Opc." className="h-9 rounded-xl" />
+              </div>
+              <Button variant="outline" className="h-9 rounded-xl" disabled={!loteFecha || loteGuardando} onClick={handleCrearLote}>
+                {loteGuardando ? "..." : "Agregar"}
+              </Button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Con lotes, el aviso de vencimiento usa el más próximo. Los lotes también se cargan al recibir una compra.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -249,10 +354,18 @@ export function EditarProductoDialog({
                 </button>
               ))}
             </div>
+            {ajusteTipo === "rotura" && (
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <select value={mermaMotivo} onChange={(e) => setMermaMotivo(e.target.value as MotivoMerma)} className={SELECT_CLASS} aria-label="Motivo de la merma">
+                  {MOTIVOS_MERMA.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <Input value={mermaNota} onChange={(e) => setMermaNota(e.target.value)} placeholder="Nota (opcional)" className="h-9 rounded-xl" maxLength={120} />
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Input
                 type="number" inputMode="decimal"
-                placeholder={ajusteTipo === "ajuste" ? "Nuevo stock total" : "Cantidad"}
+                placeholder={ajusteTipo === "ajuste" ? "Nuevo stock total" : ajusteTipo === "rotura" ? "Cantidad perdida" : "Cantidad"}
                 value={ajusteCantidad} onChange={(e) => setAjusteCantidad(e.target.value)}
                 className="rounded-xl"
               />
@@ -263,6 +376,9 @@ export function EditarProductoDialog({
                 {ajustando ? "..." : "Aplicar"}
               </Button>
             </div>
+            {ajusteTipo === "rotura" && (
+              <p className="mt-1 text-xs text-muted-foreground">Las mermas se valorizan a costo y aparecen como pérdida en Reportes.</p>
+            )}
           </div>
 
           {historial.length > 0 && (

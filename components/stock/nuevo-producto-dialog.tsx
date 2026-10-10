@@ -11,8 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
 import { createProduct, type CreateProductInput } from "@/services/products-service";
-import type { Product } from "@/lib/types";
 
 interface NuevoProductoDialogProps {
   open: boolean;
@@ -34,6 +34,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [unidad, setUnidad] = useState<"un" | "kg">("un");
   const [stockControlado, setStockControlado] = useState(true);
+  const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setFechaVencimiento("");
     setUnidad("un");
     setStockControlado(true);
+    setIva(IVA_DEFAULT);
   }, [open]);
 
   const priceNum = Number(price) || 0;
@@ -76,6 +78,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
         fechaVencimiento: fechaVencimiento || undefined,
         favorito,
         stockControlado,
+        iva,
       };
       await createProduct(input);
       onOpenChange(false);
@@ -86,6 +89,8 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
       setSaving(false);
     }
   };
+
+  const selectClass = "border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +133,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Precio de venta</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
@@ -136,6 +141,12 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             <div>
               <Label className="mb-1 block text-xs">Costo</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">IVA</Label>
+              <select value={iva} onChange={(e) => setIva(Number(e.target.value))} className={selectClass} aria-label="Alícuota de IVA">
+                {ALICUOTAS_IVA.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
             </div>
           </div>
 
@@ -159,19 +170,15 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
               <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">Lote</Label>
-              <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} className="rounded-xl" />
+              <Label className="mb-1 block text-xs">Unidades por bulto</Label>
+              <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Ej: 12" className="rounded-xl" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Se vende por</Label>
-              <select
-                value={unidad}
-                onChange={(e) => setUnidad(e.target.value as "un" | "kg")}
-                className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-              >
+              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={selectClass}>
                 <option value="un">Unidad</option>
                 <option value="kg">Peso (kg)</option>
               </select>

@@ -15,6 +15,8 @@ const compraSchema = z.object({
         productoId: z.string().min(1),
         cantidad: z.number().positive("La cantidad debe ser mayor a cero"),
         costoUnitario: z.number().min(0, "El costo no puede ser negativo"),
+        // Crea un lote de vencimiento para ese item (migracion 46).
+        fechaVencimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de vencimiento invalida").optional(),
       }),
     )
     .min(1, "La compra no tiene items"),

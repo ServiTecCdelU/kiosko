@@ -366,6 +366,22 @@ export async function POST(req: Request) {
       }
     }
 
+    // Lotes de vencimiento activos de un producto (migracion 46), el mas proximo primero.
+    case "lotes": {
+      const productoId = String(body?.productoId ?? "");
+      if (!productoId) return NextResponse.json({ error: "Falta el producto" }, { status: 400 });
+      const { data, error } = await supabaseAdmin
+        .from("producto_lotes")
+        .select("*")
+        .eq("comercio_id", comercioId)
+        .eq("producto_id", productoId)
+        .eq("activo", true)
+        .order("fecha_vencimiento", { ascending: true })
+        .limit(100);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ lotes: data ?? [] });
+    }
+
     default:
       return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
   }

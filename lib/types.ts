@@ -20,6 +20,8 @@ export interface Product {
   fechaVencimiento?: Date;
   unidad: "un" | "kg";
   stockControlado: boolean;
+  /** Alicuota de IVA (0, 2.5, 5, 10.5, 21, 27). La usa la Factura A/B. */
+  iva: number;
   disabled: boolean;
   // Oferta de catálogo (descuento propio del kiosko, la sync no lo toca)
   ofertaActiva: boolean;
@@ -87,6 +89,8 @@ export interface CajaMovimiento {
   tipo: CajaMovTipo;
   monto: number;
   concepto: string;
+  /** Solo gastos (lib/gastos.ts). Los viejos no tienen. */
+  categoria?: string;
   usuarioNombre?: string;
   fecha: Date;
 }

@@ -39,6 +39,10 @@ const RUTAS_ADMIN = [
   "/api/afip/probar",
   // PCs registradas: solo el dueño las registra o da de baja.
   "/api/dispositivos",
+  // Recuento fisico de stock y lotes de vencimiento: pantallas de Stock (solo admin).
+  "/api/inventario",
+  "/api/consultas/inventario",
+  "/api/lotes",
 ];
 
 /** Metodos puntuales de admin en rutas que el mostrador tambien usa. */

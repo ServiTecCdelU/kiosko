@@ -3,19 +3,14 @@
 // anon key: leia todas las ventas del periodo, los costos de los productos y
 // los gastos de caja. Ahora se calcula aca y al cliente solo le llega el
 // resultado agregado.
+//
+// Todo corte por dia u hora es en hora argentina (lib/reportes-tiempo.ts):
+// el servidor corre en UTC y antes corria el dia despues de las 21 hs.
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import type {
-  Reporte,
-  ProductoVendido,
-  RubroRentabilidad,
-  VentaDia,
-  ResumenReporte,
-} from "@/services/reportes-service";
-
-function localDay(iso: string): string {
-  // YYYY-MM-DD en zona local
-  return new Date(iso).toLocaleDateString("en-CA");
-}
+import type { Reporte } from "@/services/reportes-service";
+import { agruparPorDiaSemana, agruparPorHora, momentoArgentina } from "@/lib/reportes-tiempo";
+import { agruparGastos } from "@/lib/gastos";
+import { resumenPerdidas } from "@/lib/perdidas";
 
 interface ProductoAcum {
   productId: string;
@@ -24,6 +19,27 @@ interface ProductoAcum {
   total: number;
   costo: number;
   sinCosto: number;
+}
+
+/** precio_base y rubro de un conjunto de productos del comercio, de a 500. */
+async function costosYRubros(
+  comercioId: string,
+  ids: string[],
+): Promise<{ costoPorId: Map<string, number | undefined>; rubroPorId: Map<string, string> }> {
+  const costoPorId = new Map<string, number | undefined>();
+  const rubroPorId = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data: prods } = await supabaseAdmin
+      .from("productos")
+      .select("id,precio_base,category")
+      .eq("comercio_id", comercioId)
+      .in("id", ids.slice(i, i + 500));
+    for (const p of prods ?? []) {
+      costoPorId.set(p.id, p.precio_base != null ? Number(p.precio_base) : undefined);
+      rubroPorId.set(p.id, p.category || "Sin rubro");
+    }
+  }
+  return { costoPorId, rubroPorId };
 }
 
 export async function calcularReporte(
@@ -61,7 +77,7 @@ export async function calcularReporte(
     } else {
       // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
       const tr =
-        ["transferencia", "tarjeta"].includes(v.payment_method)
+        ["transferencia", "tarjeta", "debito", "credito"].includes(v.payment_method)
           ? total
           : v.payment_method === "mixto"
             ? Math.min(total, Number(v.transfer_amount) || 0)
@@ -70,7 +86,7 @@ export async function calcularReporte(
       efectivo += total - tr;
     }
 
-    const dia = localDay(v.created_at);
+    const { dia } = momentoArgentina(v.created_at);
     dias.set(dia, (dias.get(dia) ?? 0) + total);
 
     const items = Array.isArray(v.items) ? v.items : [];
@@ -85,22 +101,29 @@ export async function calcularReporte(
     }
   }
 
+  // Perdidas del periodo: mermas y faltantes de recuento (lib/perdidas.ts).
+  const { data: movsData } = await supabaseAdmin
+    .from("stock_movimientos")
+    .select("producto_id,tipo,cantidad,referencia")
+    .eq("comercio_id", comercioId)
+    .in("tipo", ["rotura", "ajuste"])
+    .lt("cantidad", 0)
+    .gte("fecha", desde.toISOString())
+    .lte("fecha", hasta.toISOString())
+    .limit(5000);
+  const movsPerdida = (movsData ?? []).map((m) => ({
+    productoId: String(m.producto_id),
+    tipo: String(m.tipo),
+    cantidad: Number(m.cantidad) || 0,
+    referencia: m.referencia as string | null,
+  }));
+
   // Costo actual por producto (no historico: si el costo cambio, el margen de ventas
   // viejas se calcula con el costo de hoy — aproximacion aceptable para un kiosko chico).
-  const ids = Array.from(productos.keys());
-  const costoPorId = new Map<string, number | undefined>();
-  const rubroPorId = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: prods } = await supabaseAdmin
-      .from("productos")
-      .select("id,precio_base,category")
-      .eq("comercio_id", comercioId)
-      .in("id", ids);
-    for (const p of prods ?? []) {
-      costoPorId.set(p.id, p.precio_base != null ? Number(p.precio_base) : undefined);
-      rubroPorId.set(p.id, p.category || "Sin rubro");
-    }
-  }
+  const ids = Array.from(new Set([...productos.keys(), ...movsPerdida.map((m) => m.productoId)]));
+  const { costoPorId, rubroPorId } = ids.length > 0
+    ? await costosYRubros(comercioId, ids)
+    : { costoPorId: new Map<string, number | undefined>(), rubroPorId: new Map<string, string>() };
 
   let costoTotal = 0;
   let sinCostoCount = 0;
@@ -127,12 +150,15 @@ export async function calcularReporte(
 
   const { data: gastosData } = await supabaseAdmin
     .from("caja_movimientos")
-    .select("monto")
+    .select("monto,categoria")
     .eq("comercio_id", comercioId)
     .eq("tipo", "gasto")
     .gte("fecha", desde.toISOString())
-    .lte("fecha", hasta.toISOString());
-  const gastosTotal = (gastosData ?? []).reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    .lte("fecha", hasta.toISOString())
+    .limit(5000);
+  const gastos = gastosData ?? [];
+  const gastosTotal = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const perdidas = resumenPerdidas(movsPerdida, costoPorId);
 
   return {
     resumen: {
@@ -148,11 +174,14 @@ export async function calcularReporte(
       margenPct: totalVentas > 0 ? (margenBruto / totalVentas) * 100 : 0,
       sinCosto: sinCostoCount,
       gastosTotal,
-      gananciaNeta: margenBruto - gastosTotal,
+      perdidasTotal: perdidas.total,
+      gananciaNeta: margenBruto - gastosTotal - perdidas.total,
     },
     porDia: Array.from(dias.entries())
       .map(([fecha, total]) => ({ fecha, total }))
       .sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    porHora: agruparPorHora(ventas),
+    porDiaSemana: agruparPorDiaSemana(ventas),
     masVendidos: Array.from(productos.values())
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, topN)
@@ -174,5 +203,7 @@ export async function calcularReporte(
         margenPct: r.total > 0 ? ((r.total - r.costo) / r.total) * 100 : undefined,
       }))
       .sort((a, b) => b.total - a.total),
+    gastosPorCategoria: agruparGastos(gastos),
+    perdidas,
   };
 }

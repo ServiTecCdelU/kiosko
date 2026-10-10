@@ -76,6 +76,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ compra, items: items ?? [] });
     }
 
+    // ── Cuenta corriente de proveedores (migracion 44) ───────────
+    case "comprasConSaldo": {
+      // Compras recibidas a las que les falta pagar algo. Postgres no compara
+      // dos columnas via PostgREST: se trae lo no marcado como pagado y se filtra.
+      let q = supabaseAdmin
+        .from("compras")
+        .select("*, proveedores(nombre)")
+        .eq("comercio_id", comercioId)
+        .eq("estado", "recibida")
+        .eq("pagada", false);
+      const proveedorId = String(body?.proveedorId ?? "");
+      if (proveedorId) q = q.eq("proveedor_id", proveedorId);
+      const { data, error } = await q.order("created_at", { ascending: true }).limit(2000);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      const conSaldo = (data ?? []).filter((c: any) => Number(c.total) - Number(c.pagado ?? 0) > 0.009);
+      return NextResponse.json({ compras: conSaldo });
+    }
+
+    case "pagosProveedor": {
+      const proveedorId = String(body?.proveedorId ?? "");
+      if (!proveedorId) return NextResponse.json({ error: "Falta el proveedor" }, { status: 400 });
+      const { data, error } = await supabaseAdmin
+        .from("proveedor_pagos")
+        .select("*")
+        .eq("comercio_id", comercioId)
+        .eq("proveedor_id", proveedorId)
+        .order("fecha", { ascending: false })
+        .limit(acotar(body?.limit, 50));
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ pagos: data ?? [] });
+    }
+
     default:
       return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
   }
