@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { apiUrl } from "@/lib/utils/api-url";
 import { formatDate } from "@/lib/utils/format";
 import { CONTACT } from "@/lib/marketing/contact";
+import { trackWhatsAppClick } from "@/lib/analytics";
 import { esMotivoDePago, type EstadoAcceso } from "@/lib/acceso-comercio";
 
 type Acceso = EstadoAcceso & { soporte?: boolean };
@@ -97,6 +98,7 @@ export function AvisoAccesoBanner({ rol }: { rol: string | null }) {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 rounded-xl border border-current/30 px-2.5 py-1 text-xs font-medium hover:bg-current/10"
+            onClick={() => trackWhatsAppClick("banner-acceso", { conversion: false })}
           >
             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
           </a>

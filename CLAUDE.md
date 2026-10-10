@@ -165,8 +165,8 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SESSION_SECRET`, `BASE_PATH`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`,
 `MP_TOKEN_KEY`, `MP_SAAS_TOKEN` (cobro de la suscripción, cuenta de ServiTec), `AFIP_CERT_KEY`,
-`IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`, `NEXT_PUBLIC_GA_ID` / `NEXT_PUBLIC_ADS_ID` (etiqueta de Google,
-opcionales; SEO y Google en `docs/SEO-Y-GOOGLE.md`).
+`IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`. Google Analytics y Ads no usan variables: los IDs
+están en `lib/analytics.ts` (SEO y Google en `docs/SEO-Y-GOOGLE.md`).
 Detalle de cada una en `docs/CONTEXTO.md` §5.
 
 ## Roadmap

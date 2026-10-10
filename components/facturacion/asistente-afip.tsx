@@ -10,6 +10,7 @@ import { ArrowLeft, ArrowRight, Check, Globe, MessageCircle, MonitorSmartphone }
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CONTACT } from "@/lib/marketing/contact";
+import { trackWhatsAppClick } from "@/lib/analytics";
 import type { PasoTutorial } from "@/lib/afip/explicar-error";
 import type { EstadoConfigAfip } from "@/services/facturacion-service";
 import { PasoAmbiente, PasoDatos, PasoPedido, type Ambiente } from "./tutorial/pasos-sistema";
@@ -145,7 +146,7 @@ export function AsistenteAfip({ estado, onEstado }: { estado: EstadoConfigAfip; 
 
       <p className="text-center text-xs text-muted-foreground">
         ¿Te trabaste en algún paso?{" "}
-        <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+        <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline" onClick={() => trackWhatsAppClick("asistente-afip", { conversion: false })}>
           <MessageCircle className="h-3.5 w-3.5" /> Escribinos por WhatsApp
         </a>
         {" "}y te ayudamos a terminarlo.

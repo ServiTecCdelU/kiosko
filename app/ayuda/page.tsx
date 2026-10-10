@@ -14,6 +14,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { CONTACT } from "@/lib/marketing/contact";
+import { trackWhatsAppClick } from "@/lib/analytics";
 
 interface Tema {
   id: string;
@@ -236,7 +237,7 @@ function Contenido() {
 
         <p className="text-center text-xs text-muted-foreground">
           ¿Algo no está acá?{" "}
-          <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+          <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline" onClick={() => trackWhatsAppClick("ayuda", { conversion: false })}>
             <MessageCircle className="h-3.5 w-3.5" /> Escribinos por WhatsApp
           </a>
         </p>

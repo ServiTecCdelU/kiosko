@@ -27,37 +27,35 @@ y en pausa hasta que decidas activarla.
 | Preguntas frecuentes actualizadas (factura electrónica, precios, balanza) | `lib/marketing/faq.ts` |
 | Sitemap | `app/sitemap.ts` |
 | `noindex` en pantallas privadas | `proxy.ts` |
-| Etiqueta de Google (GA4 + Ads), solo si están las variables | `components/analytics/google-tag.tsx` |
-| Eventos: `registro_completado` (conversión principal), `sign_up`, `generate_lead` (click en WhatsApp), `comenzar_registro` (click en "Probar gratis") | `lib/analytics.ts` |
+| Etiqueta de Google (GA4 `G-4PECQ9ZPFY` + Ads `AW-18494398369`), solo en producción | `components/analytics/google-tag.tsx` |
+| Eventos GA4 (todos con `producto: "comercio"`): `sign_up` (alta OK en `/registro`) y `whatsapp_click` (con `ubicacion`: hero, footer, cierre, demo-version-paga, ayuda, suscripcion, asistente-afip, banner-acceso) | `lib/analytics.ts`, `components/analytics/whatsapp-link.tsx` |
+| Conversiones de Ads directas (`value: 1`, `ARS`): "Registro completado - Comercio" al completar el alta y "Clic WhatsApp - Comercio" en los links de la landing y la demo. Los links de adentro de la app (comercios ya registrados) solo mandan el evento de GA4, no la conversión | `lib/analytics.ts` |
 | Términos y política de privacidad (Ads exige privacidad en la página de destino) | `app/terms`, `app/privacy` |
 | Verificación de Search Console por etiqueta (opcional) | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` |
 
-Variables en Vercel (Settings → Environment Variables, entorno Production):
+No hace falta cargar nada en Vercel: los IDs están en el código (`lib/analytics.ts`) y la
+etiqueta se carga sola en producción. Para cambiar un ID o una etiqueta de conversión, se
+edita ese archivo. La única variable opcional es `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`
+(solo si verificás Search Console por etiqueta HTML; después hay que redeploy).
 
-```
-NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
-NEXT_PUBLIC_ADS_ID=AW-XXXXXXXXXX          (opcional, para Ads)
-NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=...  (solo si verificás por etiqueta HTML)
-```
-
-Después de cargarlas hay que **redeploy** (son `NEXT_PUBLIC_`, se fijan en el build).
+En local (`npm run dev`) no se manda nada a Google. Para probar los eventos hay que hacerlo
+en producción: con la extensión "Google Analytics Debugger" o en Analytics → Administrar →
+DebugView se ven `whatsapp_click` y `sign_up` al instante.
 
 ## 2. Google Analytics 4
 
 1. Entrar a <https://analytics.google.com> con la cuenta de Google de ServiTec
    (la misma que ya usa Ads para la distribuidora, así quedan vinculadas).
-2. **Administrar → Crear → Propiedad**: nombre "MultiComercioPanel", zona horaria
-   Argentina, moneda ARS. Si ya hay una propiedad para servitec.net.ar, se puede
-   usar la misma: la landing es una ruta del mismo dominio.
-3. **Flujo de datos → Web**: URL `https://www.servitec.net.ar`, nombre "Sitio".
-   Dejar activada la **medición mejorada** (toma las vistas de página al navegar y
-   los clics salientes solos).
-4. Copiar el **ID de medición** (`G-…`) → `NEXT_PUBLIC_GA_ID` en Vercel → redeploy.
-5. Verificar: abrir la landing y en Analytics → **Informes → Tiempo real** tiene que
-   aparecer la visita. En **Administrar → Eventos** van a aparecer
-   `generate_lead`, `comenzar_registro` y `registro_completado` a medida que ocurran.
-6. **Marcar `registro_completado` como evento clave** (Administrar → Eventos →
-   "Marcar como evento clave"). Es lo que después se importa en Ads como conversión.
+2. La propiedad ya existe: ID de medición **`G-4PECQ9ZPFY`** (está en `lib/analytics.ts`).
+   En **Flujo de datos → Web** dejar activada la **medición mejorada** (toma las vistas
+   de página al navegar solas).
+3. Verificar: abrir la landing en producción y en Analytics → **Informes → Tiempo real**
+   tiene que aparecer la visita. En **Administrar → Eventos** van a aparecer
+   `whatsapp_click` y `sign_up` a medida que ocurran, con el parámetro `producto`
+   = `comercio` (sirve para separarlos de la distribuidora si comparten propiedad).
+4. **Marcar `sign_up` como evento clave** (Administrar → Eventos → "Marcar como
+   evento clave"). Opcional: crear la dimensión personalizada `ubicacion` (alcance
+   evento) para ver desde qué botón se hace click en WhatsApp.
 
 ## 3. Search Console
 
@@ -85,24 +83,25 @@ Después de cargarlas hay que **redeploy** (son `NEXT_PUBLIC_`, se fijan en el b
 Como ya hay una cuenta de Ads con la campaña de la distribuidora, se usa la misma
 cuenta. **Todo queda en pausa**: no se gasta nada hasta que se active a mano.
 
-### 4.1 Vincular Analytics y traer la conversión
+### 4.1 Conversiones (ya cargadas en el código)
 
-1. Ads → **Herramientas → Cuentas vinculadas → Google Analytics (GA4)** → vincular
-   la propiedad del paso 2.
-2. Ads → **Objetivos → Conversiones → Nueva acción de conversión → Importar →
-   Propiedades de Google Analytics 4 → Web** → elegir `registro_completado`.
-   Categoría "Registro", valor: sin valor (o $20.000 si querés que Ads optimice por
-   valor), recuento "Una". Marcarla como **acción principal**.
-3. Opcional: `generate_lead` (WhatsApp) importada como conversión **secundaria**,
-   para ver qué anuncios generan consultas.
-4. No hace falta `NEXT_PUBLIC_ADS_ID` para esto. Solo se carga si querés
-   remarketing (listas de quienes visitaron la landing): copiar el ID de la
-   etiqueta de Google Ads (`AW-…`) de Herramientas → Administrador de etiquetas.
+Las dos acciones de conversión existen en Ads y el código las dispara directo con la
+etiqueta de Google (no hace falta importarlas desde GA4):
+
+| Acción en Ads | Cuándo se dispara | Etiqueta |
+|---|---|---|
+| Registro completado - Comercio | Cuando `/registro` creó el comercio (respuesta OK, antes de redirigir) | `AW-18494398369/RMreCPezpZgdEKG_6PJE` |
+| Clic WhatsApp - Comercio | Click en "Hablar por WhatsApp" de la landing (hero, pie, cierre) y en "Consultar por WhatsApp" de la demo | `AW-18494398369/9SEkCPqzpZgdEKG_6PJE` |
+
+Ambas con valor 1 ARS, recuento "Una". Dejar **Registro completado** como acción
+**principal** y **Clic WhatsApp** como **secundaria** (para que Ads optimice por
+registros y no por consultas). Vincular igualmente Analytics (Herramientas → Cuentas
+vinculadas → GA4) para ver las visitas de la campaña dentro de Analytics.
 
 ### 4.2 Campaña de búsqueda (crear en pausa)
 
 - **Nueva campaña → Objetivo: Clientes potenciales → Tipo: Búsqueda**.
-- Conversión: `registro_completado`. Redes: **solo Búsqueda de Google** (desactivar
+- Conversión: "Registro completado - Comercio". Redes: **solo Búsqueda de Google** (desactivar
   Display y partners de búsqueda, gastan sin convertir).
 - Ubicación: Argentina (o las provincias donde hagan soporte). Idioma: español.
 - Presupuesto: **$3.000 por día** para arrancar (Ads puede gastar hasta el doble
@@ -162,9 +161,10 @@ llamada con el WhatsApp de ServiTec; precio: Básico $20.000 / Pro $40.000 por m
 
 ### 4.5 Antes de activar
 
-- Revisar que en Ads → Conversiones figure `registro_completado` con estado
-  "Registrando conversiones" (hacer un registro de prueba con una cuenta de Google
-  nueva y borrarlo después desde el superadmin).
+- Revisar que en Ads → Conversiones las dos acciones figuren con estado
+  "Registrando conversiones" (hacer click en WhatsApp desde la landing en producción,
+  y un registro de prueba con una cuenta de Google nueva que después se borra desde el
+  superadmin). Las conversiones tardan hasta unas horas en aparecer en Ads.
 - Pasar la campaña a **Habilitada**. Primera semana: mirar **Términos de búsqueda**
   todos los días y agregar negativas a lo que no tenga sentido.
 

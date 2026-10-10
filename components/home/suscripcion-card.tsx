@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { CONTACT } from "@/lib/marketing/contact";
+import { trackWhatsAppClick } from "@/lib/analytics";
 import { METODO_PAGO_LABEL, textoPeriodo } from "@/lib/suscripcion";
 import { activarDebito, cancelarDebito, crearLinkDePago, getSuscripcion, type EstadoSuscripcion } from "@/services/billing-service";
 
@@ -144,7 +145,7 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
           )}
           {estado.precioMensual > 0 && !estado.mpDisponible && (
             <Button variant="outline" className="rounded-2xl" asChild>
-              <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="mr-2 h-4 w-4" /> Pagar por WhatsApp</a>
+              <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackWhatsAppClick("suscripcion", { conversion: false })}><MessageCircle className="mr-2 h-4 w-4" /> Pagar por WhatsApp</a>
             </Button>
           )}
           {estado.pagos.some((p) => p.estado === "pendiente" && p.metodo === "mercadopago") && (

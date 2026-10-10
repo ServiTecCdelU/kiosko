@@ -230,9 +230,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 | `MP_SAAS_TOKEN` | Access Token de **producción** de la cuenta de Mercado Pago de ServiTec: cobra las suscripciones (`/suscripcion`, webhook `/api/billing/webhook`). Sin ella no aparecen el botón de pago ni el débito automático, y el billing sigue con pagos manuales desde el superadmin. |
 | `IMPRESORA_ZPL_RAW` | Destino RAW de la Zebra |
 | `DISTRIBUIDORA_API_URL` | Sincronización de catálogo |
-| `NEXT_PUBLIC_GA_ID` | ID de medición de Google Analytics 4 (`G-…`). Sin ella no se carga ninguna etiqueta de Google. Guía: `docs/SEO-Y-GOOGLE.md`. |
-| `NEXT_PUBLIC_ADS_ID` | ID de la etiqueta de Google Ads (`AW-…`), para remarketing y conversiones. Opcional. |
-| `NEXT_PUBLIC_ADS_CONVERSION_REGISTRO` | Etiqueta de conversión de Ads del registro (`AW-…/xxxx`). Opcional: lo normal es importar el evento `registro_completado` de GA4 en Ads. |
+| *(Google Analytics / Ads)* | No usa variables: los IDs de GA4 (`G-4PECQ9ZPFY`), de Ads (`AW-18494398369`) y las etiquetas de conversión viven en `lib/analytics.ts`. La etiqueta se carga solo con `NODE_ENV=production`. Guía: `docs/SEO-Y-GOOGLE.md`. |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Código de la etiqueta HTML de Search Console. Opcional si el dominio se verifica por DNS. |
 
 Tests de integración: `.env.test.local` con `TEST_SUPABASE_URL` y

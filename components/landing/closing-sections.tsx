@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Check, Plus } from 'lucide-react'
-import { CONTACT, ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
+import { ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
+import { WhatsAppLink } from '@/components/analytics/whatsapp-link'
 // Las preguntas viven en lib/marketing/faq.ts: tambien se publican como JSON-LD.
 import { FAQS } from '@/lib/marketing/faq'
 import { Kicker, SectionHead, WhatsAppIcon } from './shared'
@@ -114,15 +115,13 @@ export function CtaFinal() {
             >
               Crear mi comercio gratis
             </Link>
-            <a
-              href={CONTACT.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <WhatsAppLink
+              ubicacion="cierre"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/40 px-7 py-3.5 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
             >
               <WhatsAppIcon />
               Hablar por WhatsApp
-            </a>
+            </WhatsAppLink>
           </div>
         </div>
       </div>

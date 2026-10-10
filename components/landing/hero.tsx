@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import { CONTACT, ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
+import { ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
+import { WhatsAppLink } from '@/components/analytics/whatsapp-link'
 import { PosMock } from './pos-mock'
 import { WhatsAppIcon, btnGhost, btnPrimary } from './shared'
 
@@ -46,10 +47,10 @@ export function Hero() {
             Probar gratis {TRIAL_DAYS} días
             <ArrowRight className="h-4 w-4" />
           </Link>
-          <a href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer" className={btnGhost}>
+          <WhatsAppLink ubicacion="hero" className={btnGhost}>
             <WhatsAppIcon />
             Hablar por WhatsApp
-          </a>
+          </WhatsAppLink>
         </div>
         <p className="mt-5 font-mono text-xs text-muted-foreground/80">
           Sin tarjeta · Sin instalación · Funciona en PC, tablet y celular

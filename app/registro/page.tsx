@@ -162,7 +162,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el comercio");
       toast.success("¡Listo! Tu comercio está creado");
-      trackRegistroCompletado(validado.datos.plan, validado.datos.rubro);
+      trackRegistroCompletado({ plan: validado.datos.plan, rubro: validado.datos.rubro });
       router.replace(data.redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el comercio");

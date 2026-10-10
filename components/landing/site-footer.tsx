@@ -1,5 +1,6 @@
 import { CONTACT, LEGAL } from '@/lib/marketing/contact'
 import { Brand } from './shared'
+import { WhatsAppLink } from '@/components/analytics/whatsapp-link'
 
 const linkCls = 'text-sm text-muted-foreground transition-colors hover:text-white'
 
@@ -29,9 +30,9 @@ export function SiteFooter() {
             <ul className="flex flex-col gap-2.5">
               <li><a className={linkCls} href={`mailto:${CONTACT.email}`}>Escribinos por email</a></li>
               <li>
-                <a className={linkCls} href={CONTACT.whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <WhatsAppLink ubicacion="footer" className={linkCls}>
                   Hablar por WhatsApp
-                </a>
+                </WhatsAppLink>
               </li>
               <li><a className={linkCls} href="/terms">Términos y Condiciones</a></li>
               <li><a className={linkCls} href="/privacy">Política de Privacidad</a></li>

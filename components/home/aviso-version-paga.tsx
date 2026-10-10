@@ -5,6 +5,7 @@
 // se muestra que esas funciones vienen en la version paga.
 import { Lock, MessageCircle, type LucideIcon } from "lucide-react";
 import { CONTACT } from "@/lib/marketing/contact";
+import { trackWhatsAppClick } from "@/lib/analytics";
 import { DEMO_SLUG } from "@/lib/demo";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -44,6 +45,7 @@ export function AvisoVersionPaga({ id, icono: Icono, titulo, descripcion }: Avis
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors hover:border-primary hover:text-primary"
+            onClick={() => trackWhatsAppClick("demo-version-paga")}
           >
             <MessageCircle className="h-4 w-4" /> Consultar por WhatsApp
           </a>
