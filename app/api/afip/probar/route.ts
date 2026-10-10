@@ -5,7 +5,7 @@
 // y su nota de credito: la prueba completa de punta a punta.
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { motivoSinFacturacion } from "@/lib/server/plan";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { conAcceso, estadoServidores, ultimoAutorizado } from "@/lib/server/afip/cliente";
 import { pruebaEmisionHomologacion } from "@/lib/server/afip/facturar";

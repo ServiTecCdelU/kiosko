@@ -203,6 +203,8 @@ export interface Usuario {
   comercioNombre?: string;
   /** Slug del comercio: el panel vive en /<slug> (la landing queda en /). */
   comercioSlug?: string;
+  /** Plan del comercio (free | basico | pro): solo para mostrar avisos de "plan Pro"; el servidor lo valida. */
+  plan?: string;
   /** Entro con el PIN viejo de 4: tiene que elegir uno de 6 antes de seguir. */
   debeCambiarPin?: boolean;
   /** Caja (puesto) de la PC registrada donde entro por PIN. */

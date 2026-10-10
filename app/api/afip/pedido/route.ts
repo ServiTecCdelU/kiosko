@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { motivoSinFacturacion } from "@/lib/server/plan";
 import { estadoPublico, generarPedido, leerConfigAfip } from "@/lib/server/afip/config";
 
 export const runtime = "nodejs";

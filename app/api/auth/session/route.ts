@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   if (sesion.soporte && sesion.superadmin) {
     const [{ data: sa }, { data: comercio }] = await Promise.all([
       supabaseAdmin.from("superadmins").select("email").ilike("email", patronCorreoExacto(sesion.usuarioId)).maybeSingle(),
-      supabaseAdmin.from("comercios").select("id, nombre, slug").eq("id", sesion.comercioId).maybeSingle(),
+      supabaseAdmin.from("comercios").select("id, nombre, slug, plan").eq("id", sesion.comercioId).maybeSingle(),
     ]);
     if (!sa || !comercio) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
     return NextResponse.json({
@@ -32,6 +32,7 @@ export async function GET(req: Request) {
       soporte: true,
       comercioNombre: comercio.nombre,
       comercioSlug: comercio.slug,
+      plan: comercio.plan,
     });
   }
 

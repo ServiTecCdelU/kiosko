@@ -17,6 +17,7 @@ import { CONTACT } from "@/lib/marketing/contact";
 import { trackWhatsAppClick } from "@/lib/analytics";
 import { METODO_PAGO_LABEL, montoMensual, planIncluyeFacturacion, textoPeriodo } from "@/lib/suscripcion";
 import { PLANES_REGISTRO } from "@/lib/registro";
+import { getCurrentUser, setCurrentUser } from "@/hooks/use-auth";
 import {
   activarDebito, cambiarPlan, cancelarDebito, crearLinkDePago, getSuscripcion, type EstadoSuscripcion, type PlanContratable,
 } from "@/services/billing-service";
@@ -125,12 +126,15 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
         ? `Lo que ya pagaste sigue vigente hasta el ${formatDate(estado.suscripcionHasta!)}; desde el mes siguiente se cobra ${formatCurrency(nuevo)} por mes.`
         : `Desde ahora la suscripción cuesta ${formatCurrency(nuevo)} por mes.`;
     const pierdeFacturacion = planIncluyeFacturacion(estado.plan) && !planIncluyeFacturacion(p.plan)
-      ? " Ojo: el plan Básico no incluye facturación electrónica; tu configuración de ARCA queda guardada pero no vas a poder facturar hasta volver a Pro."
+      ? " Ojo: el plan Básico no incluye facturación electrónica ni lector Point de Mercado Pago; tu configuración queda guardada pero no vas a poder usarlos hasta volver a Pro."
       : "";
     if (!window.confirm(`¿Cambiar al plan ${p.nombre}? El cambio aplica al instante. ${detalle}${pierdeFacturacion}`)) return;
     setCambiando(true);
     try {
       const r = await cambiarPlan(p.plan);
+      // El plan guardado en el navegador decide los avisos de "plan Pro": se actualiza sin recargar.
+      const u = getCurrentUser();
+      if (u) setCurrentUser({ ...u, plan: r.plan });
       toast.success(`Listo: ahora estás en el plan ${r.nombre}`);
       await cargar();
     } catch (e) {

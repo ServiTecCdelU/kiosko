@@ -24,7 +24,7 @@ import { ErrorAfip, type DetalleComprobante } from "@/lib/afip/mensajes";
 import { configOperativa, leerConfigAfip, type ConfigOperativa } from "@/lib/server/afip/config";
 import { conAcceso, consultarComprobante, solicitarCAE, ultimoAutorizado } from "@/lib/server/afip/cliente";
 import { asegurarCaeas, caeaVigente, informarPendientes } from "@/lib/server/afip/caea";
-import { motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { motivoSinFacturacion } from "@/lib/server/plan";
 
 export interface FilaFactura {
   id: string;

@@ -3,7 +3,7 @@
 // Administracion de puestos de cobro (solo admin): crear, renombrar, activar.
 import { useState } from "react";
 import { toast } from "sonner";
-import { Monitor, Plus } from "lucide-react";
+import { Lock, Monitor, Plus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { crearPuesto, actualizarPuesto, type PuestoConEstado } from "@/services/caja-service";
+import { ModalPlanPro } from "@/components/plan/modal-plan-pro";
+import { useAuth } from "@/hooks/use-auth";
 
 interface PuestosDialogProps {
   open: boolean;
@@ -24,10 +26,20 @@ interface PuestosDialogProps {
 export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: PuestosDialogProps) {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [working, setWorking] = useState(false);
+  const [modalPro, setModalPro] = useState(false);
+  const { user } = useAuth();
+  // Plan Basico: 1 caja. Sumar o reactivar otra muestra el modal de plan Pro
+  // (el servidor lo frena igual: errorAlSumarCaja en /api/puestos).
+  const activos = puestos.filter((p) => p.activo).length;
+  const topeBasico = user?.plan === "basico" && activos >= 1;
 
   const handleCrear = async () => {
     const nombre = nuevoNombre.trim();
     if (!nombre) return;
+    if (topeBasico) {
+      setModalPro(true);
+      return;
+    }
     setWorking(true);
     try {
       await crearPuesto(nombre);
@@ -42,6 +54,10 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
   };
 
   const handleActivo = async (p: PuestoConEstado, activo: boolean) => {
+    if (activo && topeBasico) {
+      setModalPro(true);
+      return;
+    }
     try {
       await actualizarPuesto(p.id, { activo });
       toast.success(activo ? "Puesto activado" : "Puesto desactivado");
@@ -137,6 +153,13 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
             <Plus className="mr-1 h-4 w-4" /> Agregar
           </Button>
         </div>
+        {topeBasico && (
+          <p className="text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-medium text-primary"><Lock className="h-3 w-3" /> Plan Básico: una caja.</span>{" "}
+            Para sumar cajas, pasá al plan Pro desde Suscripción.
+          </p>
+        )}
+        <ModalPlanPro funcion={modalPro ? "cajas" : null} onOpenChange={setModalPro} />
       </DialogContent>
     </Dialog>
   );

@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
-import { motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { motivoSinFacturacion } from "@/lib/server/plan";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarCaeaActivo } from "@/lib/server/afip/config";
 import { asegurarCaeas, caeasGuardados, informarPendientes, informarSinMovimiento, pedirCaea } from "@/lib/server/afip/caea";

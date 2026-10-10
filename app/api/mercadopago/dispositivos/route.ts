@@ -4,13 +4,18 @@ import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { listarDispositivosMP, cambiarModoOperacionMP } from "@/lib/server/mercadopago";
 import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
+import { motivoSinPoint } from "@/lib/server/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  const comercioId = comercioIdDeSesion(req);
+  // El lector Point es del plan Pro (lib/server/plan.ts).
+  const motivo = await motivoSinPoint(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   try {
-    const token = await tokenMPDeComercio(comercioIdDeSesion(req));
+    const token = await tokenMPDeComercio(comercioId);
     const dispositivos = await listarDispositivosMP(token);
     return NextResponse.json({ dispositivos });
   } catch (e) {
@@ -33,9 +38,12 @@ export async function PATCH(req: Request) {
   const deviceId = String(body?.deviceId ?? "");
   const modo = body?.modo === "STANDALONE" ? "STANDALONE" : "PDV";
   if (!deviceId) return NextResponse.json({ error: "Falta el id del lector" }, { status: 400 });
+  const comercioId = comercioIdDeSesion(req);
+  const motivo = await motivoSinPoint(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
 
   try {
-    const token = await tokenMPDeComercio(comercioIdDeSesion(req));
+    const token = await tokenMPDeComercio(comercioId);
     await cambiarModoOperacionMP(token, deviceId, modo);
     return NextResponse.json({ ok: true, deviceId, modo });
   } catch (e) {

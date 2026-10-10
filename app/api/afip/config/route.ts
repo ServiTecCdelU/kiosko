@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
-import { facturacionEnPlan, motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { facturacionEnPlan, motivoSinFacturacion } from "@/lib/server/plan";
 import { estadoPublico, guardarDatosFiscales, guardarOperacion, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { validarDatosFiscales, validarOperacion } from "@/lib/afip/datos-fiscales";
 

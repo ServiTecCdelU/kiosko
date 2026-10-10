@@ -3,7 +3,7 @@
 // corresponda a la clave guardada y a la CUIT antes de guardarlo.
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { motivoSinFacturacion } from "@/lib/server/afip/plan";
+import { motivoSinFacturacion } from "@/lib/server/plan";
 import { estadoPublico, subirCertificado } from "@/lib/server/afip/config";
 
 export const runtime = "nodejs";

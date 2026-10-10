@@ -13,7 +13,7 @@ export const FAQS: PreguntaFrecuente[] = [
   { q: "¿Funciona con lector de código de barras?", a: "Sí. Cualquier lector USB o Bluetooth funciona: conectás y escaneás directo en el punto de venta. También lee las etiquetas con peso de las balanzas (EAN-13)." },
   { q: "¿Puedo tener varias cajas abiertas?", a: "Sí. Cada caja tiene su apertura, cierre y arqueo, con el detalle de qué cajero la operó, y un consolidado del día con todas las cajas." },
   { q: "¿Sirve si vendo por kilo?", a: "Sí. Podés vender por unidad o por peso, y escanear las etiquetas que imprime la balanza." },
-  { q: "¿Emite factura electrónica?", a: "Sí. Factura electrónica de ARCA (ex AFIP): Factura C para monotributistas y Factura A y B para responsables inscriptos, con notas de crédito y QR, directo desde el punto de venta (incluida en el plan Pro). Con cualquier plan cobrás con QR de Mercado Pago." },
+  { q: "¿Emite factura electrónica?", a: "Sí. Factura electrónica de ARCA (ex AFIP): Factura C para monotributistas y Factura A y B para responsables inscriptos, con notas de crédito y QR, directo desde el punto de venta (incluida en el plan Pro). Con cualquier plan cobrás con QR de Mercado Pago; el lector Point es del Pro." },
   { q: "¿Cuánto cuesta?", a: `Probás gratis ${TRIAL_DAYS} días, sin tarjeta. Después, el plan Básico cuesta $30.000 por mes con una caja, y el plan Pro $60.000 por mes con cajas extra a $10.000 cada una. Podés cambiar de plan cuando quieras. Se paga mes a mes con Mercado Pago y podés dejar de usarlo cuando quieras.` },
   { q: "¿Mis datos están seguros?", a: "Cada comercio tiene sus datos aislados, con copias de seguridad diarias. Podés descargar toda tu información en Excel cuando quieras: los datos son tuyos." },
 ];

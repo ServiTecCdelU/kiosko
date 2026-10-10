@@ -14,6 +14,31 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { conectarMP, desconectarMP, getConexionMP, type ConexionMP } from "@/services/mercadopago-service";
 import { AvisoVersionPaga, useEsDemo } from "@/components/home/aviso-version-paga";
+import { ModalPlanPro } from "@/components/plan/modal-plan-pro";
+import { useAuth } from "@/hooks/use-auth";
+import { planIncluyePoint } from "@/lib/suscripcion";
+import { Lock } from "lucide-react";
+
+/** true si el plan del comercio incluye el lector Point (en Basico solo QR). */
+function usePointEnPlan(): boolean {
+  const { user } = useAuth();
+  return planIncluyePoint(user?.plan);
+}
+
+/** Aviso en Basico: el lector Point es del Pro. Abre el modal de plan. */
+function AvisoPointPro() {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/50 p-3">
+      <p className="text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1 font-medium text-primary"><Lock className="h-3 w-3" /> Lector Point: plan Pro.</span>{" "}
+        Con el Básico cobrás con QR de Mercado Pago.
+      </p>
+      <Button size="sm" variant="outline" className="h-7 rounded-lg text-xs" onClick={() => setAbierto(true)}>Ver plan Pro</Button>
+      <ModalPlanPro funcion={abierto ? "point" : null} onOpenChange={setAbierto} />
+    </div>
+  );
+}
 
 export function MercadoPagoCard() {
   // En la demo no se piden credenciales reales: se muestra la version paga.
@@ -102,6 +127,7 @@ function Conectado({
 }: { conexion: ConexionMP; onCambiar: () => void; onDesconectado: () => void }) {
   const [confirmando, setConfirmando] = useState(false);
   const [desconectando, setDesconectando] = useState(false);
+  const conPoint = usePointEnPlan();
 
   const desconectar = async () => {
     setDesconectando(true);
@@ -120,7 +146,7 @@ function Conectado({
   return (
     <div className="mt-1 space-y-3">
       <p className="text-sm text-muted-foreground">
-        Los cobros con QR y con lector Point entran a tu cuenta
+        Los cobros con QR{conPoint ? " y con lector Point" : ""} entran a tu cuenta
         {conexion.cuentaId ? <> (N° {conexion.cuentaId})</> : null}. Token terminado en{" "}
         <span className="font-mono font-semibold text-foreground">···{conexion.tokenFinal}</span>
         {conexion.conectadoAt ? <>, conectado el {new Date(conexion.conectadoAt).toLocaleDateString("es-AR")}</> : null}.
@@ -131,7 +157,8 @@ function Conectado({
         </p>
       )}
 
-      {conexion.webhookUrl && <WebhookUrl url={conexion.webhookUrl} />}
+      {/* El webhook solo hace falta para el lector Point: en Basico se muestra el aviso de plan. */}
+      {conPoint ? conexion.webhookUrl && <WebhookUrl url={conexion.webhookUrl} /> : <AvisoPointPro />}
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="rounded-xl" onClick={onCambiar}>
@@ -193,6 +220,7 @@ function FormularioToken({
 }: { cambiando: boolean; onCancelar?: () => void; onConectado: (c: ConexionMP) => void }) {
   const [token, setToken] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const conPoint = usePointEnPlan();
 
   const conectar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,7 +242,7 @@ function FormularioToken({
       <p className="text-sm text-muted-foreground">
         {cambiando
           ? "Pegá el nuevo Access Token. El anterior se reemplaza."
-          : "Conectá tu cuenta para cobrar con QR y con lector Point. La plata entra directo a tu cuenta."}{" "}
+          : `Conectá tu cuenta para cobrar con QR${conPoint ? " y con lector Point" : ""}. La plata entra directo a tu cuenta.`}{" "}
         Lo encontrás en Mercado Pago Developers → Tus integraciones → tu aplicación → Credenciales de producción → <b>Access Token</b>.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">

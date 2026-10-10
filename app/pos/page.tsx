@@ -23,6 +23,7 @@ import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
 import { VentasOfflineDialog } from "@/components/pos/ventas-offline-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { MENSAJE_POINT_PRO, planIncluyePoint } from "@/lib/suscripcion";
 import { panelHref } from "@/lib/panel";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
 import { PesoDialog } from "@/components/pos/peso-dialog";
@@ -439,6 +440,11 @@ function PosScreen() {
   const handleConfirm = useCallback(
     async (data: ConfirmData) => {
       if (data.paymentMethod === "mercadopago_point") {
+        // El lector Point es del plan Pro (el servidor lo valida igual).
+        if (!planIncluyePoint(getCurrentUser()?.plan)) {
+          toast.error(MENSAJE_POINT_PRO);
+          return;
+        }
         setProcessing(true);
         try {
           const user = getCurrentUser();

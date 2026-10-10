@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearIntentoPagoPoint, cancelarIntentoPagoPoint } from "@/lib/server/mercadopago";
 import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
+import { motivoSinPoint } from "@/lib/server/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "El carrito esta vacio" }, { status: 400 });
   }
   if (!deviceId) return NextResponse.json({ error: "Falta el lector Point" }, { status: 400 });
+  // El lector Point es del plan Pro (lib/server/plan.ts).
+  const motivo = await motivoSinPoint(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   if (!Number.isFinite(total) || total <= 0) {
     return NextResponse.json({ error: "Total invalido" }, { status: 400 });
   }

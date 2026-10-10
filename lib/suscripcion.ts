@@ -129,7 +129,13 @@ export function planIncluyeFacturacion(plan: unknown): boolean {
   return plan !== "basico";
 }
 
+/** El lector Point de Mercado Pago es del plan Pro. El cobro con QR esta en todos. */
+export function planIncluyePoint(plan: unknown): boolean {
+  return plan !== "basico";
+}
+
 export const MENSAJE_FACTURACION_PRO = "La facturación electrónica es del plan Pro. Pasá a Pro desde Suscripción para usarla.";
+export const MENSAJE_POINT_PRO = "El lector Point de Mercado Pago es del plan Pro. Pasá a Pro desde Suscripción para usarlo.";
 
 // ---- Cambio de plan por el propio comercio (decidido 2026-10-10) ----
 
