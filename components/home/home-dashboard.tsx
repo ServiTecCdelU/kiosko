@@ -24,6 +24,7 @@ import {
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { PrimerosPasosCard } from "@/components/home/primeros-pasos-card";
 import { CuentaCard } from "@/components/home/cuenta-card";
+import { SuscripcionCard } from "@/components/home/suscripcion-card";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
@@ -186,6 +187,7 @@ function HomeContent() {
         </div>
 
         {rol === "admin" && <CuentaCard />}
+        {rol === "admin" && <SuscripcionCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
           {user?.comercioNombre ?? "Tu comercio"} · Punto de venta
