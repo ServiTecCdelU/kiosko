@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { crearCliente } from "@/services/clientes-service";
+import { CONDICIONES_RECEPTOR } from "@/lib/afip/iva";
 import type { Cliente } from "@/lib/types";
 
 interface NuevoClienteDialogProps {
@@ -20,6 +21,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [documento, setDocumento] = useState("");
+  const [condicionIva, setCondicionIva] = useState("");
   const [limite, setLimite] = useState("");
   const [notas, setNotas] = useState("");
   const [working, setWorking] = useState(false);
@@ -29,6 +31,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setNombre("");
       setTelefono("");
       setDocumento("");
+      setCondicionIva("");
       setLimite("");
       setNotas("");
     }
@@ -45,6 +48,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
         nombre,
         telefono,
         documento,
+        condicionIva: condicionIva || undefined,
         limiteCredito: Number(limite) || 0,
         notas,
       });
@@ -72,10 +76,20 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
             <Field label="Teléfono">
               <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} className="rounded-xl" inputMode="tel" />
             </Field>
-            <Field label="Documento">
-              <Input value={documento} onChange={(e) => setDocumento(e.target.value)} className="rounded-xl" />
+            <Field label="DNI o CUIT">
+              <Input value={documento} onChange={(e) => setDocumento(e.target.value)} className="rounded-xl" inputMode="numeric" />
             </Field>
           </div>
+          <Field label="Condición frente al IVA (para facturarle)">
+            <select
+              value={condicionIva}
+              onChange={(e) => setCondicionIva(e.target.value)}
+              className="border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none"
+            >
+              <option value="">No sé / consumidor final</option>
+              {CONDICIONES_RECEPTOR.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </Field>
           <Field label="Límite de crédito (0 = sin límite)">
             <Input value={limite} onChange={(e) => setLimite(e.target.value)} className="rounded-xl" type="number" inputMode="decimal" />
           </Field>

@@ -62,15 +62,41 @@ export function PasoDatos({ estado, correr, ocupado }: PropsPaso) {
   const [domicilio, setDomicilio] = useState(estado.domicilio ?? "");
   const [inicio, setInicio] = useState(estado.inicioActividades ?? "");
   const [iibb, setIibb] = useState(estado.ingresosBrutos ?? "");
+  const [condicion, setCondicion] = useState<"monotributo" | "responsable_inscripto">(estado.condicionIva ?? "monotributo");
 
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
-        correr("datos", () => guardarDatosFiscales({ cuit, razonSocial, domicilio, inicioActividades: inicio, ingresosBrutos: iibb }), "Datos guardados");
+        correr("datos", () => guardarDatosFiscales({ cuit, razonSocial, domicilio, inicioActividades: inicio, ingresosBrutos: iibb, condicionIva: condicion }), "Datos guardados");
       }}
     >
+      <div className="space-y-2 sm:col-span-2">
+        <Label>Tu condición frente al IVA</Label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {([
+            ["monotributo", "Monotributista", "Emitís Factura C a todos tus clientes."],
+            ["responsable_inscripto", "Responsable inscripto", "Emitís Factura B al público y Factura A a otros inscriptos, con el IVA de cada producto discriminado."],
+          ] as const).map(([valor, titulo, texto]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setCondicion(valor)}
+              className={cn(
+                "rounded-2xl border-2 p-3 text-left transition-colors",
+                condicion === valor ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+              )}
+            >
+              <span className="block font-semibold">{titulo}</span>
+              <span className="block text-xs text-muted-foreground">{texto}</span>
+            </button>
+          ))}
+        </div>
+        {condicion === "responsable_inscripto" && (
+          <p className="text-xs text-warning">Revisá que cada producto tenga su alícuota de IVA (Stock → Editar producto). Por defecto es 21 %.</p>
+        )}
+      </div>
       <div className="space-y-1"><Label htmlFor="cuit">Tu CUIT</Label><Input id="cuit" value={cuit} onChange={(e) => setCuit(e.target.value)} placeholder="20-12345678-6" inputMode="numeric" className="rounded-xl" /></div>
       <div className="space-y-1"><Label htmlFor="razon">Nombre o razón social</Label><Input id="razon" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} placeholder="Como figura en ARCA" className="rounded-xl" /></div>
       <div className="space-y-1 sm:col-span-2"><Label htmlFor="domicilio">Domicilio del comercio</Label><Input id="domicilio" value={domicilio} onChange={(e) => setDomicilio(e.target.value)} placeholder="Calle, número, ciudad" className="rounded-xl" /></div>

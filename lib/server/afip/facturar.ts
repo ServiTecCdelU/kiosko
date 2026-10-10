@@ -1,5 +1,6 @@
-// lib/server/afip/facturar.ts — emision de Factura C y Nota de credito C (server-only).
-// Spec: docs/superpowers/specs/2026-10-03-facturacion-afip-design.md
+// lib/server/afip/facturar.ts — emision de facturas y notas de credito (server-only).
+// Spec: docs/superpowers/specs/2026-10-03-facturacion-afip-design.md (Factura C)
+//       docs/superpowers/specs/2026-10-10-factura-a-b-design.md (Factura A/B)
 //
 // Reglas que este archivo garantiza:
 // - Numeros correlativos: lock por (comercio, ambiente, tipo, punto de venta)
@@ -8,10 +9,13 @@
 //   respuesta se pierde, el reintento primero consulta ese numero en AFIP.
 // - La venta nunca depende de AFIP: un fallo deja la factura en 'error' para
 //   reintentar; no tira abajo el cobro, la anulacion ni la devolucion.
+// - El tipo (A, B o C) lo decide la condicion del emisor y la del receptor
+//   (lib/afip/iva.ts); el desglose de IVA se guarda en la fila y no cambia.
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { CBTE } from "@/lib/afip/constantes";
+import { esFactura, notaCreditoDe, TIPOS_FACTURA, TIPOS_NOTA_CREDITO } from "@/lib/afip/constantes";
 import { hoyArgentinaIso, receptorDeVenta } from "@/lib/afip/comprobante";
+import { desglosarIva, esCondicionReceptor, prorratearDesglose, tipoComprobante, type CondicionReceptor, type Desglose } from "@/lib/afip/iva";
 import { ErrorAfip } from "@/lib/afip/mensajes";
 import { configOperativa, leerConfigAfip, type ConfigOperativa } from "@/lib/server/afip/config";
 import { conAcceso, consultarComprobante, solicitarCAE, ultimoAutorizado } from "@/lib/server/afip/cliente";
@@ -32,6 +36,11 @@ export interface FilaFactura {
   doc_tipo: number;
   doc_nro: string;
   receptor_nombre: string | null;
+  receptor_condicion: number;
+  neto: number | null;
+  iva: number | null;
+  exento: number | null;
+  alicuotas: Desglose["alicuotas"] | null;
   cae: string | null;
   cae_vto: string | null;
   estado: "pendiente" | "autorizada" | "rechazada" | "error";
@@ -42,12 +51,30 @@ export interface FilaFactura {
 const LOCK_SEGUNDOS = 60;
 const LOCK_REINTENTOS = 10;
 const LOCK_ESPERA_MS = 700;
-const CONDICION_CONSUMIDOR_FINAL = 5;
+
+function desgloseDe(f: FilaFactura): Desglose | null {
+  if (f.neto === null || f.iva === null || f.exento === null) return null;
+  return { neto: f.neto, iva: f.iva, exento: f.exento, alicuotas: Array.isArray(f.alicuotas) ? f.alicuotas : [] };
+}
+
+function columnasDesglose(d: Desglose | null) {
+  return d
+    ? { neto: d.neto, iva: d.iva, exento: d.exento, alicuotas: d.alicuotas }
+    : { neto: null, iva: null, exento: null, alicuotas: null };
+}
 
 async function leerFactura(id: string): Promise<FilaFactura> {
   const { data, error } = await supabaseAdmin.from("facturas").select("*").eq("id", id).single();
   if (error) throw new Error(error.message);
-  return { ...(data as FilaFactura), total: Number(data.total), numero: data.numero === null ? null : Number(data.numero) };
+  return {
+    ...(data as FilaFactura),
+    total: Number(data.total),
+    numero: data.numero === null ? null : Number(data.numero),
+    neto: data.neto === null || data.neto === undefined ? null : Number(data.neto),
+    iva: data.iva === null || data.iva === undefined ? null : Number(data.iva),
+    exento: data.exento === null || data.exento === undefined ? null : Number(data.exento),
+    receptor_condicion: Number(data.receptor_condicion) || 5,
+  };
 }
 
 async function actualizar(id: string, cambios: Partial<FilaFactura>): Promise<FilaFactura> {
@@ -73,7 +100,7 @@ async function conLock<T>(clave: string, fn: () => Promise<T>): Promise<T> {
 }
 
 async function asociadoDe(f: FilaFactura, cfg: ConfigOperativa) {
-  if (f.cbte_tipo !== CBTE.NOTA_CREDITO_C) return null;
+  if (!TIPOS_NOTA_CREDITO.includes(f.cbte_tipo)) return null;
   const original = await leerFactura(f.factura_asociada_id!);
   if (original.estado !== "autorizada" || original.numero === null) {
     throw new Error("La factura original todavía no está autorizada por AFIP");
@@ -114,8 +141,9 @@ async function procesar(f: FilaFactura, cfgActual: ConfigOperativa): Promise<Fil
 
       const r = await solicitarCAE(cfg, auth, {
         cbteTipo: f.cbte_tipo, puntoVenta: f.punto_venta, numero, fecha, total: f.total,
-        docTipo: f.doc_tipo, docNro: f.doc_nro, condicionIva: CONDICION_CONSUMIDOR_FINAL,
+        docTipo: f.doc_tipo, docNro: f.doc_nro, condicionIva: f.receptor_condicion,
         asociado: await asociadoDe(f, cfg),
+        desglose: desgloseDe(f),
       });
       if (r.aprobado) {
         const obs = r.observaciones.map((o) => `${o.codigo}: ${o.texto}`).join(" · ");
@@ -137,7 +165,9 @@ async function configActiva(comercioId: string): Promise<ConfigOperativa> {
   return configOperativa(fila);
 }
 
-async function crearOReusar(fila: Omit<FilaFactura, "id" | "numero" | "cae" | "cae_vto" | "estado" | "error" | "intentos">, buscarExistente: () => Promise<FilaFactura | null>): Promise<FilaFactura> {
+type FilaNueva = Omit<FilaFactura, "id" | "numero" | "cae" | "cae_vto" | "estado" | "error" | "intentos">;
+
+async function crearOReusar(fila: FilaNueva, buscarExistente: () => Promise<FilaFactura | null>): Promise<FilaFactura> {
   const existente = await buscarExistente();
   if (existente) return existente;
   const id = `fac_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
@@ -156,16 +186,45 @@ async function crearOReusar(fila: Omit<FilaFactura, "id" | "numero" | "cae" | "c
 async function facturaVivaDeVenta(comercioId: string, ventaId: string): Promise<FilaFactura | null> {
   const { data } = await supabaseAdmin
     .from("facturas").select("id")
-    .eq("comercio_id", comercioId).eq("venta_id", ventaId).eq("cbte_tipo", CBTE.FACTURA_C).neq("estado", "rechazada")
+    .eq("comercio_id", comercioId).eq("venta_id", ventaId).in("cbte_tipo", [...TIPOS_FACTURA]).neq("estado", "rechazada")
     .maybeSingle();
   return data ? leerFactura(data.id) : null;
 }
 
-/** Factura C de una venta. Si ya existe, la devuelve (o reintenta si quedo con error). */
-export async function facturarVenta(comercioId: string, ventaId: string, documento?: string | null): Promise<FilaFactura> {
+/**
+ * Desglose de IVA de una venta a partir del IVA actual de cada producto
+ * (precios finales). Solo para emisores inscriptos: la Factura C no discrimina.
+ */
+async function desgloseDeVenta(comercioId: string, items: unknown, total: number): Promise<Desglose> {
+  const lista = Array.isArray(items) ? items : [];
+  const ids = Array.from(new Set(lista.map((i: any) => String(i?.productId ?? "")).filter(Boolean)));
+  const ivaPorId = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data } = await supabaseAdmin.from("productos").select("id, iva").eq("comercio_id", comercioId).in("id", ids.slice(i, i + 500));
+    for (const p of data ?? []) ivaPorId.set(p.id, p.iva != null ? Number(p.iva) : 21);
+  }
+  return desglosarIva(
+    lista.map((i: any) => ({
+      subtotal: Number(i?.subtotal) || (Number(i?.price) || 0) * (Number(i?.quantity) || 0),
+      iva: ivaPorId.get(String(i?.productId ?? "")) ?? 21,
+    })),
+    total,
+  );
+}
+
+/**
+ * Factura de una venta (A, B o C segun el emisor y el cliente). Si ya existe,
+ * la devuelve (o reintenta si quedo con error).
+ */
+export async function facturarVenta(
+  comercioId: string,
+  ventaId: string,
+  documento?: string | null,
+  condicion?: CondicionReceptor | null,
+): Promise<FilaFactura> {
   const cfg = await configActiva(comercioId);
   const { data: venta, error } = await supabaseAdmin
-    .from("ventas").select("id, total, estado, cliente_id, caja_id")
+    .from("ventas").select("id, total, estado, cliente_id, caja_id, items")
     .eq("comercio_id", comercioId).eq("id", ventaId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!venta) throw new Error("No se encontró la venta");
@@ -173,14 +232,21 @@ export async function facturarVenta(comercioId: string, ventaId: string, documen
   const total = Number(venta.total);
   if (!(total > 0)) throw new Error("La venta no tiene importe para facturar");
 
-  let cliente: { documento?: string | null; nombre?: string | null } | null = null;
+  let cliente: { documento?: string | null; nombre?: string | null; condicion_iva?: string | null } | null = null;
   if (venta.cliente_id) {
-    const { data } = await supabaseAdmin.from("clientes").select("documento, nombre").eq("id", venta.cliente_id).maybeSingle();
+    const { data } = await supabaseAdmin.from("clientes").select("documento, nombre, condicion_iva").eq("id", venta.cliente_id).maybeSingle();
     cliente = data;
   }
-  if (documento) cliente = { documento, nombre: cliente?.nombre ?? null };
-  const receptor = receptorDeVenta(total, cliente);
+  if (documento) cliente = { documento, nombre: cliente?.nombre ?? null, condicion_iva: cliente?.condicion_iva ?? null };
+
+  // Condicion del receptor: la elegida al facturar > la del cliente > consumidor final.
+  const condicionReceptor: CondicionReceptor =
+    condicion ?? (esCondicionReceptor(cliente?.condicion_iva) ? cliente!.condicion_iva as CondicionReceptor : "consumidor_final");
+  const emisor = cfg.condicion_iva ?? "monotributo";
+  const cbteTipo = tipoComprobante(emisor, condicionReceptor, false);
+  const receptor = receptorDeVenta(total, cliente, emisor === "monotributo" ? "consumidor_final" : condicionReceptor);
   if (!receptor.ok) throw new Error(receptor.error);
+  const desglose = emisor === "responsable_inscripto" ? await desgloseDeVenta(comercioId, venta.items, total) : null;
 
   // Punto de venta: el de la caja donde se hizo la venta, si tiene uno propio;
   // si no, el general de la configuracion de AFIP.
@@ -196,8 +262,10 @@ export async function facturarVenta(comercioId: string, ventaId: string, documen
   const factura = await crearOReusar(
     {
       comercio_id: comercioId, venta_id: ventaId, devolucion_id: null, factura_asociada_id: null,
-      ambiente: cfg.ambiente, cbte_tipo: CBTE.FACTURA_C, punto_venta: puntoVenta, fecha: hoyArgentinaIso(),
+      ambiente: cfg.ambiente, cbte_tipo: cbteTipo, punto_venta: puntoVenta, fecha: hoyArgentinaIso(),
       total, doc_tipo: receptor.receptor.docTipo, doc_nro: receptor.receptor.docNro, receptor_nombre: receptor.receptor.nombre,
+      receptor_condicion: receptor.receptor.condicionIva,
+      ...columnasDesglose(desglose),
     },
     () => facturaVivaDeVenta(comercioId, ventaId),
   );
@@ -205,9 +273,9 @@ export async function facturarVenta(comercioId: string, ventaId: string, documen
 }
 
 /**
- * Nota de credito C contra la factura de una venta. Sin devolucionId = anulacion
- * total; con devolucionId = el importe de esa devolucion (sin pasarse de lo que
- * queda sin acreditar de la factura).
+ * Nota de credito contra la factura de una venta (del mismo tipo: A, B o C).
+ * Sin devolucionId = anulacion total; con devolucionId = el importe de esa
+ * devolucion (sin pasarse de lo que queda sin acreditar de la factura).
  */
 export async function notaDeCredito(comercioId: string, ventaId: string, devolucionId: string | null): Promise<FilaFactura | null> {
   const original = await facturaVivaDeVenta(comercioId, ventaId);
@@ -230,15 +298,19 @@ export async function notaDeCredito(comercioId: string, ventaId: string, devoluc
   total = Math.round(total * 100) / 100;
   if (total <= 0) return null; // ya esta todo acreditado
 
+  const desgloseOriginal = desgloseDe(autorizada);
+  const cbteNc = notaCreditoDe(autorizada.cbte_tipo);
   const nc = await crearOReusar(
     {
       comercio_id: comercioId, venta_id: ventaId, devolucion_id: devolucionId, factura_asociada_id: autorizada.id,
-      ambiente: autorizada.ambiente, cbte_tipo: CBTE.NOTA_CREDITO_C, punto_venta: autorizada.punto_venta, fecha: hoyArgentinaIso(),
+      ambiente: autorizada.ambiente, cbte_tipo: cbteNc, punto_venta: autorizada.punto_venta, fecha: hoyArgentinaIso(),
       total, doc_tipo: autorizada.doc_tipo, doc_nro: autorizada.doc_nro, receptor_nombre: autorizada.receptor_nombre,
+      receptor_condicion: autorizada.receptor_condicion,
+      ...columnasDesglose(desgloseOriginal ? prorratearDesglose(desgloseOriginal, total) : null),
     },
     async () => {
       let q = supabaseAdmin.from("facturas").select("id")
-        .eq("factura_asociada_id", autorizada.id).eq("cbte_tipo", CBTE.NOTA_CREDITO_C).neq("estado", "rechazada");
+        .eq("factura_asociada_id", autorizada.id).eq("cbte_tipo", cbteNc).neq("estado", "rechazada");
       q = devolucionId ? q.eq("devolucion_id", devolucionId) : q.is("devolucion_id", null);
       const { data } = await q.maybeSingle();
       return data ? leerFactura(data.id) : null;
@@ -254,7 +326,7 @@ export async function reintentar(comercioId: string, facturaId: string): Promise
   if (f.estado === "autorizada") return f;
   if (f.estado === "rechazada") throw new Error("AFIP rechazó este comprobante: corregí el motivo y facturá de nuevo");
   const resultado = await procesar(f, await configActiva(comercioId));
-  if (resultado.estado === "autorizada" && resultado.cbte_tipo === CBTE.FACTURA_C && resultado.venta_id) {
+  if (resultado.estado === "autorizada" && esFactura(resultado.cbte_tipo) && resultado.venta_id) {
     const { data: venta } = await supabaseAdmin.from("ventas").select("estado").eq("id", resultado.venta_id).maybeSingle();
     if (venta?.estado === "anulada") await notaDeCredito(comercioId, resultado.venta_id, null).catch(() => null);
   }

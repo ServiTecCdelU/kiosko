@@ -25,7 +25,10 @@ export async function POST(req: Request) {
       case "modo": {
         if (await esComercioDemo(comercioId)) return NextResponse.json({ activo: false, modo: "manual", demo: true });
         const cfg = await leerConfigAfip(comercioId);
-        return NextResponse.json({ activo: !!cfg?.activo, modo: cfg?.modo ?? "manual", ambiente: cfg?.ambiente ?? null });
+        return NextResponse.json({
+          activo: !!cfg?.activo, modo: cfg?.modo ?? "manual", ambiente: cfg?.ambiente ?? null,
+          condicionIva: cfg?.condicion_iva ?? "monotributo",
+        });
       }
 
       case "deVentas": {
@@ -73,6 +76,9 @@ export async function POST(req: Request) {
           comprobante: {
             id: f.id, cbteTipo: f.cbte_tipo, puntoVenta: f.punto_venta, numero: Number(f.numero), fecha: f.fecha,
             total: Number(f.total), docTipo: f.doc_tipo, docNro: f.doc_nro, receptorNombre: f.receptor_nombre,
+            receptorCondicion: Number(f.receptor_condicion) || 5,
+            neto: f.neto != null ? Number(f.neto) : null, iva: f.iva != null ? Number(f.iva) : null,
+            exento: f.exento != null ? Number(f.exento) : null, alicuotas: Array.isArray(f.alicuotas) ? f.alicuotas : [],
             cae: f.cae, caeVto: f.cae_vto, ambiente: f.ambiente, asociado, items,
             qr: urlQrAfip({
               fecha: f.fecha, cuit: cfg.cuit, puntoVenta: f.punto_venta, cbteTipo: f.cbte_tipo, numero: Number(f.numero),
@@ -82,6 +88,7 @@ export async function POST(req: Request) {
           emisor: {
             razonSocial: cfg.razon_social, cuit: cfg.cuit, domicilio: cfg.domicilio,
             ingresosBrutos: cfg.ingresos_brutos, inicioActividades: cfg.inicio_actividades,
+            condicionIva: cfg.condicion_iva ?? "monotributo",
           },
         });
       }

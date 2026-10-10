@@ -56,7 +56,7 @@ export const TAREAS_AUTORIZAR: Record<"homologacion" | "produccion", Tarea[]> = 
 
 export const TAREAS_PUNTO_VENTA: Tarea[] = [
   { id: "abm", texto: <>En ARCA, abrí <b>“Administración de puntos de venta y domicilios”</b>.</>, ayuda: AYUDA_SERVICIO("Administración de puntos de venta y domicilios") },
-  { id: "agregar", texto: <>Tocá <b>“Agregar”</b>. Poné un <b>número nuevo</b> (que no uses en otro sistema), en sistema elegí <b>“Factura Electrónica - Monotributo - Web Services”</b> y el domicilio de tu comercio.</> },
+  { id: "agregar", texto: <>Tocá <b>“Agregar”</b>. Poné un <b>número nuevo</b> (que no uses en otro sistema), en sistema elegí <b>“Factura Electrónica - Monotributo - Web Services”</b> (si sos monotributista) o <b>“Factura Electrónica - Web Services”</b> (si sos responsable inscripto) y el domicilio de tu comercio.</> },
   { id: "cargar", texto: <>Cargá ese número acá abajo.</> },
 ];
 

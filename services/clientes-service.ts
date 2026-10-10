@@ -9,6 +9,7 @@ function mapCliente(d: Record<string, any>): Cliente {
     nombre: d.nombre ?? "",
     telefono: d.telefono ?? undefined,
     documento: d.documento ?? undefined,
+    condicionIva: d.condicion_iva ?? undefined,
     limiteCredito: Number(d.limite_credito) || 0,
     saldo: Number(d.saldo) || 0,
     puntos: Number(d.puntos) || 0,
@@ -65,6 +66,7 @@ export interface CrearClienteInput {
   nombre: string;
   telefono?: string;
   documento?: string;
+  condicionIva?: string;
   limiteCredito?: number;
   notas?: string;
 }

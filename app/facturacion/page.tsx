@@ -28,7 +28,7 @@ export default function FacturacionPage() {
             <AvisoVersionPaga
               icono={FileText}
               titulo="Facturación electrónica AFIP/ARCA"
-              descripcion="Emití Factura C y Nota de crédito C desde el punto de venta, con CAE y QR de AFIP, automática o a pedido."
+              descripcion="Emití Factura A, B o C y sus notas de crédito desde el punto de venta, con CAE y QR de AFIP, automática o a pedido."
             />
           </div>
         ) : error ? (

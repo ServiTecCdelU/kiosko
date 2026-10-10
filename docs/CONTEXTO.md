@@ -52,7 +52,10 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `components/facturacion/tutorial/`, con lo de ARCA como lista para tildar y los errores de ARCA
   explicados en `lib/afip/explicar-error.ts`; spec
   `docs/superpowers/specs/2026-10-03-facturacion-afip-design.md`): Factura C y Nota de
-  crédito C con certificado propio de cada comercio. El sistema genera la clave (cifrada
+  crédito C (monotributo) y, desde la migración 48, **Factura A y B** con sus notas de crédito
+  para responsable inscripto (`afip_config.condicion_iva`): A a inscriptos con CUIT, B al
+  resto, con el IVA desglosado por alícuota a partir de `productos.iva` (`lib/afip/iva.ts`,
+  spec `2026-10-10-factura-a-b-design.md`). Certificado propio de cada comercio. El sistema genera la clave (cifrada
   con `AFIP_CERT_KEY`) y el CSR; el dueño sube el `.crt`. Emisión manual (botón Facturar
   en POS y Ventas) o automática (`after()` en `/api/ventas` y en el webhook de MP).
   Anular o devolver una venta facturada emite la NC sola. Numeración con lock
@@ -184,7 +187,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 47).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 48).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -194,9 +197,9 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras` (+ `proveedor_pagos`),
   `inventarios` (+ items), `producto_lotes`, `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`48_*.sql`**. Las **44 a 47** (cuenta corriente de proveedores y
-  categoría de gastos, inventario, lotes de vencimiento, IVA) se corren **antes** de deployar
-  el código que las usa, en ese orden (la 46 redefine funciones que la 44 ya tocó).
+- La siguiente migración es **`49_*.sql`**. Las **44 a 48** (cuenta corriente de proveedores y
+  categoría de gastos, inventario, lotes de vencimiento, IVA, Factura A/B) se corren **antes**
+  de deployar el código que las usa, en ese orden (la 46 redefine funciones que la 44 ya tocó).
   La **42** (`42_aislamiento_saas.sql`) se corre
   **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
   usuario **antes** de escribir el código que lo usa; el usuario lo corre.
@@ -240,8 +243,7 @@ por categoría y pérdidas (todo 2026-10-10, specs en `docs/superpowers/specs/20
 
 ### Lo que falta para un supermercado (relevado 2026-10-10)
 
-Los seis puntos relevados ese día están hechos. Quedan como siguientes pasos naturales:
-- Factura A/B (responsable inscripto), ahora que cada producto tiene IVA.
+Los seis puntos relevados ese día están hechos, y también Factura A/B. Quedan como siguientes pasos naturales:
 - Factura electrónica por ESC/POS (hoy sale por el navegador con su QR).
 - Recordatorios de vencimiento de pago a proveedores (`compras.vence` ya existe).
 - Descontar lotes al vender (hoy la cantidad del lote es informativa).
@@ -251,7 +253,7 @@ Los seis puntos relevados ese día están hechos. Quedan como siguientes pasos n
 | # | Ítem | Nota |
 |---|---|---|
 | 4.1 | Offline completo | Existe la cola de ventas; verificar alcance real antes de prometerlo. |
-| — | Factura A/B (responsable inscripto) y CAEA (contingencia) | La v1 cubre Factura C + NC C (monotributo). |
+| — | CAEA (contingencia) | Factura A/B ya está (migración 48); falta probarla en homologación con una CUIT inscripta. |
 | — | **Probar la facturación con una CUIT real en homologación** | Lo que no se pudo probar sin certificado: CAE real, NC real, impresión con QR. |
 | — | Billing de suscripción automático | Hoy solo hay aviso de pago mensual. |
 

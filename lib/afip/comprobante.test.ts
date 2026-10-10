@@ -38,6 +38,16 @@ describe("receptorDeVenta", () => {
     const r = receptorDeVenta(5000, { documento: "123" });
     assert.ok(r.ok && r.receptor.docTipo === 99);
   });
+  test("responsable inscripto: exige CUIT y manda condicion 1", () => {
+    assert.match((receptorDeVenta(5000, { documento: "30123456" }, "responsable_inscripto") as { error: string }).error, /CUIT/);
+    const r = receptorDeVenta(5000, { documento: "20123456786", nombre: "Distribuidora SA" }, "responsable_inscripto");
+    assert.ok(r.ok && r.receptor.docTipo === 80 && r.receptor.condicionIva === 1);
+  });
+  test("monotributista y exento: condicion 6 y 4", () => {
+    assert.ok(receptorDeVenta(5000, { documento: "20123456786" }, "monotributo").ok);
+    assert.equal((receptorDeVenta(5000, null, "monotributo") as { receptor: { condicionIva: number } }).receptor.condicionIva, 6);
+    assert.equal((receptorDeVenta(5000, null, "exento") as { receptor: { condicionIva: number } }).receptor.condicionIva, 4);
+  });
   test(`desde $${UMBRAL_IDENTIFICACION} sin documento no se puede (RG 5700/2025)`, () => {
     assert.equal(receptorDeVenta(UMBRAL_IDENTIFICACION).ok, false);
     assert.equal(receptorDeVenta(UMBRAL_IDENTIFICACION - 1).ok, true);

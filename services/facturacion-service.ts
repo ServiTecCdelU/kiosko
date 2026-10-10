@@ -2,6 +2,7 @@
 import { consultar } from "@/services/api-client";
 import { apiUrl } from "@/lib/utils/api-url";
 import { descargarBlob } from "@/lib/utils/descargar";
+import type { CondicionEmisor, CondicionReceptor } from "@/lib/afip/iva";
 
 export type EstadoFactura = "pendiente" | "autorizada" | "rechazada" | "error";
 
@@ -28,6 +29,7 @@ export interface EstadoConfigAfip {
   domicilio?: string;
   inicioActividades?: string;
   ingresosBrutos?: string | null;
+  condicionIva?: CondicionEmisor;
   puntoVenta?: number | null;
   ambiente?: "homologacion" | "produccion";
   modo?: "manual" | "automatico";
@@ -46,13 +48,19 @@ export interface PasoPrueba {
 export interface Comprobante {
   comprobante: {
     id: string; cbteTipo: number; puntoVenta: number; numero: number; fecha: string; total: number;
-    docTipo: number; docNro: string; receptorNombre: string | null; cae: string; caeVto: string;
+    docTipo: number; docNro: string; receptorNombre: string | null; receptorCondicion: number; cae: string; caeVto: string;
     ambiente: "homologacion" | "produccion";
     asociado: { cbteTipo: number; puntoVenta: number; numero: number } | null;
     items: { nombre: string; cantidad: number; precio: number; subtotal: number }[];
+    /** Factura A/B: desglose declarado a AFIP. Null en Factura C. */
+    neto: number | null; iva: number | null; exento: number | null;
+    alicuotas: { id: number; alicuota: number; base: number; importe: number }[];
     qr: string;
   };
-  emisor: { razonSocial: string; cuit: string; domicilio: string; ingresosBrutos: string | null; inicioActividades: string };
+  emisor: {
+    razonSocial: string; cuit: string; domicilio: string; ingresosBrutos: string | null; inicioActividades: string;
+    condicionIva: CondicionEmisor;
+  };
 }
 
 async function pedir<T>(ruta: string, method: string, body?: unknown): Promise<T> {
@@ -91,14 +99,15 @@ export async function textoPedidoCertificado(): Promise<string> {
 }
 
 // ── Emision (cualquier rol) ──
-export const facturarVenta = (ventaId: string, documento?: string) =>
-  pedir<{ factura: FacturaResumen }>("/api/afip/facturar", "POST", { ventaId, documento }).then((r) => r.factura);
+/** condicion: del cliente que recibe (solo cuenta si el emisor es responsable inscripto). */
+export const facturarVenta = (ventaId: string, documento?: string, condicion?: CondicionReceptor) =>
+  pedir<{ factura: FacturaResumen }>("/api/afip/facturar", "POST", { ventaId, documento, condicion }).then((r) => r.factura);
 export const reintentarFactura = (facturaId: string) =>
   pedir<{ factura: FacturaResumen }>("/api/afip/reintentar", "POST", { facturaId }).then((r) => r.factura);
 
 // ── Lecturas ──
 export const getModoFacturacion = () =>
-  consultar<{ activo: boolean; modo: "manual" | "automatico"; demo?: boolean }>("/api/consultas/facturas", "modo");
+  consultar<{ activo: boolean; modo: "manual" | "automatico"; demo?: boolean; condicionIva?: CondicionEmisor }>("/api/consultas/facturas", "modo");
 export const getFacturasDeVentas = (ventaIds: string[]) =>
   consultar<{ facturas: FacturaResumen[] }>("/api/consultas/facturas", "deVentas", { ventaIds }).then((r) => r.facturas);
 export const getComprobante = (facturaId: string) =>

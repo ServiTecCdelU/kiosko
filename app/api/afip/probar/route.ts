@@ -6,7 +6,7 @@ import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { conAcceso, estadoServidores, ultimoAutorizado } from "@/lib/server/afip/cliente";
-import { CBTE } from "@/lib/afip/constantes";
+import { CBTE, NOMBRE_CBTE } from "@/lib/afip/constantes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,9 +34,11 @@ export async function POST(req: Request) {
     pasos.push({ paso: `Servidores de AFIP (${cfg.ambiente})`, ok: servOk, detalle: `app ${s.app} · base ${s.db} · acceso ${s.auth}` });
     if (!servOk) throw new Error("AFIP informa servidores con problemas. Probá más tarde.");
 
-    const ultimo = await conAcceso(cfg, (auth) => ultimoAutorizado(cfg, auth, CBTE.FACTURA_C));
+    // Se consulta el tipo que el comercio va a emitir mas (B si es inscripto, C si es monotributo).
+    const tipo = cfg.condicion_iva === "responsable_inscripto" ? CBTE.FACTURA_B : CBTE.FACTURA_C;
+    const ultimo = await conAcceso(cfg, (auth) => ultimoAutorizado(cfg, auth, tipo));
     pasos.push({ paso: "Acceso con tu certificado", ok: true, detalle: "AFIP aceptó el certificado para Facturación electrónica" });
-    pasos.push({ paso: `Punto de venta ${cfg.punto_venta}`, ok: true, detalle: `Última Factura C autorizada: ${ultimo}` });
+    pasos.push({ paso: `Punto de venta ${cfg.punto_venta}`, ok: true, detalle: `Última ${NOMBRE_CBTE[tipo]} autorizada: ${ultimo}` });
   } catch (e) {
     pasos.push({ paso: "Error", ok: false, detalle: e instanceof Error ? e.message : String(e) });
     return NextResponse.json({ ok: false, pasos, estado: estadoPublico(fila) });

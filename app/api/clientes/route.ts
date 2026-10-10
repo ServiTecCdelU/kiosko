@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { generarIdLegible } from "@/lib/server/ids";
+import { esCondicionReceptor } from "@/lib/afip/iva";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
       nombre,
       telefono: String(body?.telefono ?? "").trim() || null,
       documento: String(body?.documento ?? "").trim() || null,
+      // Para elegir Factura A o B cuando el comercio es responsable inscripto (migracion 48).
+      condicion_iva: esCondicionReceptor(body?.condicionIva) ? body.condicionIva : null,
       limite_credito: limiteCredito,
       saldo: 0,
       notas: String(body?.notas ?? "").trim() || null,

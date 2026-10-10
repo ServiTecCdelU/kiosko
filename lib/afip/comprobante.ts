@@ -1,5 +1,6 @@
 // lib/afip/comprobante.ts — reglas del comprobante (puras, testeadas).
 import { CONDICION_IVA, DOC, UMBRAL_IDENTIFICACION, URL_QR_AFIP } from "./constantes.ts";
+import { CONDICION_RECEPTOR_ID, type CondicionReceptor } from "./iva.ts";
 
 const PESOS_CUIT = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
 
@@ -25,17 +26,26 @@ export type ResultadoReceptor = { ok: true; receptor: Receptor } | { ok: false; 
  * A quien se le factura. Sin datos: consumidor final (99/0), permitido salvo
  * que el total llegue al umbral de la RG 5700/2025. Con documento del cliente
  * (fiado o elegido en el POS): DNI o CUIT/CUIL segun la cantidad de digitos.
+ * Un responsable inscripto (Factura A) tiene que identificarse con CUIT.
  */
-export function receptorDeVenta(total: number, cliente?: { documento?: string | null; nombre?: string | null } | null): ResultadoReceptor {
+export function receptorDeVenta(
+  total: number,
+  cliente?: { documento?: string | null; nombre?: string | null } | null,
+  condicion: CondicionReceptor = "consumidor_final",
+): ResultadoReceptor {
   const doc = (cliente?.documento ?? "").replace(/\D/g, "");
   const nombre = cliente?.nombre?.trim() || null;
+  const condicionIva = CONDICION_RECEPTOR_ID[condicion] ?? CONDICION_IVA.CONSUMIDOR_FINAL;
 
   if (doc.length === 11) {
     if (!cuitValido(doc)) return { ok: false, error: `El CUIT/CUIL ${doc} del cliente no es válido` };
-    return { ok: true, receptor: { docTipo: DOC.CUIT, docNro: doc, condicionIva: CONDICION_IVA.CONSUMIDOR_FINAL, nombre } };
+    return { ok: true, receptor: { docTipo: DOC.CUIT, docNro: doc, condicionIva, nombre } };
+  }
+  if (condicion === "responsable_inscripto") {
+    return { ok: false, error: "Para una Factura A hace falta el CUIT del cliente (11 números)" };
   }
   if (doc.length >= 7 && doc.length <= 8) {
-    return { ok: true, receptor: { docTipo: DOC.DNI, docNro: doc, condicionIva: CONDICION_IVA.CONSUMIDOR_FINAL, nombre } };
+    return { ok: true, receptor: { docTipo: DOC.DNI, docNro: doc, condicionIva, nombre } };
   }
   if (total >= UMBRAL_IDENTIFICACION) {
     return {
@@ -43,7 +53,7 @@ export function receptorDeVenta(total: number, cliente?: { documento?: string | 
       error: `Ventas de $${UMBRAL_IDENTIFICACION.toLocaleString("es-AR")} o más necesitan el DNI o CUIT del cliente (RG 5700/2025)`,
     };
   }
-  return { ok: true, receptor: { docTipo: DOC.CONSUMIDOR_FINAL, docNro: "0", condicionIva: CONDICION_IVA.CONSUMIDOR_FINAL, nombre } };
+  return { ok: true, receptor: { docTipo: DOC.CONSUMIDOR_FINAL, docNro: "0", condicionIva, nombre } };
 }
 
 const ZONA = "America/Argentina/Buenos_Aires";

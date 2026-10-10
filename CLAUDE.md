@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `47`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `48`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -152,7 +152,8 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
   tabla `superadmins` (panel `/superadmin`, puede entrar a un comercio en modo soporte).
 - Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`.
 - Sesión: cookie `kiosko_sesion` firmada con HMAC (12 h). Demo pública: slug `demo`, PIN `1234`.
-- Facturación AFIP/ARCA (Factura C + NC C) en `lib/afip/` (puro, testeado) y
+- Facturación AFIP/ARCA (Factura C para monotributo; A y B con IVA por alícuota para
+  responsable inscripto, más sus notas de crédito) en `lib/afip/` (puro, testeado) y
   `lib/server/afip/`. Conexión a AFIP **solo** por `lib/server/afip/soap.ts` (producción
   exige TLS SECLEVEL=1). En la demo, MP y AFIP muestran "disponible en la versión paga".
 - Alta self-service en `/registro`: Google → formulario → comercio en prueba (RPC atómica

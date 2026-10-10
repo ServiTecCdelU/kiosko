@@ -52,7 +52,7 @@ export const HOJAS: Hoja[] = [
   {
     nombre: "Clientes", tabla: "clientes", orden: "nombre",
     columnas: [
-      c("nombre", "Nombre"), c("telefono", "Teléfono"), c("documento", "Documento"),
+      c("nombre", "Nombre"), c("telefono", "Teléfono"), c("documento", "Documento"), c("condicion_iva", "Condición IVA"),
       c("saldo", "Saldo (deuda)", "numero"), c("limite_credito", "Límite de crédito", "numero"),
       c("puntos", "Puntos", "numero"), c("activo", "Activo", "bool"), c("notas", "Notas"),
       c("created_at", "Alta", "fecha"), c("id", "ID"),

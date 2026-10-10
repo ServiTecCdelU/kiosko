@@ -14,6 +14,8 @@ const esquemaDatos = z.object({
   domicilio: z.string().trim().min(5, "Poné el domicilio comercial").max(200),
   inicioActividades: fechaIso,
   ingresosBrutos: z.string().trim().max(40).optional().transform((v) => v || null),
+  /** Monotributo emite Factura C; responsable inscripto, A y B (migracion 48). */
+  condicionIva: z.enum(["monotributo", "responsable_inscripto"]).default("monotributo"),
 });
 
 export type DatosFiscales = z.infer<typeof esquemaDatos>;

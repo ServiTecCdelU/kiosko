@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FileText, Loader2 } from "lucide-react";
-import { CBTE } from "@/lib/afip/constantes";
+import { esFactura } from "@/lib/afip/constantes";
 import { useImprimirComprobante } from "@/components/facturacion/comprobante-fiscal";
 import { facturarVenta, getFacturasDeVentas, getModoFacturacion } from "@/services/facturacion-service";
 
@@ -29,7 +29,7 @@ export function FacturaPos({ ventaId }: { ventaId: string | null }) {
         if (f.estado !== "autorizada") throw new Error(f.error ?? "AFIP no autorizó la factura. Reintentá desde Ventas.");
         await imprimir(f.id);
       } else {
-        const f = (await getFacturasDeVentas([ventaId])).find((x) => x.cbte_tipo === CBTE.FACTURA_C && x.estado !== "rechazada");
+        const f = (await getFacturasDeVentas([ventaId])).find((x) => esFactura(x.cbte_tipo) && x.estado !== "rechazada");
         if (f?.estado === "autorizada") await imprimir(f.id);
         else if (f?.estado === "error") toast.error(`La factura tuvo un error: ${f.error ?? ""}. Reintentá desde Ventas.`);
         else toast.info("La factura se está emitiendo. Probá de nuevo en unos segundos.");

@@ -100,6 +100,8 @@ export interface Cliente {
   nombre: string;
   telefono?: string;
   documento?: string;
+  /** Condicion frente al IVA (lib/afip/iva.ts): decide Factura A o B si el comercio es inscripto. */
+  condicionIva?: string;
   limiteCredito: number;
   saldo: number; // deuda actual (positivo = debe)
   puntos: number; // programa de fidelidad, se ganan con cualquier venta asociada

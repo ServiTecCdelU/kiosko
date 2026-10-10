@@ -3,6 +3,8 @@
 // components/facturacion/factura-venta.tsx — la factura electronica de una venta:
 // seccion del detalle (Facturar / Reintentar / Imprimir, notas de credito) y
 // badge para la tabla de Ventas. Solo aparece si el comercio factura.
+// Si el comercio es responsable inscripto, al facturar se elige la condicion
+// del cliente (A a inscriptos con CUIT, B al resto).
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FileCheck2, FileWarning, Loader2, Printer, RotateCw } from "lucide-react";
@@ -11,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { CBTE, NOMBRE_CBTE, UMBRAL_IDENTIFICACION } from "@/lib/afip/constantes";
+import { esFactura, LETRA_CBTE, NOMBRE_CBTE, UMBRAL_IDENTIFICACION } from "@/lib/afip/constantes";
 import { numeroComprobante } from "@/lib/afip/comprobante";
+import { CONDICIONES_RECEPTOR, type CondicionEmisor, type CondicionReceptor } from "@/lib/afip/iva";
 import { useImprimirComprobante } from "@/components/facturacion/comprobante-fiscal";
 import {
   facturarVenta, getFacturasDeVentas, getModoFacturacion, reintentarFactura, type FacturaResumen,
@@ -52,15 +55,16 @@ export function useFacturasPorVenta(ventaIds: string[], activa: boolean) {
 }
 
 const facturaDe = (fs: FacturaResumen[] | undefined) =>
-  fs?.filter((f) => f.cbte_tipo === CBTE.FACTURA_C && f.estado !== "rechazada").at(-1);
+  fs?.filter((f) => esFactura(f.cbte_tipo) && f.estado !== "rechazada").at(-1);
 
 export function FacturaBadge({ facturas }: { facturas: FacturaResumen[] | undefined }) {
   const f = facturaDe(facturas);
   if (!f) return null;
+  const letra = LETRA_CBTE[f.cbte_tipo] ?? "C";
   if (f.estado === "autorizada") {
-    return <Badge variant="outline" className="border-success/50 text-success" title={`CAE ${f.cae}`}>FC {f.numero}</Badge>;
+    return <Badge variant="outline" className="border-success/50 text-success" title={`CAE ${f.cae}`}>F{letra} {f.numero}</Badge>;
   }
-  return <Badge variant="outline" className="border-destructive/50 text-destructive" title={f.error ?? ""}>FC con error</Badge>;
+  return <Badge variant="outline" className="border-destructive/50 text-destructive" title={f.error ?? ""}>F{letra} con error</Badge>;
 }
 
 const ESTADO_TEXTO: Record<FacturaResumen["estado"], string> = {
@@ -78,24 +82,31 @@ interface FacturaVentaSeccionProps {
 }
 
 export function FacturaVentaSeccion({ ventaId, total, anulada, onCambio }: FacturaVentaSeccionProps) {
-  const activa = useFacturacionActiva();
+  const [emisor, setEmisor] = useState<CondicionEmisor | null>(null);
   const [facturas, setFacturas] = useState<FacturaResumen[] | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   const [documento, setDocumento] = useState("");
+  const [condicion, setCondicion] = useState<CondicionReceptor>("consumidor_final");
   const { imprimir, cargando, elemento } = useImprimirComprobante();
+
+  useEffect(() => {
+    getModoFacturacion().then((m) => setEmisor(m.activo ? m.condicionIva ?? "monotributo" : null)).catch(() => setEmisor(null));
+  }, []);
 
   const cargar = useCallback(async () => {
     setFacturas(await getFacturasDeVentas([ventaId]).catch(() => []));
   }, [ventaId]);
 
   useEffect(() => {
-    if (activa) cargar();
-  }, [activa, cargar]);
+    if (emisor) cargar();
+  }, [emisor, cargar]);
 
-  if (!activa || facturas === null) return null;
+  if (!emisor || facturas === null) return null;
 
   const viva = facturaDe(facturas);
-  const necesitaDocumento = total >= UMBRAL_IDENTIFICACION;
+  const inscripto = emisor === "responsable_inscripto";
+  const exigeCuit = inscripto && condicion === "responsable_inscripto";
+  const necesitaDocumento = total >= UMBRAL_IDENTIFICACION || exigeCuit;
 
   const accion = async (fn: () => Promise<FacturaResumen>, exito: string) => {
     setTrabajando(true);
@@ -144,23 +155,48 @@ export function FacturaVentaSeccion({ ventaId, total, anulada, onCambio }: Factu
       ))}
 
       {!viva && !anulada && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            value={documento}
-            onChange={(e) => setDocumento(e.target.value)}
-            placeholder={necesitaDocumento ? "DNI o CUIT del cliente (obligatorio)" : "DNI o CUIT del cliente (opcional)"}
-            className="h-9 rounded-xl"
-            inputMode="numeric"
-            maxLength={20}
-          />
-          <Button
-            className="h-9 shrink-0 rounded-xl"
-            disabled={trabajando || (necesitaDocumento && !documento.trim())}
-            onClick={() => accion(() => facturarVenta(ventaId, documento.trim() || undefined), "Factura autorizada por AFIP")}
-          >
-            {trabajando && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Facturar
-          </Button>
+        <div className="space-y-2">
+          {inscripto && (
+            <div className="flex flex-wrap gap-1.5">
+              {CONDICIONES_RECEPTOR.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setCondicion(c.value)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    condicion === c.value ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {c.label}
+                </button>
+              ))}
+              <span className="self-center text-xs text-muted-foreground">
+                → {condicion === "responsable_inscripto" ? "Factura A" : "Factura B"}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={documento}
+              onChange={(e) => setDocumento(e.target.value)}
+              placeholder={exigeCuit ? "CUIT del cliente (obligatorio)" : necesitaDocumento ? "DNI o CUIT del cliente (obligatorio)" : "DNI o CUIT del cliente (opcional)"}
+              className="h-9 rounded-xl"
+              inputMode="numeric"
+              maxLength={20}
+            />
+            <Button
+              className="h-9 shrink-0 rounded-xl"
+              disabled={trabajando || (necesitaDocumento && !documento.trim())}
+              onClick={() => accion(
+                () => facturarVenta(ventaId, documento.trim() || undefined, inscripto ? condicion : undefined),
+                "Factura autorizada por AFIP",
+              )}
+            >
+              {trabajando && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Facturar
+            </Button>
+          </div>
         </div>
       )}
       {elemento}

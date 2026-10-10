@@ -1,15 +1,43 @@
 // lib/afip/constantes.ts — codigos y direcciones de AFIP/ARCA usados por la facturacion.
 // Spec: docs/superpowers/specs/2026-10-03-facturacion-afip-design.md
+//       docs/superpowers/specs/2026-10-10-factura-a-b-design.md
 
 export type Ambiente = "homologacion" | "produccion";
 
-export const CBTE = { FACTURA_C: 11, NOTA_CREDITO_C: 13 } as const;
+export const CBTE = {
+  FACTURA_A: 1, NOTA_CREDITO_A: 3,
+  FACTURA_B: 6, NOTA_CREDITO_B: 8,
+  FACTURA_C: 11, NOTA_CREDITO_C: 13,
+} as const;
 export type CbteTipo = (typeof CBTE)[keyof typeof CBTE];
 
 export const NOMBRE_CBTE: Record<number, string> = {
+  [CBTE.FACTURA_A]: "Factura A",
+  [CBTE.NOTA_CREDITO_A]: "Nota de crédito A",
+  [CBTE.FACTURA_B]: "Factura B",
+  [CBTE.NOTA_CREDITO_B]: "Nota de crédito B",
   [CBTE.FACTURA_C]: "Factura C",
   [CBTE.NOTA_CREDITO_C]: "Nota de crédito C",
 };
+
+/** Letra del comprobante, para badges y numeros ("FA 12"). */
+export const LETRA_CBTE: Record<number, "A" | "B" | "C"> = {
+  [CBTE.FACTURA_A]: "A", [CBTE.NOTA_CREDITO_A]: "A",
+  [CBTE.FACTURA_B]: "B", [CBTE.NOTA_CREDITO_B]: "B",
+  [CBTE.FACTURA_C]: "C", [CBTE.NOTA_CREDITO_C]: "C",
+};
+
+export const TIPOS_FACTURA: readonly number[] = [CBTE.FACTURA_A, CBTE.FACTURA_B, CBTE.FACTURA_C];
+export const TIPOS_NOTA_CREDITO: readonly number[] = [CBTE.NOTA_CREDITO_A, CBTE.NOTA_CREDITO_B, CBTE.NOTA_CREDITO_C];
+
+export const esFactura = (cbteTipo: number) => TIPOS_FACTURA.includes(cbteTipo);
+
+/** Nota de credito que anula o ajusta una factura de ese tipo. */
+export function notaCreditoDe(cbteFactura: number): number {
+  if (cbteFactura === CBTE.FACTURA_A) return CBTE.NOTA_CREDITO_A;
+  if (cbteFactura === CBTE.FACTURA_B) return CBTE.NOTA_CREDITO_B;
+  return CBTE.NOTA_CREDITO_C;
+}
 
 /** Tipos de documento del receptor (tabla de AFIP). */
 export const DOC = { CUIT: 80, CUIL: 86, DNI: 96, CONSUMIDOR_FINAL: 99 } as const;

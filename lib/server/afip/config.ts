@@ -14,6 +14,8 @@ export interface FilaConfigAfip {
   domicilio: string;
   inicio_actividades: string;
   ingresos_brutos: string | null;
+  /** monotributo = Factura C; responsable_inscripto = Factura A/B con IVA discriminado. */
+  condicion_iva: "monotributo" | "responsable_inscripto";
   punto_venta: number | null;
   ambiente: Ambiente;
   modo: "manual" | "automatico";
@@ -47,6 +49,7 @@ export function estadoPublico(fila: FilaConfigAfip | null) {
     domicilio: fila.domicilio,
     inicioActividades: fila.inicio_actividades,
     ingresosBrutos: fila.ingresos_brutos,
+    condicionIva: fila.condicion_iva ?? "monotributo",
     puntoVenta: fila.punto_venta,
     ambiente: fila.ambiente,
     modo: fila.modo,
@@ -88,6 +91,7 @@ export async function guardarDatosFiscales(comercioId: string, d: DatosFiscales)
     domicilio: d.domicilio,
     inicio_actividades: d.inicioActividades,
     ingresos_brutos: d.ingresosBrutos,
+    condicion_iva: d.condicionIva,
   };
   if (!previa) {
     const { data, error } = await supabaseAdmin

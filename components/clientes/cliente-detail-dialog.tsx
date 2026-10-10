@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { getCliente, getMovimientos, registrarPago, canjearPuntos } from "@/services/clientes-service";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { CONDICIONES_RECEPTOR } from "@/lib/afip/iva";
 import type { Cliente, CuentaMov } from "@/lib/types";
 
 interface ClienteDetailDialogProps {
@@ -128,6 +129,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {cliente.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{cliente.telefono}</span>}
                 {cliente.documento && <span className="flex items-center gap-1"><Contact className="h-3 w-3" />{cliente.documento}</span>}
+                {cliente.condicionIva && <span>{CONDICIONES_RECEPTOR.find((c) => c.value === cliente.condicionIva)?.label ?? cliente.condicionIva}</span>}
                 {cliente.limiteCredito > 0 && <span>Límite: {formatCurrency(cliente.limiteCredito)}</span>}
               </div>
             </div>

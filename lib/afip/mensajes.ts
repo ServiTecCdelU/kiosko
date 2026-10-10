@@ -133,28 +133,42 @@ export interface DetalleComprobante {
   condicionIva: number;
   /** Nota de credito: comprobante que anula o ajusta. */
   asociado?: { cbteTipo: number; puntoVenta: number; numero: number; cuit: string; fecha: string } | null;
+  /**
+   * Factura A/B (emisor inscripto): neto gravado, IVA por alicuota y exento.
+   * Sin desglose = clase C (neto = total, IVA 0). Debe cumplir
+   * total = neto + iva + exento (lib/afip/iva.ts lo garantiza).
+   */
+  desglose?: { neto: number; iva: number; exento: number; alicuotas: { id: number; base: number; importe: number }[] } | null;
 }
 
 /**
- * FECAESolicitar de un comprobante clase C. El ORDEN de los elementos es el
- * del XSD de WSFEv1 (si no, AFIP rechaza el XML): ... MonId, MonCotiz,
- * CondicionIVAReceptorId, CbtesAsoc.
+ * FECAESolicitar de un comprobante. El ORDEN de los elementos es el del XSD de
+ * WSFEv1 (si no, AFIP rechaza el XML): ... MonId, MonCotiz,
+ * CondicionIVAReceptorId, CbtesAsoc, Iva.
  */
 export function sobreSolicitarCAE(auth: Auth, d: DetalleComprobante): string {
   const total = importeAfip(d.total);
   const asociado = d.asociado
     ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${d.asociado.cbteTipo}</ar:Tipo><ar:PtoVta>${d.asociado.puntoVenta}</ar:PtoVta><ar:Nro>${d.asociado.numero}</ar:Nro><ar:Cuit>${d.asociado.cuit}</ar:Cuit><ar:CbteFch>${fechaAfip(d.asociado.fecha)}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>`
     : "";
+  const g = d.desglose;
+  const neto = g ? importeAfip(g.neto) : total;
+  const opEx = g ? importeAfip(g.exento) : "0.00";
+  const impIva = g ? importeAfip(g.iva) : "0.00";
+  const iva = g && g.alicuotas.length > 0
+    ? `<ar:Iva>${g.alicuotas.map((a) => `<ar:AlicIva><ar:Id>${a.id}</ar:Id><ar:BaseImp>${importeAfip(a.base)}</ar:BaseImp><ar:Importe>${importeAfip(a.importe)}</ar:Importe></ar:AlicIva>`).join("")}</ar:Iva>`
+    : "";
   const detalle =
     `<ar:Concepto>${CONCEPTO_PRODUCTOS}</ar:Concepto>` +
     `<ar:DocTipo>${d.docTipo}</ar:DocTipo><ar:DocNro>${escaparXml(d.docNro)}</ar:DocNro>` +
     `<ar:CbteDesde>${d.numero}</ar:CbteDesde><ar:CbteHasta>${d.numero}</ar:CbteHasta>` +
     `<ar:CbteFch>${fechaAfip(d.fecha)}</ar:CbteFch>` +
-    `<ar:ImpTotal>${total}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${total}</ar:ImpNeto>` +
-    `<ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>0.00</ar:ImpIVA>` +
+    `<ar:ImpTotal>${total}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${neto}</ar:ImpNeto>` +
+    `<ar:ImpOpEx>${opEx}</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${impIva}</ar:ImpIVA>` +
     `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz>` +
     `<ar:CondicionIVAReceptorId>${d.condicionIva}</ar:CondicionIVAReceptorId>` +
-    asociado;
+    asociado +
+    iva;
   return sobreWsfe(
     "FECAESolicitar",
     auth,
