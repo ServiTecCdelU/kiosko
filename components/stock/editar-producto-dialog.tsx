@@ -308,7 +308,8 @@ export function EditarProductoDialog({
               </Button>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Con lotes, el aviso de vencimiento usa el más próximo. Los lotes también se cargan al recibir una compra.
+              Con lotes, el aviso de vencimiento usa el más próximo. Los lotes se cargan al recibir una compra, se descuentan
+              al vender (primero el que vence antes) y se dan de baja solos cuando se terminan.
             </p>
           </div>
 

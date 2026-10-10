@@ -189,7 +189,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 
 ## 4. Base de datos (Supabase propio)
 
-- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 49).
+- Migraciones en `supabase/NN_*.sql`, **numeradas y en orden** (hoy 01 → 50).
   Se corren a mano en el SQL Editor de Supabase. Una base nueva = correrlas
   todas en orden (`04_rls_off` queda neutralizada por `22_cerrar_anon_rls`).
 - Después de una base nueva: dar de alta el primer superadmin (comentario al
@@ -199,8 +199,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   `productos`, `stock_movimientos`, `ventas`, `caja` (+ movimientos de caja),
   `clientes` (+ cuenta corriente, puntos), `proveedores`, `compras` (+ `proveedor_pagos`),
   `inventarios` (+ items), `producto_lotes`, `ofertas`/combos (+ historial), sorteos/premios, `sync_log`.
-- La siguiente migración es **`50_*.sql`**. Las **44 a 49** (cuenta corriente de proveedores y
-  categoría de gastos, inventario, lotes de vencimiento, IVA, Factura A/B, billing) se corren **antes**
+- La siguiente migración es **`51_*.sql`**. Las **44 a 50** (cuenta corriente de proveedores y
+  categoría de gastos, inventario, lotes de vencimiento, IVA, Factura A/B, billing, descuento de lotes) se corren **antes**
   de deployar el código que las usa, en ese orden (la 46 redefine funciones que la 44 ya tocó).
   La **42** (`42_aislamiento_saas.sql`) se corre
   **después** de deployar el código del mismo commit (borra funciones que el código viejo usaba). Regla: informar el SQL exacto al
@@ -249,8 +249,9 @@ por categoría y pérdidas (todo 2026-10-10, specs en `docs/superpowers/specs/20
 Los seis puntos relevados ese día están hechos, y también Factura A/B, la factura por
 ESC/POS y los recordatorios de pago a proveedores (fecha pactada en la recepción y en
 Cuenta corriente, tarjeta "Pagos a proveedores" en el inicio; `lib/proveedores-vencimientos.ts`).
-Queda como siguiente paso natural:
-- Descontar lotes al vender (hoy la cantidad del lote es informativa).
+Los lotes también se descuentan al vender (migración 50, trigger en `stock_movimientos`:
+FIFO por fecha, devolución al anular, baja automática del lote agotado). No queda nada
+pendiente de ese relevamiento.
 
 ### Pendiente (lo que sigue del plan maestro)
 

@@ -15,7 +15,7 @@ yogur con fechas distintas y solo podía anotar una.
 | Un producto sin lotes conserva la fecha manual; uno que tuvo lotes y ya no tiene activos queda sin fecha | Para el kiosko que nunca usa lotes nada cambia. |
 | La recepción de compra acepta fecha por ítem y crea el lote | Es el momento natural: el remito en la mano. |
 | Lotes a mano y "dar de baja" desde Editar producto | Cuando se termina o se tira un lote, se da de baja y la fecha pasa al siguiente. Dar de baja no toca stock: si se tiró mercadería, se registra la merma aparte. |
-| Las ventas no descuentan de los lotes | Llevar FIFO por lote en la venta es otro nivel de complejidad. La cantidad del lote es informativa ("entraron 24"). |
+| ~~Las ventas no descuentan de los lotes~~ **Sí descuentan** (migración 50, mismo día): un trigger en `stock_movimientos` consume el lote que vence antes (FIFO por fecha) en ventas y mermas, devuelve en anulaciones y devoluciones, da de baja el lote agotado y pasa la fecha del producto al siguiente | Un trigger cubre todos los caminos (POS, cola offline, webhook de MP) sin tocar `process_sale_kiosko`. Un lote cargado solo con fecha (cantidad 0) sigue siendo informativo y nunca se toca. Lo vendido que no entra en ningún lote no se registra. Test: `tests/db/lotes.test.ts`. |
 
 API: `POST /api/lotes` (crear a mano), `DELETE /api/lotes` (baja); consulta `lotes` en
 `/api/consultas/productos`.
