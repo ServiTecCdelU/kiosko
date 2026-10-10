@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { CONTACT } from "@/lib/marketing/contact";
 import { trackWhatsAppClick } from "@/lib/analytics";
-import { METODO_PAGO_LABEL, montoMensual, textoPeriodo } from "@/lib/suscripcion";
+import { METODO_PAGO_LABEL, montoMensual, planIncluyeFacturacion, textoPeriodo } from "@/lib/suscripcion";
+import { PLANES_REGISTRO } from "@/lib/registro";
 import {
   activarDebito, cambiarPlan, cancelarDebito, crearLinkDePago, getSuscripcion, type EstadoSuscripcion, type PlanContratable,
 } from "@/services/billing-service";
@@ -123,7 +124,10 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
       : vigente
         ? `Lo que ya pagaste sigue vigente hasta el ${formatDate(estado.suscripcionHasta!)}; desde el mes siguiente se cobra ${formatCurrency(nuevo)} por mes.`
         : `Desde ahora la suscripción cuesta ${formatCurrency(nuevo)} por mes.`;
-    if (!window.confirm(`¿Cambiar al plan ${p.nombre}? El cambio aplica al instante. ${detalle}`)) return;
+    const pierdeFacturacion = planIncluyeFacturacion(estado.plan) && !planIncluyeFacturacion(p.plan)
+      ? " Ojo: el plan Básico no incluye facturación electrónica; tu configuración de ARCA queda guardada pero no vas a poder facturar hasta volver a Pro."
+      : "";
+    if (!window.confirm(`¿Cambiar al plan ${p.nombre}? El cambio aplica al instante. ${detalle}${pierdeFacturacion}`)) return;
     setCambiando(true);
     try {
       const r = await cambiarPlan(p.plan);
@@ -220,6 +224,7 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
                       : `${p.cajasIncluidas} caja${p.cajasIncluidas === 1 ? "" : "s"} incluida${p.cajasIncluidas === 1 ? "" : "s"}; cada caja extra ${formatCurrency(p.precioCajaExtra)} por mes`}
                     {p.descripcion && ` · ${p.descripcion}`}
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{PLANES_REGISTRO.find((r) => r.id === p.plan)?.detalle}</p>
                   {!actual && (
                     <>
                       <Button variant="outline" size="sm" className="mt-2 rounded-2xl" disabled={cambiando || !!bloqueo} onClick={() => cambiar(p)}>

@@ -4,13 +4,12 @@
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
+import { facturacionEnPlan, motivoSinFacturacion } from "@/lib/server/afip/plan";
 import { estadoPublico, guardarDatosFiscales, guardarOperacion, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { validarDatosFiscales, validarOperacion } from "@/lib/afip/datos-fiscales";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const VERSION_PAGA = "La facturación electrónica está disponible en la versión paga.";
 
 const fallo = (e: unknown, status = 400) => NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status });
 
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
   const comercioId = comercioIdDeSesion(req);
   try {
     if (await esComercioDemo(comercioId)) return NextResponse.json({ configurado: false, demo: true });
-    return NextResponse.json(estadoPublico(await leerConfigAfip(comercioId)));
+    return NextResponse.json({ ...estadoPublico(await leerConfigAfip(comercioId)), planPermite: await facturacionEnPlan(comercioId) });
   } catch (e) {
     return fallo(e, 500);
   }
@@ -34,7 +33,8 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) return fallo(VERSION_PAGA, 403);
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return fallo(motivo, 403);
   const v = validarDatosFiscales(await cuerpo(req));
   if (!v.ok) return fallo(v.error);
   try {
@@ -46,7 +46,8 @@ export async function PUT(req: Request) {
 
 export async function PATCH(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) return fallo(VERSION_PAGA, 403);
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return fallo(motivo, 403);
   const body = await cuerpo(req);
   try {
     if (body?.activo === false) return NextResponse.json(estadoPublico(await marcarActivo(comercioId, false)));

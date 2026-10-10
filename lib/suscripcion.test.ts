@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   coberturaDelPago, descripcionPago, esPrincipalDelGrupo, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo,
-  validarCambioDePlan,
+  planIncluyeFacturacion, validarCambioDePlan,
 } from "./suscripcion.ts";
 
 describe("periodos y fin de mes en hora argentina", () => {
@@ -89,5 +89,14 @@ describe("validarCambioDePlan (el comercio elige su plan)", () => {
     assert.equal(validarCambioDePlan({ actual: "basico", nuevo: "free", cajasActivas: 1, tarifaNueva: basico }).ok, false);
     assert.equal(validarCambioDePlan({ actual: "basico", nuevo: "premium", cajasActivas: 1, tarifaNueva: basico }).ok, false);
     assert.equal(validarCambioDePlan({ actual: "basico", nuevo: undefined, cajasActivas: 1, tarifaNueva: basico }).ok, false);
+  });
+});
+
+describe("funciones por plan", () => {
+  test("facturacion electronica: solo el Basico queda afuera", () => {
+    assert.equal(planIncluyeFacturacion("basico"), false);
+    assert.equal(planIncluyeFacturacion("pro"), true);
+    assert.equal(planIncluyeFacturacion("free"), true, "free lo asigna el superadmin: sin limites");
+    assert.equal(planIncluyeFacturacion(undefined), true, "sin plan cargado no se bloquea nada");
   });
 });

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinFacturacion } from "@/lib/server/afip/plan";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarCaeaActivo } from "@/lib/server/afip/config";
 import { asegurarCaeas, caeasGuardados, informarPendientes, informarSinMovimiento, pedirCaea } from "@/lib/server/afip/caea";
@@ -59,7 +60,8 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) return fallo("La facturación electrónica está disponible en la versión paga.", 403);
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return fallo(motivo, 403);
   const body = await req.json().catch(() => null);
   try {
     const fila = await marcarCaeaActivo(comercioId, body?.activo === true);
@@ -71,7 +73,8 @@ export async function PATCH(req: Request) {
 
 export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) return fallo("La facturación electrónica está disponible en la versión paga.", 403);
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return fallo(motivo, 403);
   const body = await req.json().catch(() => null);
   try {
     const cfg = configOperativa(await leerConfigAfip(comercioId));

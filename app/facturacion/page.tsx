@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AvisoVersionPaga, useEsDemo } from "@/components/home/aviso-version-paga";
 import { AsistenteAfip } from "@/components/facturacion/asistente-afip";
+import { AvisoPlanPro } from "@/components/facturacion/aviso-plan-pro";
 import { ContingenciaCaea } from "@/components/facturacion/contingencia-caea";
 import { MercadoPagoCard } from "@/components/home/mercadopago-card";
 import { getConfigAfip, type EstadoConfigAfip } from "@/services/facturacion-service";
@@ -38,6 +39,12 @@ export default function FacturacionPage() {
         ) : !estado ? (
           <div className="mx-auto max-w-3xl space-y-4">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
+          </div>
+        ) : estado.planPermite === false ? (
+          // Plan Basico: la facturacion es del Pro. Mercado Pago (abajo) si esta incluido.
+          <div className="mx-auto flex max-w-3xl flex-col gap-4">
+            <AvisoPlanPro />
+            <MercadoPagoCard />
           </div>
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-4">

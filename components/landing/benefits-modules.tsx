@@ -71,7 +71,7 @@ export function Benefits() {
   )
 }
 
-const MODULES: { icon: LucideIcon; title: string; text: string; soon?: boolean }[] = [
+const MODULES: { icon: LucideIcon; title: string; text: string; soon?: boolean; pro?: boolean }[] = [
   { icon: ShoppingCart, title: 'Punto de venta', text: 'Escaneá, cobrá y emití el ticket en segundos.' },
   { icon: Wallet, title: 'Caja', text: 'Apertura, cierre y arqueo por turno y cajero.' },
   { icon: Receipt, title: 'Ventas', text: 'Historial de tickets, devoluciones y anulaciones.' },
@@ -83,8 +83,8 @@ const MODULES: { icon: LucideIcon; title: string; text: string; soon?: boolean }
   { icon: ChartColumn, title: 'Reportes', text: 'Ventas, márgenes y productos más vendidos.' },
   { icon: RefreshCw, title: 'Sincronización', text: 'Catálogo y precios actualizados de tu distribuidora.' },
   { icon: FileSpreadsheet, title: 'Importación Excel', text: 'Traé tus productos y precios en minutos.' },
-  { icon: Scale, title: 'Balanza', text: 'Venta por peso con etiquetas de balanza.', soon: true },
-  { icon: FileText, title: 'Factura electrónica', text: 'Preparado para ARCA.', soon: true },
+  { icon: Scale, title: 'Balanza', text: 'Venta por peso y lectura de las etiquetas de la balanza.' },
+  { icon: FileText, title: 'Factura electrónica', text: 'Factura A, B y C de ARCA con CAE y QR, desde la venta.', pro: true },
 ]
 
 export function Modules() {
@@ -106,6 +106,10 @@ export function Modules() {
               {m.soon ? (
                 <span className="absolute right-4 top-4 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
                   Próximamente
+                </span>
+              ) : m.pro ? (
+                <span className="absolute right-4 top-4 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-sky-300">
+                  Plan Pro
                 </span>
               ) : null}
               <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-sky-300 ring-1 ring-primary/20">

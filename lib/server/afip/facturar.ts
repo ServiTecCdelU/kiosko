@@ -24,7 +24,7 @@ import { ErrorAfip, type DetalleComprobante } from "@/lib/afip/mensajes";
 import { configOperativa, leerConfigAfip, type ConfigOperativa } from "@/lib/server/afip/config";
 import { conAcceso, consultarComprobante, solicitarCAE, ultimoAutorizado } from "@/lib/server/afip/cliente";
 import { asegurarCaeas, caeaVigente, informarPendientes } from "@/lib/server/afip/caea";
-import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinFacturacion } from "@/lib/server/afip/plan";
 
 export interface FilaFactura {
   id: string;
@@ -248,7 +248,9 @@ async function procesar(f: FilaFactura, cfgActual: ConfigOperativa): Promise<Fil
 }
 
 async function configActiva(comercioId: string): Promise<ConfigOperativa> {
-  if (await esComercioDemo(comercioId)) throw new Error("La facturación electrónica está disponible en la versión paga.");
+  // Demo o plan Basico: no se emite nada, aunque la configuracion haya quedado activa.
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) throw new Error(motivo);
   const fila = await leerConfigAfip(comercioId);
   if (!fila?.activo) throw new Error("La facturación electrónica no está activada. Configurala en Facturación.");
   return configOperativa(fila);

@@ -119,6 +119,18 @@ export function puedeSumarCaja(t: TarifaPlan, cajasActivas: number): boolean {
   return t.maxCajas === null || cajasActivas < t.maxCajas;
 }
 
+// ---- Funciones por plan (decidido 2026-10-10) ----
+
+/**
+ * La facturacion electronica es del plan Pro. "free" lo asigna el superadmin
+ * (cortesia o comercio propio) y no se le limita nada.
+ */
+export function planIncluyeFacturacion(plan: unknown): boolean {
+  return plan !== "basico";
+}
+
+export const MENSAJE_FACTURACION_PRO = "La facturación electrónica es del plan Pro. Pasá a Pro desde Suscripción para usarla.";
+
 // ---- Cambio de plan por el propio comercio (decidido 2026-10-10) ----
 
 /** Planes que el comercio puede elegir solo. "free" lo asigna el superadmin. */

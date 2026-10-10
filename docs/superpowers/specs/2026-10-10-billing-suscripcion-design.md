@@ -53,6 +53,25 @@ superadmin los puede seguir editando.)
   "principal" a mano y nadie termina con todas las sucursales descontadas.
 - El descuento aplicado queda en cada pago (`saas_pagos.descuento_pct`) y se ve en Suscripción.
 
+## Funciones por plan (decidido 2026-10-10)
+
+| Función | Básico | Pro | Free (lo asigna el superadmin) |
+|---|---|---|---|
+| POS, caja, stock, clientes, reportes, Mercado Pago | sí | sí | sí |
+| Cajas | 1 | sin tope ($10.000 c/u extra) | sin tope |
+| **Facturación electrónica ARCA** (A, B, C, NC, CAEA) | **no** | sí | sí |
+
+- Regla pura: `planIncluyeFacturacion` en `lib/suscripcion.ts` (solo `basico` queda afuera;
+  sin plan o `free` no se bloquea nada).
+- Servidor: `lib/server/afip/plan.ts` (`motivoSinFacturacion`: demo o Básico). Lo aplican la
+  emisión (`configActiva` en `facturar.ts`, cubre POS manual y automático, NC y CAEA) y las
+  rutas de `/api/afip` que escriben. `GET /api/afip/config` devuelve `planPermite`.
+- Pantalla: `/facturacion` en Básico muestra un modal "Facturación electrónica: plan Pro" con
+  botón a `/suscripcion` y, detrás, una tarjeta bloqueada con el mismo aviso
+  (`components/facturacion/aviso-plan-pro.tsx`). Los cobros con Mercado Pago quedan usables.
+- Bajar de Pro a Básico conserva la configuración de ARCA (certificado, punto de venta); solo
+  deja de emitir hasta volver a Pro. El confirm del cambio lo avisa.
+
 ## Cambio de plan por el comercio (decidido 2026-10-10, sin migración)
 
 El dueño cambia solo entre Básico y Pro desde `/suscripcion` (`POST /api/billing/plan`,

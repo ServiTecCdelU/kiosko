@@ -28,6 +28,8 @@ export interface FacturaResumen {
 export interface EstadoConfigAfip {
   configurado: boolean;
   demo?: boolean;
+  /** false si el plan del comercio (Básico) no incluye facturación electrónica. */
+  planPermite?: boolean;
   cuit?: string;
   razonSocial?: string;
   domicilio?: string;

@@ -3,7 +3,7 @@
 // corresponda a la clave guardada y a la CUIT antes de guardarlo.
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinFacturacion } from "@/lib/server/afip/plan";
 import { estadoPublico, subirCertificado } from "@/lib/server/afip/config";
 
 export const runtime = "nodejs";
@@ -13,9 +13,8 @@ const MAX_CERT = 20_000; // un .crt pesa ~2 KB
 
 export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) {
-    return NextResponse.json({ error: "La facturación electrónica está disponible en la versión paga." }, { status: 403 });
-  }
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   const body = await req.json().catch(() => null);
   const pem = String(body?.certificado ?? "");
   if (!pem.includes("BEGIN CERTIFICATE") || pem.length > MAX_CERT) {

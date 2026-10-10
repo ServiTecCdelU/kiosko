@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinFacturacion } from "@/lib/server/afip/plan";
 import { estadoPublico, generarPedido, leerConfigAfip } from "@/lib/server/afip/config";
 
 export const runtime = "nodejs";
@@ -12,9 +12,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) {
-    return NextResponse.json({ error: "La facturación electrónica está disponible en la versión paga." }, { status: 403 });
-  }
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   try {
     const { data } = await supabaseAdmin.from("comercios").select("slug").eq("id", comercioId).single();
     return NextResponse.json(estadoPublico(await generarPedido(comercioId, data?.slug ?? comercioId)));

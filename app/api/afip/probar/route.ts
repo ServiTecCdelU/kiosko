@@ -5,7 +5,7 @@
 // y su nota de credito: la prueba completa de punta a punta.
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinFacturacion } from "@/lib/server/afip/plan";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { conAcceso, estadoServidores, ultimoAutorizado } from "@/lib/server/afip/cliente";
 import { pruebaEmisionHomologacion } from "@/lib/server/afip/facturar";
@@ -23,9 +23,8 @@ interface Paso {
 
 export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
-  if (await esComercioDemo(comercioId)) {
-    return NextResponse.json({ error: "La facturación electrónica está disponible en la versión paga." }, { status: 403 });
-  }
+  const motivo = await motivoSinFacturacion(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   const body = (await req.json().catch(() => null)) as { activar?: unknown; emitir?: unknown } | null;
   const fila = await leerConfigAfip(comercioId);
 
