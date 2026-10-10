@@ -4,7 +4,9 @@ import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import "@/app/globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { GoogleTag } from "@/components/analytics/google-tag";
 import { IMAGEN_OG, OG_BASE, conBase, siteOrigin } from "@/lib/site";
+import { DESCRIPCION_SEO, MARCA, NOMBRE_APP, PALABRAS_CLAVE, TITULO_SEO } from "@/lib/marketing/seo";
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -14,30 +16,38 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
-const TITULO = "MultiComercioPanel - ServiTec";
-const DESCRIPCION_OG = "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Gestión integral para cualquier rubro.";
+// Titulo y descripcion pensados para la busqueda (lib/marketing/seo.ts). Las
+// pantallas internas ponen el suyo; el panel de cada comercio, el nombre del comercio.
+const DESCRIPCION_OG = "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Punto de venta, caja, stock, fiado y factura electrónica para tu comercio.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin()),
-  title: TITULO,
-  description: "Tu programa no impone las reglas: Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. La solución de gestión ideal para cualquier rubro.",
-  applicationName: "MultiComercioPanel",
+  title: TITULO_SEO,
+  description: DESCRIPCION_SEO,
+  keywords: PALABRAS_CLAVE,
+  applicationName: NOMBRE_APP,
+  authors: [{ name: MARCA }],
+  creator: MARCA,
   manifest: conBase("/manifest.json"),
   icons: {
     icon: [{ url: conBase("/icons/favicon-32.png"), sizes: "32x32", type: "image/png" }],
     apple: [{ url: conBase("/icons/icon-192.png"), sizes: "192x192", type: "image/png" }],
   },
   alternates: { canonical: conBase("/") || "/" },
+  // Search Console: verificacion por etiqueta (si se verifica el dominio por DNS no hace falta).
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : undefined,
   openGraph: {
     ...OG_BASE,
     url: conBase("/") || "/",
-    title: TITULO,
+    title: `${NOMBRE_APP} - ${MARCA}`,
     description: DESCRIPCION_OG,
   },
   twitter: {
     card: "summary_large_image",
-    title: TITULO,
-    description: "Vos no te adaptás a nuestro sistema, nuestro sistema se adapta a vos. Se adapta a cualquier rubro.",
+    title: `${NOMBRE_APP} - ${MARCA}`,
+    description: DESCRIPCION_OG,
     images: [IMAGEN_OG.url],
   },
 };
@@ -61,6 +71,7 @@ export default function RootLayout({
         {children}
         <Toaster richColors position="top-center" />
         <ServiceWorkerRegister />
+        <GoogleTag />
       </body>
     </html>
   );

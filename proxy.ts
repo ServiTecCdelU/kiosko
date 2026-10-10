@@ -12,10 +12,21 @@ import { getSesion } from "@/lib/server/sesion";
 import { autorizar, reglaDeRuta } from "@/lib/permisos-api";
 import { esLectura } from "@/lib/acceso-comercio";
 import { accesoDeComercio, mensajeSoloLectura } from "@/lib/server/acceso";
+import { esPaginaIndexable } from "@/lib/marketing/seo";
 
 export async function proxy(request: NextRequest) {
   // nextUrl.pathname ya viene sin el basePath (/comercio en produccion).
   const ruta = request.nextUrl.pathname;
+
+  // Paginas (no /api): solo la landing, el registro y las legales se indexan.
+  // El resto (POS, caja, login, panel de cada comercio) sale con noindex para
+  // que Google no muestre pantallas privadas. No consulta nada: es solo la cabecera.
+  if (!ruta.startsWith("/api/") && ruta !== "/api") {
+    const res = NextResponse.next();
+    if (!esPaginaIndexable(ruta)) res.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return res;
+  }
+
   const regla = reglaDeRuta(ruta, request.method);
   if (regla === "publica" || regla === "superadmin") return NextResponse.next();
 
@@ -47,5 +58,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  // /api (guardia) y las paginas (cabecera noindex). Quedan afuera los archivos
+  // estaticos: no tiene sentido correr el proxy por cada icono o chunk.
+  matcher: ["/api/:path*", "/((?!_next/|icons/|manifest\\.json|sw\\.js|metadato\\.jpg|favicon\\.ico).*)"],
 };

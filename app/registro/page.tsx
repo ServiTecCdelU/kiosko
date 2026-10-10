@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { apiUrl } from "@/lib/utils/api-url";
+import { trackRegistroCompletado } from "@/lib/analytics";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { MAX_CAJAS_REGISTRO, PLANES_REGISTRO, RUBROS, validarRegistro } from "@/lib/registro";
 import { slugDeNombre } from "@/lib/slug";
@@ -161,6 +162,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el comercio");
       toast.success("¡Listo! Tu comercio está creado");
+      trackRegistroCompletado(validado.datos.plan, validado.datos.rubro);
       router.replace(data.redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el comercio");

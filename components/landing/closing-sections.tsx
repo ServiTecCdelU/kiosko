@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Check, Plus } from 'lucide-react'
 import { CONTACT, ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
+// Las preguntas viven en lib/marketing/faq.ts: tambien se publican como JSON-LD.
+import { FAQS } from '@/lib/marketing/faq'
 import { Kicker, SectionHead, WhatsAppIcon } from './shared'
 
 const STEPS = [
@@ -67,15 +69,6 @@ export function Security() {
     </section>
   )
 }
-
-const FAQS = [
-  { q: '¿Necesito instalar algo?', a: 'No. Es 100% web: funciona desde cualquier computadora, tablet o celular con navegador.' },
-  { q: '¿Funciona con lector de código de barras?', a: 'Sí. Cualquier lector USB o Bluetooth funciona: conectás y escaneás directo en el punto de venta.' },
-  { q: '¿Puedo tener varias cajas abiertas?', a: 'Sí. Cada caja tiene su apertura, cierre y arqueo, con el detalle de qué cajero la operó.' },
-  { q: '¿Sirve si vendo por kilo?', a: 'Sí. Podés vender por unidad o por peso. La integración con balanzas etiquetadoras llega próximamente.' },
-  { q: '¿Emite factura electrónica?', a: 'Estamos preparando la integración con ARCA. Hoy podés emitir tickets internos y gestionar el fiado; la facturación electrónica llega próximamente.' },
-  { q: '¿Cuánto cuesta?', a: 'Estamos definiendo los planes. Escribinos por WhatsApp y lo vemos según el tamaño de tu comercio.' },
-]
 
 export function Faq() {
   return (
