@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `48`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `49`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -164,7 +164,8 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 ## Variables de Entorno
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SESSION_SECRET`, `BASE_PATH`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`,
-`MP_TOKEN_KEY`, `AFIP_CERT_KEY`, `IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`.
+`MP_TOKEN_KEY`, `MP_SAAS_TOKEN` (cobro de la suscripción, cuenta de ServiTec), `AFIP_CERT_KEY`,
+`IMPRESORA_ZPL_RAW`, `DISTRIBUIDORA_API_URL`.
 Detalle de cada una en `docs/CONTEXTO.md` §5.
 
 ## Roadmap

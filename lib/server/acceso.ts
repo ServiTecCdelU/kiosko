@@ -7,6 +7,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { evaluarAcceso, type EstadoAcceso } from "@/lib/acceso-comercio";
 import { DEMO_SLUG } from "@/lib/demo";
+import { precioDelPlan } from "@/lib/server/billing";
 
 const CACHE_MS = 60_000;
 const cache = new Map<string, { valor: EstadoAcceso; hasta: number }>();
@@ -19,7 +20,7 @@ export async function accesoDeComercio(comercioId: string): Promise<EstadoAcceso
 
   const { data, error } = await supabaseAdmin
     .from("comercios")
-    .select("estado, trial_hasta, slug")
+    .select("estado, trial_hasta, slug, plan, suscripcion_hasta")
     .eq("id", comercioId)
     .maybeSingle();
   // Si la base no responde no se bloquea a nadie: cortar la caja de un comercio
@@ -27,19 +28,22 @@ export async function accesoDeComercio(comercioId: string): Promise<EstadoAcceso
   if (error) return COMPLETO;
   if (!data) return { nivel: "solo_lectura", motivo: "baja" };
 
-  // La demo publica nunca vence.
-  const valor = data.slug === DEMO_SLUG ? COMPLETO : evaluarAcceso(data);
+  // La demo publica nunca vence ni paga.
+  const valor = data.slug === DEMO_SLUG
+    ? COMPLETO
+    : evaluarAcceso({ ...data, precio_mensual: await precioDelPlan(data.plan).catch(() => 0) });
   cache.set(comercioId, { valor, hasta: Date.now() + CACHE_MS });
   return valor;
 }
 
-/** El superadmin cambio estado o prueba: que se aplique ya en esta instancia. */
+/** El superadmin cambio estado o prueba, o entro un pago: que se aplique ya en esta instancia. */
 export function olvidarAcceso(comercioId: string): void {
   cache.delete(comercioId);
 }
 
 const MENSAJES: Record<string, string> = {
   prueba_vencida: "Tu período de prueba terminó: el sistema quedó en modo consulta. Para volver a vender, contratá un plan.",
+  pago_vencido: "La suscripción está vencida: el sistema quedó en modo consulta. Pagá el mes desde Suscripción para volver a vender.",
   suspendido: "El comercio está suspendido: el sistema quedó en modo consulta. Comunicate con nosotros para reactivarlo.",
   baja: "El comercio está dado de baja: el sistema quedó en modo consulta.",
 };

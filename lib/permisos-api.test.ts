@@ -18,6 +18,10 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/mercadopago/webhook", "POST"), "publica");
   });
 
+  test("el webhook de la suscripcion es publico (Mercado Pago no tiene sesion)", () => {
+    assert.equal(reglaDeRuta("/api/billing/webhook", "POST"), "publica");
+  });
+
   test("superadmin se valida en sus propias rutas", () => {
     assert.equal(reglaDeRuta("/api/superadmin/comercios", "POST"), "superadmin");
   });
@@ -33,7 +37,7 @@ describe("reglaDeRuta", () => {
       "/api/usuarios", "/api/consultas/usuarios", "/api/compras", "/api/compras/anular",
       "/api/proveedores", "/api/proveedores/pagos", "/api/consultas/compras", "/api/productos/importar", "/api/sync",
       "/api/consultas/reportes", "/api/mercadopago/conexion", "/api/backup",
-      "/api/inventario", "/api/consultas/inventario", "/api/lotes",
+      "/api/inventario", "/api/consultas/inventario", "/api/lotes", "/api/billing", "/api/billing/pagar",
     ]) {
       assert.equal(reglaDeRuta(ruta, "POST"), "admin", ruta);
     }

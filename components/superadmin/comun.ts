@@ -33,6 +33,27 @@ export interface AccesoGoogle {
   activo: boolean;
 }
 
+/** Billing (49): precio mensual por plan. */
+export interface PlanSaas {
+  plan: Comercio["plan"];
+  nombre: string;
+  precioMensual: number;
+  descripcion: string | null;
+}
+
+export interface PagoSaas {
+  id: string;
+  plan: string;
+  monto: number;
+  periodo: string;
+  metodo: "mercadopago" | "manual";
+  estado: "pendiente" | "aprobado" | "rechazado";
+  nota: string | null;
+  usuarioNombre: string | null;
+  createdAt: string;
+  aprobadoAt: string | null;
+}
+
 export const ESTADO_COLOR: Record<Comercio["estado"], string> = {
   activo: "border-success/50 text-success",
   prueba: "border-warning text-warning",

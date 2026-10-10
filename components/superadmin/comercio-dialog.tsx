@@ -1,21 +1,23 @@
 "use client";
 // components/superadmin/comercio-dialog.tsx — "Administrar" un comercio:
-// estado, plan, pago del mes y correos con acceso de Google.
+// estado, plan, suscripcion (pagos y pago manual) y correos con acceso de Google.
 import { toast } from "sonner";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, CircleDollarSign, Download, Loader2, LogIn } from "lucide-react";
 import { descargarBackupDeComercio } from "@/services/backup-service";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { AccesosGoogle } from "@/components/superadmin/accesos-google";
-import { nombreRubro, pagoAlDia, superadminApi, whatsappDe, type Comercio } from "@/components/superadmin/comun";
-import { DIAS_GRACIA } from "@/lib/acceso-comercio";
+import { nombreRubro, pagoAlDia, superadminApi, whatsappDe, type Comercio, type PagoSaas } from "@/components/superadmin/comun";
+import { DIAS_GRACIA, DIAS_GRACIA_PAGO } from "@/lib/acceso-comercio";
+import { coberturaDelPago, METODO_PAGO_LABEL, textoPeriodo } from "@/lib/suscripcion";
 
 interface ComercioDialogProps {
   comercio: Comercio | null;
@@ -93,9 +95,88 @@ function BotonBackup({ comercioId }: { comercioId: string }) {
   );
 }
 
+/** Suscripcion: hasta cuando esta pagada, historial y pago manual (billing, 49). */
+function Suscripcion({ comercio, onCambio }: { comercio: Comercio; onCambio: () => Promise<void> }) {
+  const [pagos, setPagos] = useState<PagoSaas[] | null>(null);
+  const [nota, setNota] = useState("");
+  const [registrando, setRegistrando] = useState(false);
+  const alDia = pagoAlDia(comercio);
+  const proximo = coberturaDelPago(comercio.suscripcion_hasta);
+
+  const cargar = useCallback(() => {
+    superadminApi<{ pagos: PagoSaas[] }>({ accion: "pagos", id: comercio.id })
+      .then((r) => setPagos(r.pagos))
+      .catch(() => setPagos([]));
+  }, [comercio.id]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const registrar = async () => {
+    setRegistrando(true);
+    try {
+      const r = await superadminApi<{ periodo: string }>({ accion: "marcarPago", id: comercio.id, nota });
+      toast.success(`Pago registrado: cubre ${textoPeriodo(r.periodo)}`);
+      setNota("");
+      cargar();
+      await onCambio();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo registrar el pago");
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Suscripción</p>
+        <Badge variant="outline" className={cn(alDia ? "border-success/50 text-success" : "border-warning text-warning")}>
+          {alDia ? <Check className="mr-1 h-3 w-3" /> : <CircleDollarSign className="mr-1 h-3 w-3" />}
+          {comercio.suscripcion_hasta ? `Pagada hasta el ${formatDate(comercio.suscripcion_hasta)}` : "Sin fecha de pago"}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        El próximo pago cubre {textoPeriodo(proximo.periodo)}. Un comercio activo con plan con precio y fecha vencida tiene
+        {" "}{DIAS_GRACIA_PAGO} días de gracia y después queda en modo consulta. Sin fecha no se bloquea nunca.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (ej. transferencia, efectivo)" className="h-9 rounded-xl" maxLength={120} />
+        <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl" disabled={registrando} onClick={registrar}>
+          {registrando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CircleDollarSign className="mr-1.5 h-4 w-4" />}
+          Registrar pago manual
+        </Button>
+      </div>
+      {pagos === null ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : pagos.length > 0 && (
+        <ul className="max-h-40 divide-y overflow-y-auto rounded-lg border text-xs">
+          {pagos.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5">
+              <span>
+                <b>{textoPeriodo(p.periodo)}</b> · {METODO_PAGO_LABEL[p.metodo]} · {formatDateTime(p.aprobadoAt ?? p.createdAt)}
+                {p.nota && ` · ${p.nota}`}{p.usuarioNombre && ` · ${p.usuarioNombre}`}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="cifra">{formatCurrency(p.monto)}</span>
+                <Badge variant="outline" className={cn(
+                  "h-5 px-1.5",
+                  p.estado === "aprobado" && "border-success/50 text-success",
+                  p.estado === "pendiente" && "border-warning text-warning",
+                  p.estado === "rechazado" && "border-destructive/50 text-destructive",
+                )}>{p.estado}</Badge>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: ComercioDialogProps) {
   if (!comercio) return null;
-  const alDia = pagoAlDia(comercio);
   const rubro = nombreRubro(comercio.config?.rubro);
   const whatsapp = whatsappDe(comercio.config?.telefono);
 
@@ -106,16 +187,6 @@ export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: C
       await onCambio();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo actualizar");
-    }
-  };
-
-  const marcarPago = async () => {
-    try {
-      await superadminApi({ accion: "marcarPago", id: comercio.id });
-      toast.success("Pago del mes registrado");
-      await onCambio();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo registrar el pago");
     }
   };
 
@@ -169,15 +240,7 @@ export function ComercioDialog({ comercio, onOpenChange, onCambio, onEntrar }: C
             />
           )}
 
-          <div className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5">
-            <Badge variant="outline" className={cn(alDia ? "border-success/50 text-success" : "border-warning text-warning")}>
-              {alDia ? <Check className="mr-1 h-3 w-3" /> : <CircleDollarSign className="mr-1 h-3 w-3" />}
-              {alDia ? "Pago al día" : "Pago pendiente este mes"}
-            </Badge>
-            {!alDia && (
-              <Button size="sm" variant="outline" className="rounded-xl" onClick={marcarPago}>Marcar pago del mes</Button>
-            )}
-          </div>
+          <Suscripcion comercio={comercio} onCambio={onCambio} />
 
           <AccesosGoogle comercioId={comercio.id} onCambio={onCambio} />
 

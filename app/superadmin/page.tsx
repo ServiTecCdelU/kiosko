@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, LogOut, Loader2, Chrome, Plus, Search } from "lucide-react";
+import { Building2, CircleDollarSign, LogOut, Loader2, Chrome, Plus, Search } from "lucide-react";
+import { PlanesDialog } from "@/components/superadmin/planes-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSuperadmin } from "@/hooks/use-superadmin";
@@ -77,6 +78,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [loading, setLoading] = useState(true);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [planesOpen, setPlanesOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [administrando, setAdministrando] = useState<string | null>(null);
   const [entrando, setEntrando] = useState<string | null>(null);
@@ -141,6 +143,9 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
               className="rounded-2xl pl-9"
             />
           </div>
+          <Button variant="outline" className="rounded-2xl" onClick={() => setPlanesOpen(true)}>
+            <CircleDollarSign className="mr-2 h-4 w-4" /> Planes
+          </Button>
           <Button className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Nuevo comercio
           </Button>
@@ -171,6 +176,7 @@ function Panel({ nombre, onLogout }: { nombre: string; onLogout: () => void }) {
         onEntrar={entrar}
       />
       <NuevoComercioDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={load} />
+      <PlanesDialog open={planesOpen} onOpenChange={setPlanesOpen} />
     </main>
   );
 }

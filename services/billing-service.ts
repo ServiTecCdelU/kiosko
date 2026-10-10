@@ -1,0 +1,42 @@
+// services/billing-service.ts — suscripcion del comercio (client).
+import { apiUrl } from "@/lib/utils/api-url";
+import type { Plan } from "@/lib/suscripcion";
+
+export interface PagoSuscripcion {
+  id: string;
+  plan: string;
+  monto: number;
+  periodo: string;
+  metodo: "mercadopago" | "manual";
+  estado: "pendiente" | "aprobado" | "rechazado";
+  nota: string | null;
+  usuarioNombre: string | null;
+  createdAt: string;
+  aprobadoAt: string | null;
+}
+
+export interface EstadoSuscripcion {
+  demo?: boolean;
+  plan: Plan;
+  nombrePlan: string;
+  precioMensual: number;
+  estado: string;
+  suscripcionHasta: string | null;
+  proximo: { periodo: string; hasta: string };
+  mpDisponible: boolean;
+  pagos: PagoSuscripcion[];
+}
+
+export async function getSuscripcion(confirmar = false): Promise<EstadoSuscripcion> {
+  const res = await fetch(apiUrl(`/api/billing${confirmar ? "?confirmar=1" : ""}`));
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo leer la suscripción");
+  return data as EstadoSuscripcion;
+}
+
+export async function crearLinkDePago(): Promise<{ pagoId: string; initPoint: string }> {
+  const res = await fetch(apiUrl("/api/billing/pagar"), { method: "POST" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el pago");
+  return data;
+}

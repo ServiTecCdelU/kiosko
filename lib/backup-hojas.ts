@@ -225,6 +225,13 @@ export const HOJAS: Hoja[] = [
       c("external_reference", "Referencia"),
     ],
   },
+  {
+    nombre: "Pagos de suscripción", tabla: "saas_pagos", orden: "created_at",
+    columnas: [
+      c("created_at", "Fecha", "fecha"), c("periodo", "Mes"), c("plan", "Plan"), c("monto", "Monto", "numero"),
+      c("metodo", "Forma de pago"), c("estado", "Estado"), c("aprobado_at", "Aprobado", "fecha"), c("nota", "Nota"), c("id", "ID"),
+    ],
+  },
 ];
 
 export type Celda = string | number;

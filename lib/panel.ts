@@ -9,7 +9,7 @@
 export const RUTAS_RESERVADAS = [
   "api", "auth", "caja", "cambiar-pin", "clientes", "compras", "facturacion", "login", "ofertas-tv",
   "pantalla-cliente", "pos", "promociones", "registro", "reportes", "sincronizacion",
-  "stock", "superadmin", "usuarios", "ventas", "privacy", "terms",
+  "stock", "superadmin", "suscripcion", "usuarios", "ventas", "privacy", "terms",
   "icons", "manifest.json", "metadato.jpg", "sw.js", "_next",
 ] as const;
 

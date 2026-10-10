@@ -7,10 +7,9 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { patronCorreoExacto } from "@/lib/correo";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
-import { hoyArgentina } from "@/lib/server/fecha-argentina";
-import { DIA_LIMITE_PAGO } from "@/lib/aviso-pago";
 import { esSlugReservado } from "@/lib/panel";
 import { olvidarAcceso } from "@/lib/server/acceso";
+import { guardarPlan, listarPlanes, pagosDeComercio, registrarPagoManual } from "@/lib/server/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,28 +118,48 @@ export async function POST(req: Request) {
     return NextResponse.json({ comercio: data });
   }
 
+  // Billing (49): pago manual (efectivo, transferencia) de un mes. Extiende
+  // suscripcion_hasta hasta fin del mes que corresponda (RPC aplicar_pago_saas)
+  // y queda en el mismo historial que los pagos de Mercado Pago.
   if (accion === "marcarPago") {
     const id = String(body?.id ?? "");
     if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+    try {
+      const r = await registrarPagoManual(id, String(body?.nota ?? "").trim() || null, getSesion(req)?.nombre ?? "Superadmin");
+      olvidarAcceso(id);
+      const { data, error } = await supabaseAdmin.from("comercios").select(COLUMNAS_PANEL).eq("id", id).single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ comercio: data, periodo: r.periodo });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo registrar el pago" }, { status: 400 });
+    }
+  }
 
-    // Marca el pago del ciclo actual (dia 1 al 10): guarda el limite del
-    // ciclo en curso (dia 10, fin del dia en horario argentino) en
-    // suscripcion_hasta. El aviso (app/api/pago-mensual) compara el mes de
-    // esta fecha contra el mes actual para saber "ya pago este mes".
-    const { anio, mes } = hoyArgentina();
-    // Argentina es UTC-3 todo el año (sin horario de verano): el dia 10 a
-    // las 23:59:59 -03:00 equivale al dia 11 a las 02:59:59 UTC.
-    const limiteUtc = new Date(Date.UTC(anio, mes - 1, DIA_LIMITE_PAGO + 1, 2, 59, 59));
+  if (accion === "pagos") {
+    const id = String(body?.id ?? "");
+    if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+    try {
+      return NextResponse.json({ pagos: await pagosDeComercio(id, 36) });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron leer los pagos" }, { status: 400 });
+    }
+  }
 
-    const { data, error } = await supabaseAdmin
-      .from("comercios")
-      .update({ suscripcion_hasta: limiteUtc.toISOString() })
-      .eq("id", id)
-      .select(COLUMNAS_PANEL)
-      .single();
+  if (accion === "planes") {
+    try {
+      return NextResponse.json({ planes: await listarPlanes() });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron leer los planes" }, { status: 400 });
+    }
+  }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ comercio: data });
+  if (accion === "guardarPlan") {
+    try {
+      await guardarPlan(String(body?.plan ?? ""), Number(body?.precioMensual), String(body?.descripcion ?? "").trim() || null);
+      return NextResponse.json({ ok: true });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo guardar el plan" }, { status: 400 });
+    }
   }
 
   if (accion === "entrar") return entrarAComercio(req, String(body?.id ?? ""));
