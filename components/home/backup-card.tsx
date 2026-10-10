@@ -29,9 +29,9 @@ export function BackupCard() {
         <FileSpreadsheet className="h-6 w-6" />
       </span>
       <div className="min-w-0 flex-1">
-        <h3 id="backup-titulo" className="font-semibold text-foreground">Copia de tus datos</h3>
+        <h3 id="backup-titulo" className="font-semibold text-foreground">Reportes completos: copia de tus datos</h3>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Productos, clientes, ventas, caja, compras y más, en un Excel con una hoja por tema. Tus datos son tuyos.
+          Productos, clientes, ventas, caja, compras, pagos y más, en un Excel con una hoja por tema. Tus datos son tuyos.
         </p>
       </div>
       <Button onClick={descargar} disabled={descargando} variant="outline" className="shrink-0 rounded-xl">

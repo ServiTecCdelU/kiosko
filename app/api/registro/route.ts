@@ -13,6 +13,8 @@ import { crearLimitador, ipDe } from "@/lib/server/limite-intentos";
 import { validarRegistro } from "@/lib/registro";
 import { slugDeNombre } from "@/lib/slug";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
+import { listarPlanes } from "@/lib/server/billing";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +23,19 @@ export const dynamic = "force-dynamic";
 // molestar a nadie real.
 const altasPorIp = crearLimitador(3, 60 * 60 * 1000);
 
-/** Datos de Google para precargar el formulario. */
+/** Datos de Google para precargar el formulario, y los planes con su precio. */
 export async function GET(req: Request) {
   const registro = getRegistro(req);
   if (!registro) return NextResponse.json({ error: "Sin registro" }, { status: 401 });
-  return NextResponse.json({ email: registro.email, nombre: registro.nombre });
+  const planes = await listarPlanes().catch(() => []);
+  return NextResponse.json({
+    email: registro.email,
+    nombre: registro.nombre,
+    planes: planes.filter((p) => p.plan !== "free").map((p) => ({
+      plan: p.plan, precioMensual: p.precioMensual, cajasIncluidas: p.cajasIncluidas, precioCajaExtra: p.precioCajaExtra, maxCajas: p.maxCajas,
+    })),
+    trialDias: TRIAL_DAYS,
+  });
 }
 
 export async function POST(req: Request) {
@@ -82,6 +92,19 @@ export async function POST(req: Request) {
 
   const creado = (Array.isArray(data) ? data[0] : data) as { nuevo_id: string; nuevo_slug: string } | undefined;
   if (!creado?.nuevo_id) return NextResponse.json({ error: "No se pudo crear el comercio" }, { status: 500 });
+
+  // Plan elegido y cajas: la RPC crea "Caja 1" con plan free; aca se completa.
+  // La prueba de TRIAL_DAYS corre igual; el plan define que va a pagar despues.
+  await supabaseAdmin.from("comercios").update({ plan: datos.plan }).eq("id", creado.nuevo_id);
+  if (datos.cajas > 1) {
+    await supabaseAdmin.from("puestos").insert(
+      Array.from({ length: datos.cajas - 1 }, (_, i) => ({
+        id: `puesto_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+        comercio_id: creado.nuevo_id,
+        nombre: `Caja ${i + 2}`,
+      })),
+    );
+  }
 
   const { data: admin } = await supabaseAdmin
     .from("usuarios")

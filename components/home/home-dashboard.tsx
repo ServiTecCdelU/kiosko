@@ -19,12 +19,11 @@ import {
   Receipt,
   Truck,
   UserCog,
+  CircleHelp,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
-import { MercadoPagoCard } from "@/components/home/mercadopago-card";
 import { PrimerosPasosCard } from "@/components/home/primeros-pasos-card";
-import { BackupCard } from "@/components/home/backup-card";
-import { SuscripcionCard } from "@/components/home/suscripcion-card";
+import { CuentaCard } from "@/components/home/cuenta-card";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { useAuth } from "@/hooks/use-auth";
 import { visibleNavItems } from "@/lib/nav";
@@ -61,6 +60,7 @@ const ICONS: Record<string, typeof ShoppingCart> = {
   "/ventas": Receipt,
   "/compras": Truck,
   "/usuarios": UserCog,
+  "/ayuda": CircleHelp,
 };
 
 const SUBTITLES: Record<string, string> = {
@@ -70,11 +70,12 @@ const SUBTITLES: Record<string, string> = {
   "/stock": "Inventario y alertas",
   "/promociones": "Ofertas, sorteos y premios",
   "/reportes": "Ventas, márgenes y más vendidos",
-  "/sincronizacion": "Catálogo de la distribuidora",
-  "/facturacion": "Factura C con CAE de AFIP/ARCA",
+  "/sincronizacion": "Catálogo de la distribuidora y copia de tus datos",
+  "/facturacion": "Factura electrónica ARCA y cobros con Mercado Pago",
   "/ventas": "Historial, anulaciones y devoluciones",
-  "/compras": "Proveedores y mercadería recibida",
+  "/compras": "Proveedores, mercadería y cuenta corriente",
   "/usuarios": "Cajeros, encargados y sus PIN",
+  "/ayuda": "Tutorial paso a paso de cada pantalla",
 };
 
 // Fondo atmosférico: mesh de gradientes teal/lima muy sutil.
@@ -184,9 +185,7 @@ function HomeContent() {
           })}
         </div>
 
-        {rol === "admin" && <SuscripcionCard />}
-        {rol === "admin" && <MercadoPagoCard />}
-        {rol === "admin" && <BackupCard />}
+        {rol === "admin" && <CuentaCard />}
 
         <p className="mt-2 text-center text-xs text-muted-foreground/70">
           {user?.comercioNombre ?? "Tu comercio"} · Punto de venta

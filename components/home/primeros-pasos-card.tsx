@@ -21,7 +21,7 @@ const PASOS: { id: keyof Pasos; titulo: string; detalle: string; href: string; a
   { id: "productos", titulo: "Cargá tus productos", detalle: "Importalos desde Excel o cargalos a mano.", href: "/stock", accion: "Ir a Stock" },
   { id: "venta", titulo: "Hacé tu primera venta", detalle: "Abrí la caja y cobrá desde el Punto de Venta.", href: "/pos", accion: "Vender" },
   { id: "cajeros", titulo: "Sumá a tus cajeros", detalle: "Cada uno entra con su PIN y su caja.", href: "/usuarios", accion: "Empleados" },
-  { id: "mercadoPago", titulo: "Conectá Mercado Pago", detalle: "Cobrá con QR y lector Point.", href: "#mercado-pago", accion: "Conectar" },
+  { id: "mercadoPago", titulo: "Conectá Mercado Pago", detalle: "Cobrá con QR y lector Point (está en Facturación).", href: "/facturacion#mercado-pago", accion: "Conectar" },
 ];
 
 const CLAVE_OCULTA = "kiosko_primeros_pasos_oculta";

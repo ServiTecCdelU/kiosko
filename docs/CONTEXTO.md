@@ -34,17 +34,23 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - `/` → landing pública (`components/landing/`).
   - `/<slug>` → panel de un comercio (`app/[comercio]/`). Los slugs no pueden
     chocar con rutas fijas: ver `RUTAS_RESERVADAS` en `lib/panel.ts`.
-  - `/login`, `/pos`, `/caja`, `/stock`, `/ventas`, `/clientes`, `/compras`,
-    `/promociones`, `/reportes`, `/usuarios`, `/sincronizacion`.
+  - `/login`, `/pos`, `/caja`, `/stock` (+ `/stock/inventario`), `/ventas`, `/clientes`, `/compras`,
+    `/promociones`, `/reportes`, `/usuarios`, `/facturacion` (incluye Cobros con Mercado Pago),
+    `/sincronizacion` (Sincronización y reportes: catálogo + copia de datos en Excel),
+    `/suscripcion`, `/ayuda` (tutorial por pantalla, todos los roles).
+  - Inicio del admin: Primeros pasos, tarjetas de hoy y "Cuenta y suscripción"
+    (`components/home/cuenta-card.tsx`).
   - `/superadmin` → panel del dueño del SaaS (todos los comercios).
   - `/pantalla-cliente` y `/ofertas-tv` → pantallas secundarias (visor del
     cliente y TV de ofertas).
 - **Alta self-service** (`/registro`, CTA "Probar gratis" de la landing y link en el
   login): "Continuar con Google"; si el correo no tiene comercio, `google-verify` deja
   una cookie firmada `kiosko_registro` (30 min) y lleva al formulario (nombre del
-  comercio, rubro, nombre, WhatsApp). `POST /api/registro` llama a la RPC atómica
+  comercio, rubro, **plan Básico o Pro con su precio, cuántas cajas** si es Pro, nombre,
+  WhatsApp). `POST /api/registro` llama a la RPC atómica
   `registrar_comercio_autoservicio` (migración 40): comercio en prueba de 14 días +
-  admin con ese correo + "Caja 1". Un correo de Google = un comercio; máximo 3 altas
+  admin con ese correo + "Caja 1"; después la ruta guarda el plan elegido y crea las
+  cajas restantes ("Caja 2".."Caja N"). Un correo de Google = un comercio; máximo 3 altas
   por IP por hora. Rubro, WhatsApp y origen quedan en `comercios.config`. El panel
   nuevo muestra la tarjeta "Primeros pasos" y el superadmin ve el badge "nuevo".
   Spec: `docs/superpowers/specs/2026-10-03-autoregistro-design.md`.

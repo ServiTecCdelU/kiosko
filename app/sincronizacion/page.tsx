@@ -19,6 +19,7 @@ import type { SyncResult } from "@/services/sync-service";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { panelHref } from "@/lib/panel";
+import { BackupCard } from "@/components/home/backup-card";
 
 function estadoBadge(estado: SyncEstado) {
   if (estado === "ok") {
@@ -94,8 +95,8 @@ function SincronizacionContent() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-bold sm:text-2xl">Sincronizacion</h1>
-          <p className="text-sm text-muted-foreground">Catalogo desde la distribuidora</p>
+          <h1 className="text-xl font-bold sm:text-2xl">Sincronización y reportes</h1>
+          <p className="text-sm text-muted-foreground">Catálogo desde la distribuidora y copia completa de tus datos</p>
         </div>
         <Button onClick={handleSync} disabled={syncing} className="rounded-2xl">
           <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
@@ -180,6 +181,11 @@ function SincronizacionContent() {
       {ultima?.error && (
         <p className="mt-3 text-sm text-destructive">Ultimo error: {ultima.error}</p>
       )}
+
+      {/* Reportes completos: el Excel con todos los datos del comercio (antes en el inicio). */}
+      <div className="mt-6">
+        <BackupCard />
+      </div>
     </div></main>
   );
 }

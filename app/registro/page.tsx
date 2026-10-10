@@ -18,13 +18,23 @@ import {
 } from "@/components/ui/select";
 import { apiUrl } from "@/lib/utils/api-url";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
-import { RUBROS, validarRegistro } from "@/lib/registro";
+import { MAX_CAJAS_REGISTRO, PLANES_REGISTRO, RUBROS, validarRegistro } from "@/lib/registro";
 import { slugDeNombre } from "@/lib/slug";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
+
+interface PlanRegistro {
+  plan: "basico" | "pro";
+  precioMensual: number;
+  cajasIncluidas: number;
+  precioCajaExtra: number;
+  maxCajas: number | null;
+}
 
 interface DatosGoogle {
   email: string;
   nombre: string;
+  /** Precios vigentes (saas_planes), para mostrarlos al elegir el plan. */
+  planes?: PlanRegistro[];
 }
 
 const BENEFICIOS = [
@@ -110,14 +120,32 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
   const [nombre, setNombre] = useState(google.nombre);
   const [telefono, setTelefono] = useState("");
   const [rubro, setRubro] = useState("");
+  const [plan, setPlan] = useState<"basico" | "pro">("basico");
+  const [cajas, setCajas] = useState(1);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const direccion = useMemo(() => (nombreComercio.trim() ? slugDeNombre(nombreComercio) : ""), [nombreComercio]);
+  const precioDe = (id: "basico" | "pro") => google.planes?.find((p) => p.plan === id);
+  const tarifa = precioDe(plan);
+  const cajasCobradas = plan === "pro" ? cajas : 1;
+  const totalMes = tarifa
+    ? tarifa.precioMensual + Math.max(0, cajasCobradas - tarifa.cajasIncluidas) * tarifa.precioCajaExtra
+    : null;
+
+  // Un supermercado suele tener varias cajas: se sugiere Pro al elegir ese rubro.
+  const elegirRubro = (r: string) => {
+    setRubro(r);
+    if (r === "supermercado" && plan === "basico") setPlan("pro");
+  };
+  const elegirPlan = (p: "basico" | "pro") => {
+    setPlan(p);
+    if (p === "basico") setCajas(1);
+  };
 
   const crear = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validado = validarRegistro({ nombreComercio, nombre, telefono, rubro });
+    const validado = validarRegistro({ nombreComercio, nombre, telefono, rubro, plan, cajas: cajasCobradas });
     if (!validado.ok) {
       setError(validado.error);
       return;
@@ -166,7 +194,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
 
       <div className="space-y-1.5">
         <Label htmlFor="rubro">Rubro</Label>
-        <Select value={rubro} onValueChange={setRubro}>
+        <Select value={rubro} onValueChange={elegirRubro}>
           <SelectTrigger id="rubro" className="w-full rounded-xl">
             <SelectValue placeholder="Elegí tu rubro" />
           </SelectTrigger>
@@ -177,6 +205,53 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
           </SelectContent>
         </Select>
       </div>
+
+      <div className="space-y-1.5">
+        <Label>Plan</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {PLANES_REGISTRO.map((p) => {
+            const t = precioDe(p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => elegirPlan(p.id)}
+                className={`rounded-2xl border-2 p-3 text-left transition-colors ${plan === p.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+              >
+                <span className="block font-semibold">{p.nombre}</span>
+                {t && t.precioMensual > 0 && (
+                  <span className="cifra block text-sm text-muted-foreground">
+                    ${t.precioMensual.toLocaleString("es-AR")} / mes
+                  </span>
+                )}
+                <span className="mt-1 block text-xs text-muted-foreground">{p.detalle}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">Los {TRIAL_DAYS} días de prueba son gratis con cualquier plan. Lo podés cambiar después.</p>
+      </div>
+
+      {plan === "pro" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cajas">¿Cuántas cajas tenés?</Label>
+          <Select value={String(cajas)} onValueChange={(v) => setCajas(Number(v))}>
+            <SelectTrigger id="cajas" className="w-full rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: MAX_CAJAS_REGISTRO }, (_, i) => i + 1).map((n) => (
+                <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "caja" : "cajas"}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Se crean listas para usar.
+            {tarifa && tarifa.precioCajaExtra > 0 && ` La primera está incluida; cada caja extra suma $${tarifa.precioCajaExtra.toLocaleString("es-AR")} por mes.`}
+            {totalMes !== null && totalMes > 0 && ` Total: $${totalMes.toLocaleString("es-AR")} por mes después de la prueba.`}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="nombre">Tu nombre</Label>

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AvisoVersionPaga, useEsDemo } from "@/components/home/aviso-version-paga";
 import { AsistenteAfip } from "@/components/facturacion/asistente-afip";
 import { ContingenciaCaea } from "@/components/facturacion/contingencia-caea";
+import { MercadoPagoCard } from "@/components/home/mercadopago-card";
 import { getConfigAfip, type EstadoConfigAfip } from "@/services/facturacion-service";
 
 export default function FacturacionPage() {
@@ -42,6 +43,8 @@ export default function FacturacionPage() {
           <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <AsistenteAfip estado={estado} onEstado={setEstado} />
             {estado.activo && <ContingenciaCaea onEstado={setEstado} />}
+            {/* Cobros con Mercado Pago del comercio (QR y Point): antes estaba en el inicio. */}
+            <MercadoPagoCard />
           </div>
         )}
       </>
