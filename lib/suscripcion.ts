@@ -62,6 +62,38 @@ export function textoPeriodo(periodo: string): string {
 }
 
 /** Descripcion que ve el comercio en Mercado Pago. */
-export function descripcionPago(plan: Plan, periodo: string, comercio: string): string {
-  return `Suscripción ${PLAN_LABEL[plan]} ${textoPeriodo(periodo)} · ${comercio}`.slice(0, 120);
+export function descripcionPago(plan: Plan, periodo: string, comercio: string, cajasExtra = 0): string {
+  const extra = cajasExtra > 0 ? ` (+${cajasExtra} caja${cajasExtra === 1 ? "" : "s"})` : "";
+  return `Suscripción ${PLAN_LABEL[plan]}${extra} ${textoPeriodo(periodo)} · ${comercio}`.slice(0, 120);
+}
+
+// ---- Precio del mes: plan + cajas extra (migracion 52) ----
+
+export interface TarifaPlan {
+  precioMensual: number;
+  cajasIncluidas: number;
+  precioCajaExtra: number;
+  /** null = sin tope. */
+  maxCajas: number | null;
+}
+
+export interface MontoMensual {
+  base: number;
+  cajas: number;
+  cajasExtra: number;
+  extra: number;
+  total: number;
+}
+
+/** Cuanto paga por mes un comercio con esas cajas activas. */
+export function montoMensual(t: TarifaPlan, cajasActivas: number): MontoMensual {
+  const cajas = Math.max(0, Math.floor(cajasActivas));
+  const cajasExtra = Math.max(0, cajas - Math.max(1, t.cajasIncluidas));
+  const extra = Math.round(cajasExtra * (t.precioCajaExtra || 0) * 100) / 100;
+  return { base: t.precioMensual, cajas, cajasExtra, extra, total: Math.round((t.precioMensual + extra) * 100) / 100 };
+}
+
+/** Si el plan deja sumar una caja mas (tope de cajas). */
+export function puedeSumarCaja(t: TarifaPlan, cajasActivas: number): boolean {
+  return t.maxCajas === null || cajasActivas < t.maxCajas;
 }

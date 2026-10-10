@@ -53,7 +53,7 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
 
   const sit = situacion(estado);
   const Icono = sit.icono;
-  const sePuedePagar = estado.precioMensual > 0 && estado.mpDisponible;
+  const sePuedePagar = estado.monto.total > 0 && estado.mpDisponible;
 
   const pagar = async () => {
     setPagando(true);
@@ -83,8 +83,14 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
           <p className="eyebrow flex items-center gap-1.5"><CircleDollarSign className="h-4 w-4 text-primary" /> Suscripción</p>
           <p className="mt-1 text-lg font-semibold">
             Plan {estado.nombrePlan}
-            {estado.precioMensual > 0 && <span className="cifra ml-2 text-base font-normal text-muted-foreground">{formatCurrency(estado.precioMensual)} por mes</span>}
+            {estado.monto.total > 0 && <span className="cifra ml-2 text-base font-normal text-muted-foreground">{formatCurrency(estado.monto.total)} por mes</span>}
           </p>
+          {estado.monto.cajasExtra > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {formatCurrency(estado.monto.base)} del plan + {estado.monto.cajasExtra} caja{estado.monto.cajasExtra === 1 ? "" : "s"} extra × {formatCurrency(estado.tarifa.precioCajaExtra)}
+              {" "}({estado.monto.cajas} cajas activas, {estado.tarifa.cajasIncluidas} incluida{estado.tarifa.cajasIncluidas === 1 ? "" : "s"})
+            </p>
+          )}
           <Badge variant="outline" className={cn("mt-1", sit.clase)}><Icono className="mr-1 h-3 w-3" /> {sit.texto}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">

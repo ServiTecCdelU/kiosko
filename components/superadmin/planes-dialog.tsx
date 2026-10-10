@@ -1,5 +1,6 @@
 "use client";
-// components/superadmin/planes-dialog.tsx — precio mensual de cada plan.
+// components/superadmin/planes-dialog.tsx — precio mensual de cada plan, cajas
+// incluidas, precio por caja extra y tope de cajas (migraciones 49 y 52).
 // Precio 0 = no se cobra ni se bloquea a nadie con ese plan.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -25,7 +26,10 @@ export function PlanesDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const guardar = async (p: PlanSaas) => {
     setGuardando(p.plan);
     try {
-      await superadminApi({ accion: "guardarPlan", plan: p.plan, precioMensual: p.precioMensual, descripcion: p.descripcion });
+      await superadminApi({
+        accion: "guardarPlan", plan: p.plan, precioMensual: p.precioMensual, descripcion: p.descripcion,
+        cajasIncluidas: p.cajasIncluidas, precioCajaExtra: p.precioCajaExtra, maxCajas: p.maxCajas,
+      });
       toast.success(`Plan ${p.nombre} guardado`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
@@ -37,14 +41,21 @@ export function PlanesDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const cambiar = (plan: string, cambios: Partial<PlanSaas>) =>
     setPlanes((prev) => (prev ?? []).map((p) => (p.plan === plan ? { ...p, ...cambios } : p)));
 
+  const campo = (label: string, children: React.ReactNode) => (
+    <div>
+      <Label className="mb-1 block text-xs text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Planes y precios</DialogTitle>
           <DialogDescription>
-            Precio mensual en pesos. Con precio 0 el plan no se cobra ni se bloquea. Los comercios activos con precio y
-            fecha de pago vencida tienen 10 días de gracia y después pasan a modo consulta.
+            Cada comercio paga el precio del plan más las cajas activas que superen las incluidas. Con precio 0 el plan no
+            se cobra ni se bloquea. El tope de cajas impide crear más puestos (vacío = sin tope).
           </DialogDescription>
         </DialogHeader>
         {!planes ? (
@@ -52,18 +63,20 @@ export function PlanesDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         ) : (
           <div className="space-y-3">
             {planes.map((p) => (
-              <div key={p.plan} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">{p.nombre}</Label>
-                  <Input value={p.descripcion ?? ""} onChange={(e) => cambiar(p.plan, { descripcion: e.target.value })} placeholder="Qué incluye" className="h-9 rounded-xl" />
+              <div key={p.plan} className="space-y-2 rounded-xl border p-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold">{p.nombre}</p>
+                  <Button size="sm" className="h-8 rounded-xl" disabled={guardando === p.plan} onClick={() => guardar(p)}>
+                    {guardando === p.plan ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+                  </Button>
                 </div>
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">$ por mes</Label>
-                  <Input type="number" inputMode="decimal" value={p.precioMensual} onChange={(e) => cambiar(p.plan, { precioMensual: Number(e.target.value) || 0 })} className="h-9 rounded-xl text-right" />
+                {campo("Qué incluye", <Input value={p.descripcion ?? ""} onChange={(e) => cambiar(p.plan, { descripcion: e.target.value })} className="h-9 rounded-xl" />)}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {campo("$ por mes", <Input type="number" inputMode="decimal" value={p.precioMensual} onChange={(e) => cambiar(p.plan, { precioMensual: Number(e.target.value) || 0 })} className="h-9 rounded-xl text-right" />)}
+                  {campo("Cajas incluidas", <Input type="number" inputMode="numeric" min={1} value={p.cajasIncluidas} onChange={(e) => cambiar(p.plan, { cajasIncluidas: Math.max(1, Number(e.target.value) || 1) })} className="h-9 rounded-xl text-right" />)}
+                  {campo("$ por caja extra", <Input type="number" inputMode="decimal" value={p.precioCajaExtra} onChange={(e) => cambiar(p.plan, { precioCajaExtra: Number(e.target.value) || 0 })} className="h-9 rounded-xl text-right" />)}
+                  {campo("Tope de cajas", <Input type="number" inputMode="numeric" min={1} placeholder="sin tope" value={p.maxCajas ?? ""} onChange={(e) => cambiar(p.plan, { maxCajas: e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1) })} className="h-9 rounded-xl text-right" />)}
                 </div>
-                <Button className="h-9 rounded-xl" disabled={guardando === p.plan} onClick={() => guardar(p)}>
-                  {guardando === p.plan ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
-                </Button>
               </div>
             ))}
           </div>

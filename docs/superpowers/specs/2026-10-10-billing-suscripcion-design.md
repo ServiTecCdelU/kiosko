@@ -26,6 +26,22 @@ activo que no pagaba seguía operando igual.
 | Pagos manuales (efectivo, transferencia) van a la misma tabla `saas_pagos` con `metodo = manual` | Un solo historial por comercio, sin importar cómo pagó. |
 | La demo nunca paga ni se bloquea | Igual que con la prueba. |
 
+## Precio por plan y por caja (migración 52, decidido 2026-10-10)
+
+| Plan | Precio | Cajas incluidas | Caja extra | Tope |
+|---|---|---|---|---|
+| Free | $0 | 1 | — | sin tope |
+| Básico | $20.000 | 1 | no disponible | 1 caja |
+| Pro | $40.000 | 1 | $10.000 por mes | sin tope |
+
+- El monto del mes es `precio del plan + (cajas activas − incluidas) × precio por caja extra`
+  (`montoMensual` en `lib/suscripcion.ts`). Las cajas son los puestos activos del comercio.
+- El tope se aplica al crear o reactivar un puesto (`/api/puestos`): el Básico no deja pasar
+  de 1 y avisa que hay que pasar a Pro.
+- Las sucursales son comercios distintos (stock y caja propios) y pagan cada una. Un descuento
+  por varias sucursales del mismo dueño queda para cuando aparezca el primer caso.
+- Cada pago guarda cuántas cajas se cobraron (`saas_pagos.cajas`).
+
 ## Flujo de pago
 
 1. Admin → `/suscripcion` (o el botón "Pagar" de los carteles): ve plan, precio, hasta cuándo

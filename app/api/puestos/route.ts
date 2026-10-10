@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { errorAlSumarCaja } from "@/lib/server/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,10 @@ export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
   const nombre = String(body?.nombre ?? "").trim();
   if (!nombre) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
+
+  // Tope de cajas del plan (52): el Basico incluye 1; en Pro cada extra se cobra.
+  const tope = await errorAlSumarCaja(comercioId);
+  if (tope) return NextResponse.json({ error: tope }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
     .from("puestos")
@@ -57,7 +62,17 @@ export async function PATCH(req: Request) {
     if (!nombre) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
     cambios.nombre = nombre;
   }
-  if (body?.activo !== undefined) cambios.activo = Boolean(body.activo);
+  if (body?.activo !== undefined) {
+    cambios.activo = Boolean(body.activo);
+    // Reactivar un puesto es sumar una caja: mismo tope del plan que al crear.
+    if (cambios.activo) {
+      const { data: actual } = await supabaseAdmin.from("puestos").select("activo").eq("comercio_id", comercioId).eq("id", id).maybeSingle();
+      if (actual && !actual.activo) {
+        const tope = await errorAlSumarCaja(comercioId);
+        if (tope) return NextResponse.json({ error: tope }, { status: 403 });
+      }
+    }
+  }
   // Punto de venta de AFIP de esta caja (vacio = usa el general de Facturacion).
   if (body?.puntoVentaAfip !== undefined) {
     if (body.puntoVentaAfip === null || body.puntoVentaAfip === "") {

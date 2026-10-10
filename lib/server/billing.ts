@@ -4,10 +4,14 @@
 // La plata de la suscripcion entra a la cuenta de Mercado Pago de la
 // PLATAFORMA (MP_SAAS_TOKEN), nunca a la del comercio. Los pagos manuales
 // (efectivo, transferencia) los registra el superadmin y van al mismo historial.
+// El precio del mes es plan + cajas extra activas (lib/suscripcion.ts, 52).
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPagoMP } from "@/lib/server/mercadopago";
-import { coberturaDelPago, descripcionPago, esPlan, PLAN_LABEL, type Plan } from "@/lib/suscripcion";
+import {
+  coberturaDelPago, descripcionPago, esPlan, montoMensual, PLAN_LABEL, puedeSumarCaja,
+  type MontoMensual, type Plan, type TarifaPlan,
+} from "@/lib/suscripcion";
 
 const MP_API = "https://api.mercadopago.com";
 const PREFIJO_REF = "saas:";
@@ -23,10 +27,9 @@ function appUrl(): string {
   return (url.startsWith("http") ? url : `https://${url}`).replace(/\/$/, "");
 }
 
-export interface PlanSaas {
+export interface PlanSaas extends TarifaPlan {
   plan: Plan;
   nombre: string;
-  precioMensual: number;
   descripcion: string | null;
 }
 
@@ -42,6 +45,9 @@ export async function listarPlanes(): Promise<PlanSaas[]> {
     plan: p.plan as Plan,
     nombre: String(p.nombre ?? PLAN_LABEL[p.plan as Plan] ?? p.plan),
     precioMensual: Number(p.precio_mensual) || 0,
+    cajasIncluidas: Number(p.cajas_incluidas) || 1,
+    precioCajaExtra: Number(p.precio_caja_extra) || 0,
+    maxCajas: p.max_cajas == null ? null : Number(p.max_cajas),
     descripcion: p.descripcion ?? null,
   }));
   cachePlanes = { valor, hasta: Date.now() + CACHE_PLANES_MS };
@@ -52,25 +58,63 @@ export function olvidarPlanes(): void {
   cachePlanes = null;
 }
 
-export async function precioDelPlan(plan: string): Promise<number> {
-  return (await listarPlanes()).find((p) => p.plan === plan)?.precioMensual ?? 0;
+const PLAN_LIBRE: TarifaPlan = { precioMensual: 0, cajasIncluidas: 1, precioCajaExtra: 0, maxCajas: null };
+
+export async function tarifaDelPlan(plan: string): Promise<TarifaPlan> {
+  return (await listarPlanes()).find((p) => p.plan === plan) ?? PLAN_LIBRE;
 }
 
-export async function guardarPlan(plan: string, precioMensual: number, descripcion: string | null): Promise<void> {
+export async function precioDelPlan(plan: string): Promise<number> {
+  return (await tarifaDelPlan(plan)).precioMensual;
+}
+
+export async function guardarPlan(
+  plan: string,
+  precioMensual: number,
+  descripcion: string | null,
+  cajasIncluidas: number,
+  precioCajaExtra: number,
+  maxCajas: number | null,
+): Promise<void> {
   if (!esPlan(plan)) throw new Error("Plan inválido");
   if (!Number.isFinite(precioMensual) || precioMensual < 0) throw new Error("Precio inválido");
+  if (!Number.isInteger(cajasIncluidas) || cajasIncluidas < 1) throw new Error("Las cajas incluidas tienen que ser 1 o más");
+  if (!Number.isFinite(precioCajaExtra) || precioCajaExtra < 0) throw new Error("Precio por caja extra inválido");
+  if (maxCajas !== null && (!Number.isInteger(maxCajas) || maxCajas < cajasIncluidas)) throw new Error("El tope de cajas no puede ser menor a las incluidas");
   const { error } = await supabaseAdmin
     .from("saas_planes")
-    .update({ precio_mensual: precioMensual, descripcion, updated_at: new Date().toISOString() })
+    .update({
+      precio_mensual: precioMensual, descripcion, cajas_incluidas: cajasIncluidas, precio_caja_extra: precioCajaExtra,
+      max_cajas: maxCajas, updated_at: new Date().toISOString(),
+    })
     .eq("plan", plan);
   if (error) throw new Error(error.message);
   olvidarPlanes();
+}
+
+/** Puestos de cobro activos del comercio (lo que se cobra como cajas). */
+export async function cajasActivas(comercioId: string): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from("puestos").select("id", { count: "exact", head: true })
+    .eq("comercio_id", comercioId).eq("activo", true);
+  return count ?? 0;
+}
+
+/** Error legible si el plan del comercio no deja sumar otra caja; null si puede. */
+export async function errorAlSumarCaja(comercioId: string): Promise<string | null> {
+  const { data: c } = await supabaseAdmin.from("comercios").select("plan").eq("id", comercioId).maybeSingle();
+  const tarifa = await tarifaDelPlan(c?.plan ?? "free");
+  const activas = await cajasActivas(comercioId);
+  if (puedeSumarCaja(tarifa, activas)) return null;
+  const nombre = (await listarPlanes()).find((p) => p.plan === c?.plan)?.nombre ?? c?.plan ?? "actual";
+  return `El plan ${nombre} incluye ${tarifa.maxCajas} caja${tarifa.maxCajas === 1 ? "" : "s"}. Para sumar cajas, pasá al plan Pro desde Suscripción.`;
 }
 
 export interface PagoSaas {
   id: string;
   plan: string;
   monto: number;
+  cajas: number | null;
   periodo: string;
   metodo: "mercadopago" | "manual";
   estado: "pendiente" | "aprobado" | "rechazado";
@@ -82,7 +126,7 @@ export interface PagoSaas {
 
 function mapPago(d: Record<string, any>): PagoSaas {
   return {
-    id: d.id, plan: d.plan, monto: Number(d.monto) || 0, periodo: d.periodo, metodo: d.metodo, estado: d.estado,
+    id: d.id, plan: d.plan, monto: Number(d.monto) || 0, cajas: d.cajas == null ? null : Number(d.cajas), periodo: d.periodo, metodo: d.metodo, estado: d.estado,
     nota: d.nota ?? null, usuarioNombre: d.usuario_nombre ?? null, createdAt: d.created_at, aprobadoAt: d.aprobado_at ?? null,
   };
 }
@@ -99,6 +143,9 @@ export interface EstadoSuscripcion {
   plan: Plan;
   nombrePlan: string;
   precioMensual: number;
+  /** Desglose del mes: plan + cajas extra activas. */
+  monto: MontoMensual;
+  tarifa: TarifaPlan;
   estado: string;
   suscripcionHasta: string | null;
   /** Mes que cubriria el proximo pago y hasta cuando dejaria la suscripcion. */
@@ -108,6 +155,11 @@ export interface EstadoSuscripcion {
   pagos: PagoSaas[];
 }
 
+async function tarifaYMonto(comercioId: string, plan: Plan): Promise<{ tarifa: TarifaPlan; monto: MontoMensual }> {
+  const tarifa = await tarifaDelPlan(plan);
+  return { tarifa, monto: montoMensual(tarifa, await cajasActivas(comercioId)) };
+}
+
 export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscripcion> {
   const { data: c, error } = await supabaseAdmin
     .from("comercios").select("plan, estado, suscripcion_hasta").eq("id", comercioId).maybeSingle();
@@ -115,10 +167,13 @@ export async function estadoSuscripcion(comercioId: string): Promise<EstadoSuscr
   if (!c) throw new Error("Comercio inexistente");
   const plan = (esPlan(c.plan) ? c.plan : "free") as Plan;
   const info = (await listarPlanes()).find((p) => p.plan === plan);
+  const { tarifa, monto } = await tarifaYMonto(comercioId, plan);
   return {
     plan,
     nombrePlan: info?.nombre ?? PLAN_LABEL[plan],
-    precioMensual: info?.precioMensual ?? 0,
+    precioMensual: tarifa.precioMensual,
+    monto,
+    tarifa,
     estado: c.estado,
     suscripcionHasta: c.suscripcion_hasta,
     proximo: coberturaDelPago(c.suscripcion_hasta),
@@ -134,13 +189,13 @@ export async function crearPagoMercadoPago(comercioId: string, usuarioNombre: st
   const { data: c } = await supabaseAdmin.from("comercios").select("nombre, slug, plan, suscripcion_hasta").eq("id", comercioId).maybeSingle();
   if (!c) throw new Error("Comercio inexistente");
   const plan = (esPlan(c.plan) ? c.plan : "free") as Plan;
-  const precio = await precioDelPlan(plan);
-  if (!(precio > 0)) throw new Error("Tu plan no tiene un precio cargado: no hay nada que pagar.");
+  const { monto } = await tarifaYMonto(comercioId, plan);
+  if (!(monto.total > 0)) throw new Error("Tu plan no tiene un precio cargado: no hay nada que pagar.");
   const cobertura = coberturaDelPago(c.suscripcion_hasta);
 
   const pagoId = `spago_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const { error } = await supabaseAdmin.from("saas_pagos").insert({
-    id: pagoId, comercio_id: comercioId, plan, monto: precio, periodo: cobertura.periodo,
+    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, periodo: cobertura.periodo,
     metodo: "mercadopago", estado: "pendiente", usuario_nombre: usuarioNombre,
   });
   if (error) throw new Error(error.message);
@@ -150,7 +205,7 @@ export async function crearPagoMercadoPago(comercioId: string, usuarioNombre: st
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      items: [{ title: descripcionPago(plan, cobertura.periodo, c.nombre), quantity: 1, unit_price: precio, currency_id: "ARS" }],
+      items: [{ title: descripcionPago(plan, cobertura.periodo, c.nombre, monto.cajasExtra), quantity: 1, unit_price: monto.total, currency_id: "ARS" }],
       external_reference: `${PREFIJO_REF}${pagoId}`,
       notification_url: `${appUrl()}/api/billing/webhook`,
       back_urls: { success: volver, failure: volver, pending: volver },
@@ -233,9 +288,10 @@ export async function registrarPagoManual(comercioId: string, nota: string | nul
   const { data: c } = await supabaseAdmin.from("comercios").select("plan, suscripcion_hasta").eq("id", comercioId).maybeSingle();
   if (!c) throw new Error("Comercio inexistente");
   const plan = (esPlan(c.plan) ? c.plan : "free") as Plan;
+  const { monto } = await tarifaYMonto(comercioId, plan);
   const pagoId = `spago_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const { error } = await supabaseAdmin.from("saas_pagos").insert({
-    id: pagoId, comercio_id: comercioId, plan, monto: await precioDelPlan(plan), periodo: coberturaDelPago(c.suscripcion_hasta).periodo,
+    id: pagoId, comercio_id: comercioId, plan, monto: monto.total, cajas: monto.cajas, periodo: coberturaDelPago(c.suscripcion_hasta).periodo,
     metodo: "manual", estado: "pendiente", nota, usuario_nombre: usuarioNombre,
   });
   if (error) throw new Error(error.message);

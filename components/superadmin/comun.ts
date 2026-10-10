@@ -38,6 +38,10 @@ export interface PlanSaas {
   plan: Comercio["plan"];
   nombre: string;
   precioMensual: number;
+  cajasIncluidas: number;
+  precioCajaExtra: number;
+  /** null = sin tope */
+  maxCajas: number | null;
   descripcion: string | null;
 }
 

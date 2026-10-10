@@ -155,7 +155,11 @@ export async function POST(req: Request) {
 
   if (accion === "guardarPlan") {
     try {
-      await guardarPlan(String(body?.plan ?? ""), Number(body?.precioMensual), String(body?.descripcion ?? "").trim() || null);
+      await guardarPlan(
+        String(body?.plan ?? ""), Number(body?.precioMensual), String(body?.descripcion ?? "").trim() || null,
+        Number(body?.cajasIncluidas) || 1, Number(body?.precioCajaExtra) || 0,
+        body?.maxCajas === null || body?.maxCajas === "" || body?.maxCajas === undefined ? null : Number(body.maxCajas),
+      );
       return NextResponse.json({ ok: true });
     } catch (e) {
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo guardar el plan" }, { status: 400 });

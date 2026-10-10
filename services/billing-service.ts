@@ -20,6 +20,9 @@ export interface EstadoSuscripcion {
   plan: Plan;
   nombrePlan: string;
   precioMensual: number;
+  /** Desglose del mes: plan + cajas extra activas (52). */
+  monto: { base: number; cajas: number; cajasExtra: number; extra: number; total: number };
+  tarifa: { precioMensual: number; cajasIncluidas: number; precioCajaExtra: number; maxCajas: number | null };
   estado: string;
   suscripcionHasta: string | null;
   proximo: { periodo: string; hasta: string };

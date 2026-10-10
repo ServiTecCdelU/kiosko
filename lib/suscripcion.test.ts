@@ -1,7 +1,7 @@
 // lib/suscripcion.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coberturaDelPago, descripcionPago, finDeMesArgentina, periodoDe, textoPeriodo } from "./suscripcion.ts";
+import { coberturaDelPago, descripcionPago, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo } from "./suscripcion.ts";
 
 describe("periodos y fin de mes en hora argentina", () => {
   test("periodo y fin de mes", () => {
@@ -24,6 +24,25 @@ describe("coberturaDelPago", () => {
   test("al dia: cubre el mes siguiente al pagado", () => {
     assert.deepEqual(coberturaDelPago("2026-11-01T02:59:59.000Z", ahora), { periodo: "2026-11", hasta: "2026-12-01T02:59:59.000Z" });
     assert.deepEqual(coberturaDelPago("2027-01-01T02:59:59.000Z", ahora), { periodo: "2027-01", hasta: "2027-02-01T02:59:59.000Z" });
+  });
+});
+
+describe("montoMensual y tope de cajas", () => {
+  const basico = { precioMensual: 20000, cajasIncluidas: 1, precioCajaExtra: 0, maxCajas: 1 };
+  const pro = { precioMensual: 40000, cajasIncluidas: 1, precioCajaExtra: 10000, maxCajas: null };
+  test("Pro: 1 caja incluida, cada extra suma", () => {
+    assert.deepEqual(montoMensual(pro, 1), { base: 40000, cajas: 1, cajasExtra: 0, extra: 0, total: 40000 });
+    assert.deepEqual(montoMensual(pro, 3), { base: 40000, cajas: 3, cajasExtra: 2, extra: 20000, total: 60000 });
+    assert.equal(montoMensual(pro, 0).total, 40000);
+  });
+  test("Basico: no cobra extra y no deja sumar cajas", () => {
+    assert.equal(montoMensual(basico, 3).total, 20000);
+    assert.equal(puedeSumarCaja(basico, 1), false);
+    assert.equal(puedeSumarCaja(basico, 0), true);
+    assert.equal(puedeSumarCaja(pro, 7), true);
+  });
+  test("descripcion con cajas extra", () => {
+    assert.equal(descripcionPago("pro", "2026-10", "Súper", 2), "Suscripción Pro (+2 cajas) octubre 2026 · Súper");
   });
 });
 
