@@ -34,6 +34,7 @@ import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
 import { SaleDetailDialog } from "@/components/ventas/sale-detail-dialog";
 import { CobrosSinResolver } from "@/components/caja/cobros-sin-resolver";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { CifraAjustada } from "@/components/ui/cifra-ajustada";
 import { abrirCajon } from "@/lib/impresora/imprimir";
 import { leerConfigImpresora, modoPuedeAbrirCajon } from "@/lib/impresora/config";
 import type { Caja, CajaMovimiento, CajaMovTipo, Sale } from "@/lib/types";
@@ -237,6 +238,9 @@ export default function CajaPage() {
     : 0;
 
   const ventasVigentes = ventas.filter((v) => v.estado !== "anulada");
+  // Diferencia en vivo mientras escribe el efectivo contado: asi ve si sobra o
+  // falta antes de cerrar, y entiende contra que se compara.
+  const diferenciaPrevia = montoCierre.trim() === "" ? null : (Number(montoCierre) || 0) - esperadoEfectivo;
 
   return (
     <AppShell title="Caja">
@@ -413,9 +417,15 @@ export default function CajaPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Efectivo esperado</p>
-                    <p className="cifra text-money text-2xl font-bold">{formatCurrency(esperadoEfectivo)}</p>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr] sm:items-end">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">Efectivo que tiene que haber en el cajón</p>
+                      <CifraAjustada texto={formatCurrency(esperadoEfectivo)} maxRem={1.75} className="font-bold text-money" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Contá todo el efectivo del cajón (incluido el fondo de apertura) y escribí el total.
+                      Se compara con lo esperado y queda registrado si sobra o falta. Abajo está la cuenta completa.
+                    </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
@@ -427,54 +437,111 @@ export default function CajaPage() {
                       {working ? "Cerrando..." : "Cerrar caja"}
                     </Button>
                   </div>
+                  {diferenciaPrevia != null && (
+                    <p className={cn(
+                      "text-sm font-medium",
+                      diferenciaPrevia === 0 ? "text-success" : diferenciaPrevia > 0 ? "text-warning" : "text-destructive",
+                    )}>
+                      {diferenciaPrevia === 0
+                        ? "Arqueo exacto: coincide con lo esperado."
+                        : diferenciaPrevia > 0
+                          ? `Sobran ${formatCurrency(diferenciaPrevia)} respecto de lo esperado.`
+                          : `Faltan ${formatCurrency(-diferenciaPrevia)} respecto de lo esperado.`}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-8">
-                <MiniStat
-                  label="Apertura" value={formatCurrency(caja.montoApertura)} icon={<Wallet className="h-3.5 w-3.5" />}
-                  bgClass="bg-primary/10 text-primary" iconBgClass="bg-primary/15 text-primary"
-                />
-                <MiniStat
-                  label="Efectivo" value={formatCurrency(resumen?.totalEfectivo ?? 0)} icon={<Banknote className="h-3.5 w-3.5" />}
-                  bgClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" iconBgClass="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                />
-                <MiniStat
-                  label="Transfer." value={formatCurrency(resumen?.totalTransferencia ?? 0)} icon={<CreditCard className="h-3.5 w-3.5" />}
-                  bgClass="bg-sky-500/10 text-sky-700 dark:text-sky-400" iconBgClass="bg-sky-500/15 text-sky-600 dark:text-sky-400"
-                />
-                <MiniStat
-                  label="Mercado Pago" value={formatCurrency(resumen?.totalMercadoPago ?? 0)} icon={<QrCode className="h-3.5 w-3.5" />}
-                  bgClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400" iconBgClass="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400"
-                />
-                <MiniStat
-                  label="Total" value={formatCurrency(resumen?.totalVentas ?? 0)} icon={<TrendingUp className="h-3.5 w-3.5" />}
-                  bgClass="bg-gradient-to-br from-money to-emerald-600 text-white" solid
-                />
-                <MiniStat
-                  label="Aportes" value={formatCurrency(resumen?.totalAportes ?? 0)} icon={<ArrowUpRight className="h-3.5 w-3.5" />}
-                  bgClass="bg-money/10 text-money" iconBgClass="bg-money/15 text-money"
-                />
-                <MiniStat
-                  label="Retiros" value={formatCurrency(resumen?.totalRetiros ?? 0)} icon={<ArrowDownRight className="h-3.5 w-3.5" />}
-                  bgClass="bg-amber-500/10 text-amber-700 dark:text-amber-400" iconBgClass="bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                />
-                <MiniStat
-                  label="Gastos" value={formatCurrency(resumen?.totalGastos ?? 0)} icon={<Receipt className="h-3.5 w-3.5" />}
-                  bgClass="bg-rose-500/10 text-rose-700 dark:text-rose-400" iconBgClass="bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                />
-              </div>
+              {/* El arqueo explicado: que se vendio y por donde entro, y la cuenta del efectivo */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="card-premium rounded-2xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <TrendingUp className="h-4 w-4 text-money" /> Vendido en esta caja
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        Total vendido · {resumen?.cantidadVentas ?? 0} venta{(resumen?.cantidadVentas ?? 0) === 1 ? "" : "s"}
+                      </p>
+                      <CifraAjustada texto={formatCurrency(resumen?.totalVentas ?? 0)} maxRem={1.75} className="font-bold text-money" />
+                    </div>
+                    <ul className="divide-y rounded-xl border text-sm">
+                      <FilaArqueo
+                        icono={<Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
+                        label="Efectivo" detalle="queda en el cajón"
+                        valor={resumen?.totalEfectivo ?? 0}
+                      />
+                      <FilaArqueo
+                        icono={<CreditCard className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
+                        label="Transferencia y tarjeta" detalle="débito, crédito, posnet: va al banco"
+                        valor={resumen?.totalTransferencia ?? 0}
+                      />
+                      <FilaArqueo
+                        icono={<QrCode className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />}
+                        label="Mercado Pago" detalle="QR y Point: va a la cuenta de MP"
+                        valor={resumen?.totalMercadoPago ?? 0}
+                      />
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      Las ventas fiadas no entran acá: se cobran después desde Clientes. Las anuladas tampoco suman.
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("aporte")}>
-                  <ArrowUpCircle className="mr-2 h-4 w-4 text-money" /> Aporte
-                </Button>
-                <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("retiro")}>
-                  <ArrowDownCircle className="mr-2 h-4 w-4 text-warning" /> Retiro
-                </Button>
-                <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("gasto")}>
-                  <Receipt className="mr-2 h-4 w-4 text-destructive" /> Gasto
-                </Button>
+                <Card className="card-premium rounded-2xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Wallet className="h-4 w-4 text-primary" /> Efectivo en el cajón
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <ul className="divide-y rounded-xl border text-sm">
+                      <FilaArqueo
+                        icono={<Wallet className="h-4 w-4 text-primary" />}
+                        label="Fondo de apertura" detalle="el cambio con el que arrancó"
+                        valor={caja.montoApertura}
+                      />
+                      <FilaArqueo
+                        signo="+" icono={<Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
+                        label="Ventas en efectivo" valor={resumen?.totalEfectivo ?? 0}
+                      />
+                      <FilaArqueo
+                        signo="+" icono={<ArrowUpRight className="h-4 w-4 text-money" />}
+                        label="Aportes" detalle="plata que se puso en la caja"
+                        valor={resumen?.totalAportes ?? 0}
+                      />
+                      <FilaArqueo
+                        signo="−" icono={<ArrowDownRight className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                        label="Retiros" detalle="plata que se sacó de la caja"
+                        valor={resumen?.totalRetiros ?? 0}
+                      />
+                      <FilaArqueo
+                        signo="−" icono={<Receipt className="h-4 w-4 text-rose-600 dark:text-rose-400" />}
+                        label="Gastos" detalle="pagados con plata de la caja"
+                        valor={resumen?.totalGastos ?? 0}
+                      />
+                      <li className="flex items-center justify-between gap-3 rounded-b-xl bg-money/10 px-3 py-2.5 font-semibold">
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 text-center text-muted-foreground">=</span> Tiene que haber
+                        </span>
+                        <span className="cifra text-money">{formatCurrency(esperadoEfectivo)}</span>
+                      </li>
+                    </ul>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("aporte")}>
+                        <ArrowUpCircle className="mr-2 h-4 w-4 text-money" /> Aporte
+                      </Button>
+                      <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("retiro")}>
+                        <ArrowDownCircle className="mr-2 h-4 w-4 text-warning" /> Retiro
+                      </Button>
+                      <Button variant="outline" className="rounded-xl" onClick={() => setMovTipo("gasto")}>
+                        <Receipt className="mr-2 h-4 w-4 text-destructive" /> Gasto
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {movimientos.length > 0 && (
@@ -635,7 +702,7 @@ function ConsolidadoDia({ cajas }: { cajas: CajaDelDia[] }) {
               bgClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" iconBgClass="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
             />
             <MiniStat
-              label="Transfer." value={formatCurrency(totales.totalTransferencia)} icon={<CreditCard className="h-3.5 w-3.5" />}
+              label="Transf. y tarjeta" value={formatCurrency(totales.totalTransferencia)} icon={<CreditCard className="h-3.5 w-3.5" />}
               bgClass="bg-sky-500/10 text-sky-700 dark:text-sky-400" iconBgClass="bg-sky-500/15 text-sky-600 dark:text-sky-400"
             />
             <MiniStat
@@ -713,13 +780,34 @@ function ConsolidadoDia({ cajas }: { cajas: CajaDelDia[] }) {
   );
 }
 
+/** Una linea del arqueo: icono, concepto, aclaracion y monto (con signo si suma o resta). */
+function FilaArqueo({
+  icono, label, detalle, valor, signo,
+}: {
+  icono: React.ReactNode; label: string; detalle?: string; valor: number; signo?: "+" | "−";
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 px-3 py-2">
+      <span className="flex min-w-0 items-center gap-2">
+        {signo ? <span className="w-4 text-center text-muted-foreground">{signo}</span> : <span className="w-4" />}
+        {icono}
+        <span className="min-w-0">
+          <span className="font-medium">{label}</span>
+          {detalle && <span className="block text-xs text-muted-foreground sm:inline sm:before:content-['_·_']">{detalle}</span>}
+        </span>
+      </span>
+      <span className="cifra shrink-0 font-medium">{formatCurrency(valor)}</span>
+    </li>
+  );
+}
+
 function MiniStat({
   label, value, icon, bgClass, iconBgClass, solid,
 }: {
   label: string; value: string; icon?: React.ReactNode; bgClass?: string; iconBgClass?: string; solid?: boolean;
 }) {
   return (
-    <div className={cn("flex flex-col items-center gap-1 rounded-2xl px-2 py-3 text-center shadow-sm transition-transform hover:-translate-y-0.5", bgClass)}>
+    <div className={cn("flex min-w-0 flex-col items-center gap-1 rounded-2xl px-2 py-3 text-center shadow-sm transition-transform hover:-translate-y-0.5", bgClass)}>
       {icon && (
         <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", solid ? "bg-white/20" : iconBgClass)}>
           {icon}
@@ -728,7 +816,8 @@ function MiniStat({
       <p className={cn("text-[10px] font-medium uppercase tracking-wide", solid ? "text-white/85" : "opacity-70")}>
         {label}
       </p>
-      <p className="cifra truncate text-sm font-extrabold sm:text-base">{value}</p>
+      {/* La plata nunca se trunca con "…": se achica hasta entrar. */}
+      <CifraAjustada texto={value} maxRem={1} minRem={0.7} className="text-center font-extrabold" />
     </div>
   );
 }
@@ -762,7 +851,8 @@ function HistorialTab({
                 <TableHead className="hidden md:table-cell">Puesto</TableHead>
                 <TableHead className="text-right">Apertura</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">Efectivo</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">Transfer.</TableHead>
+                <TableHead className="hidden text-right sm:table-cell">Transf. y tarjeta</TableHead>
+                <TableHead className="hidden text-right lg:table-cell">Total vendido</TableHead>
                 <TableHead className="hidden text-right md:table-cell">Mercado Pago</TableHead>
                 <TableHead className="text-right">Diferencia</TableHead>
                 <TableHead className="text-right">PDF</TableHead>
@@ -779,6 +869,7 @@ function HistorialTab({
                   <TableCell className="cifra text-right">{formatCurrency(c.montoApertura)}</TableCell>
                   <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalEfectivo)}</TableCell>
                   <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalTransferencia)}</TableCell>
+                  <TableCell className="cifra hidden text-right lg:table-cell">{formatCurrency(c.totalVentas)}</TableCell>
                   <TableCell className="cifra hidden text-right md:table-cell">{formatCurrency(c.totalMercadoPago)}</TableCell>
                   <TableCell className={cn("cifra text-right font-medium", (c.diferencia ?? 0) < 0 ? "text-destructive" : (c.diferencia ?? 0) > 0 ? "text-warning" : "")}>
                     {formatCurrency(c.diferencia ?? 0)}

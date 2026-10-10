@@ -35,19 +35,12 @@ import { getComprasConSaldo } from "@/services/compras-service";
 import { resumenPagos, type ResumenPagos } from "@/lib/proveedores-vencimientos";
 import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { formatCurrency } from "@/lib/utils/format";
+import { CifraAjustada } from "@/components/ui/cifra-ajustada";
 import type { Caja, UserRol } from "@/lib/types";
 
 // Cuanto esperar entre actualizaciones automaticas del dashboard (mobile: el
 // dueño lo abre para "ver rápido cómo va el día", no lo deja fijo en pantalla).
 const REFRESH_MS = 60_000;
-
-// La cifra grande tiene que entrar en la tarjeta aunque el total de ventas sea de
-// muchos digitos: cuanto mas largo el texto, mas chica la letra.
-function tamanoCifra(texto: string): string {
-  if (texto.length <= 9) return "text-4xl sm:text-[2.75rem]";
-  if (texto.length <= 12) return "text-3xl sm:text-4xl";
-  return "text-2xl sm:text-3xl";
-}
 
 const ICONS: Record<string, typeof ShoppingCart> = {
   "/pos": ShoppingCart,
@@ -344,7 +337,8 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
         <div className="eyebrow flex items-center gap-1.5">
           <TrendingUp className="h-4 w-4 text-money" /> Ventas de hoy
         </div>
-        <p className={`cifra-hero mt-2 whitespace-nowrap text-money ${tamanoCifra(textoVentasHoy)}`}>{textoVentasHoy}</p>
+        {/* Se achica sola: un total de muchos digitos no puede cortarse ni salirse de la tarjeta. */}
+        <CifraAjustada texto={textoVentasHoy} maxRem={2.75} minRem={1.125} hero className="mt-2 text-money" />
         <p className="mt-1 text-xs text-muted-foreground">
           {cantHoy} {cantHoy === 1 ? "venta" : "ventas"}
         </p>
@@ -416,7 +410,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
           >
             {pagos ? pagosUrgentes : "—"}
           </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {!pagos
               ? "—"
               : pagos.vencidas > 0
