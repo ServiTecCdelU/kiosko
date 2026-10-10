@@ -19,8 +19,8 @@ const IDS_RUBRO = RUBROS.map((r) => r.id) as [string, ...string[]];
 
 /** Planes que se pueden elegir al registrarse (el precio sale de saas_planes). */
 export const PLANES_REGISTRO = [
-  { id: "basico", nombre: "Básico", detalle: "Punto de venta, stock, caja, clientes, reportes y cobro con QR de Mercado Pago. 1 caja." },
-  { id: "pro", nombre: "Pro", detalle: "Todo lo del Básico más facturación electrónica, lector Point de Mercado Pago y varias cajas." },
+  { id: "basico", nombre: "Básico", detalle: "Punto de venta, stock, caja, clientes y reportes. 1 caja." },
+  { id: "pro", nombre: "Pro", detalle: "Todo lo del Básico más facturación electrónica, cobros con Mercado Pago (QR y Point) y varias cajas." },
 ] as const;
 
 export const MAX_CAJAS_REGISTRO = 10;

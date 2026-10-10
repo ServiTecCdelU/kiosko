@@ -41,7 +41,7 @@ export default function FacturacionPage() {
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
           </div>
         ) : estado.planPermite === false ? (
-          // Plan Basico: la facturacion es del Pro. Mercado Pago (abajo) si esta incluido.
+          // Plan Basico: facturacion y Mercado Pago son del Pro (cada tarjeta muestra su bloqueo).
           <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <AvisoPlanPro />
             <MercadoPagoCard />

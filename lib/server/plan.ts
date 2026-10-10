@@ -4,11 +4,11 @@
 // leer el estado sigue abierto para que las pantallas muestren el aviso de plan.
 //
 // - Facturacion electronica ARCA: plan Pro (lib/server/afip/facturar.ts y /api/afip/*).
-// - Lector Point de Mercado Pago: plan Pro (/api/mercadopago/point, /dispositivos).
+// - Mercado Pago (conectar cuenta, QR y Point): plan Pro (/api/mercadopago/*).
 // - Cajas extra: tope del plan en lib/server/billing.ts (errorAlSumarCaja).
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { esComercioDemo } from "@/lib/server/demo";
-import { MENSAJE_FACTURACION_PRO, MENSAJE_POINT_PRO, planIncluyeFacturacion, planIncluyePoint } from "@/lib/suscripcion";
+import { MENSAJE_FACTURACION_PRO, MENSAJE_MP_PRO, planIncluyeFacturacion, planIncluyeMercadoPago } from "@/lib/suscripcion";
 
 export const VERSION_PAGA = "La facturación electrónica está disponible en la versión paga.";
 
@@ -29,8 +29,8 @@ export async function motivoSinFacturacion(comercioId: string): Promise<string |
   return null;
 }
 
-/** Mensaje de por que NO puede usar el lector Point (plan Basico), o null si puede. */
-export async function motivoSinPoint(comercioId: string): Promise<string | null> {
-  if (!planIncluyePoint(await planDeComercio(comercioId))) return MENSAJE_POINT_PRO;
+/** Mensaje de por que NO puede cobrar con Mercado Pago, QR o Point (plan Basico), o null si puede. */
+export async function motivoSinMercadoPago(comercioId: string): Promise<string | null> {
+  if (!planIncluyeMercadoPago(await planDeComercio(comercioId))) return MENSAJE_MP_PRO;
   return null;
 }

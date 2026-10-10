@@ -6,6 +6,7 @@ import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { urlWebhookMP } from "@/lib/server/mercadopago";
 import { conectarMP, desconectarMP, estadoConexionMP } from "@/lib/server/mercadopago-credencial";
 import { esComercioDemo } from "@/lib/server/demo";
+import { motivoSinMercadoPago } from "@/lib/server/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,9 @@ export async function POST(req: Request) {
 
   const comercioId = comercioIdDeSesion(req);
   if (await esComercioDemo(comercioId)) return noEnDemo();
+  // Conectar la cuenta es del plan Pro; desconectar (abajo) se deja siempre.
+  const motivo = await motivoSinMercadoPago(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
   try {
     const estado = await conectarMP(comercioId, token);
     return NextResponse.json({ ...estado, webhookUrl: webhookUrl(comercioId) });

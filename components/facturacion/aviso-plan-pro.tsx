@@ -3,8 +3,8 @@
 // components/facturacion/aviso-plan-pro.tsx — la facturacion electronica es del
 // plan Pro (decidido 2026-10-10). Un comercio en Basico ve la pantalla con el
 // modal de plan Pro encima y, detras, una tarjeta bloqueada con el mismo aviso
-// (por si cierra el modal). Los cobros con QR de Mercado Pago siguen disponibles
-// en Basico: no se tapan.
+// (por si cierra el modal). La tarjeta de Mercado Pago de abajo muestra su propio
+// bloqueo (tambien es del Pro).
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, FileText, Lock } from "lucide-react";

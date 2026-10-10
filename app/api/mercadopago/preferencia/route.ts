@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearPreferenciaMP } from "@/lib/server/mercadopago";
 import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
+import { motivoSinMercadoPago } from "@/lib/server/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
   if (!Number.isFinite(total) || total <= 0) {
     return NextResponse.json({ error: "Total invalido" }, { status: 400 });
   }
+  // Mercado Pago es del plan Pro (lib/server/plan.ts).
+  const motivo = await motivoSinMercadoPago(comercioId);
+  if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
 
   const externalReference = crypto.randomUUID();
 

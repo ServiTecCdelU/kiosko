@@ -57,29 +57,31 @@ superadmin los puede seguir editando.)
 
 | Función | Básico | Pro | Free (lo asigna el superadmin) |
 |---|---|---|---|
-| POS, caja, stock, clientes, reportes, cobro con QR de Mercado Pago | sí | sí | sí |
+| POS, caja, stock, clientes, reportes | sí | sí | sí |
 | Cajas | 1 | sin tope ($10.000 c/u extra) | sin tope |
 | **Facturación electrónica ARCA** (A, B, C, NC, CAEA) | **no** | sí | sí |
-| **Lector Point de Mercado Pago** | **no** | sí | sí |
+| **Cobros con Mercado Pago** (conectar cuenta, QR y lector Point) | **no** | sí | sí |
 
-- Reglas puras: `planIncluyeFacturacion` y `planIncluyePoint` en `lib/suscripcion.ts` (solo
-  `basico` queda afuera; sin plan o `free` no se bloquea nada). El tope de cajas ya estaba
-  (`puedeSumarCaja`, `errorAlSumarCaja`).
-- Servidor: `lib/server/plan.ts` (`motivoSinFacturacion`: demo o Básico; `motivoSinPoint`).
-  Facturación: la emisión (`configActiva` en `facturar.ts`, cubre POS manual y automático, NC
-  y CAEA) y las rutas de `/api/afip` que escriben; `GET /api/afip/config` devuelve
-  `planPermite`. Point: `/api/mercadopago/point/cobrar` y `/api/mercadopago/dispositivos`
-  responden 403.
+- Reglas puras: `planIncluyeFacturacion` y `planIncluyeMercadoPago` en `lib/suscripcion.ts`
+  (solo `basico` queda afuera; sin plan o `free` no se bloquea nada). El tope de cajas ya
+  estaba (`puedeSumarCaja`, `errorAlSumarCaja`).
+- Servidor: `lib/server/plan.ts` (`motivoSinFacturacion`: demo o Básico;
+  `motivoSinMercadoPago`). Facturación: la emisión (`configActiva` en `facturar.ts`, cubre
+  POS manual y automático, NC y CAEA) y las rutas de `/api/afip` que escriben;
+  `GET /api/afip/config` devuelve `planPermite`. Mercado Pago: conectar la cuenta
+  (`POST /api/mercadopago/conexion`), el QR (`/preferencia`), el Point (`/point/cobrar`) y
+  los lectores (`/dispositivos`) responden 403; desconectar y resolver cobros viejos se
+  dejan siempre.
 - El plan viaja al navegador en la sesión (`Usuario.plan`, `datosDeComercio`) solo para los
   avisos; al cambiar de plan en `/suscripcion` se actualiza el usuario guardado sin recargar.
 - Pantallas, con el modal reutilizable `components/plan/modal-plan-pro.tsx` (botón a
   `/suscripcion`): `/facturacion` en Básico lo muestra al entrar y detrás una tarjeta bloqueada
-  (`aviso-plan-pro.tsx`); la tarjeta de Mercado Pago en Básico habla solo de QR y reemplaza el
-  webhook del Point por "Lector Point: plan Pro" con el modal; el diálogo de puestos en Básico
-  con una caja activa abre el modal al agregar o reactivar otra; el POS rechaza Point con un
-  aviso (hoy los botones de MP están comentados en el carrito).
-- Bajar de Pro a Básico conserva la configuración de ARCA y de Mercado Pago; solo deja de
-  emitir y de usar el Point hasta volver a Pro. El confirm del cambio lo avisa.
+  (`aviso-plan-pro.tsx`); la tarjeta de Mercado Pago en Básico es una tarjeta bloqueada con
+  "Ver plan Pro" y el modal; el diálogo de puestos en Básico con una caja activa abre el modal
+  al agregar o reactivar otra; el POS rechaza QR y Point con un aviso (hoy los botones de MP
+  están comentados en el carrito).
+- Bajar de Pro a Básico conserva la configuración de ARCA y el token de Mercado Pago; solo
+  deja de emitir y de cobrar con MP hasta volver a Pro. El confirm del cambio lo avisa.
 
 ## Cambio de plan por el comercio (decidido 2026-10-10, sin migración)
 

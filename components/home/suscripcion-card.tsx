@@ -126,7 +126,7 @@ export function SuscripcionCard({ completa = false }: { completa?: boolean }) {
         ? `Lo que ya pagaste sigue vigente hasta el ${formatDate(estado.suscripcionHasta!)}; desde el mes siguiente se cobra ${formatCurrency(nuevo)} por mes.`
         : `Desde ahora la suscripción cuesta ${formatCurrency(nuevo)} por mes.`;
     const pierdeFacturacion = planIncluyeFacturacion(estado.plan) && !planIncluyeFacturacion(p.plan)
-      ? " Ojo: el plan Básico no incluye facturación electrónica ni lector Point de Mercado Pago; tu configuración queda guardada pero no vas a poder usarlos hasta volver a Pro."
+      ? " Ojo: el plan Básico no incluye facturación electrónica ni cobros con Mercado Pago (QR y Point); tu configuración queda guardada pero no vas a poder usarlos hasta volver a Pro."
       : "";
     if (!window.confirm(`¿Cambiar al plan ${p.nombre}? El cambio aplica al instante. ${detalle}${pierdeFacturacion}`)) return;
     setCambiando(true);

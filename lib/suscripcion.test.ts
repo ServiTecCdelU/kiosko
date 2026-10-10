@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   coberturaDelPago, descripcionPago, esPrincipalDelGrupo, finDeMesArgentina, montoMensual, periodoDe, puedeSumarCaja, textoPeriodo,
-  planIncluyeFacturacion, planIncluyePoint, validarCambioDePlan,
+  planIncluyeFacturacion, planIncluyeMercadoPago, validarCambioDePlan,
 } from "./suscripcion.ts";
 
 describe("periodos y fin de mes en hora argentina", () => {
@@ -99,9 +99,9 @@ describe("funciones por plan", () => {
     assert.equal(planIncluyeFacturacion("free"), true, "free lo asigna el superadmin: sin limites");
     assert.equal(planIncluyeFacturacion(undefined), true, "sin plan cargado no se bloquea nada");
   });
-  test("lector Point: misma regla", () => {
-    assert.equal(planIncluyePoint("basico"), false);
-    assert.equal(planIncluyePoint("pro"), true);
-    assert.equal(planIncluyePoint("free"), true);
+  test("Mercado Pago (QR y Point): misma regla", () => {
+    assert.equal(planIncluyeMercadoPago("basico"), false);
+    assert.equal(planIncluyeMercadoPago("pro"), true);
+    assert.equal(planIncluyeMercadoPago("free"), true);
   });
 });
