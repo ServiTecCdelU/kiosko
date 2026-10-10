@@ -141,7 +141,9 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 - Supabase PostgreSQL (proyecto propio) + Supabase Auth solo para login con Google
 - Forms: react-hook-form + zod · Charts: recharts · Toasts: sonner
 - Excel: xlsx-js-style · PDF: jspdf + autotable · Códigos: @zxing (lector), qrcode
-- Impresión: ZPL directo a Zebra ZD220 (`lib/server/zpl.ts`) con fallback al navegador
+- Impresión: desde el navegador. Térmica ESC/POS (`lib/escpos.ts`, puro) por WebUSB o por
+  el agente local (`herramientas/agente-impresora/`), con cajón; Zebra ZPL (`lib/server/zpl.ts`)
+  solo con la app en la misma PC; fallback al navegador. Orquestador: `lib/impresora/imprimir.ts`
 - PWA con cola de ventas offline (`lib/offline/`)
 - Deploy: Vercel (proyecto `kiosko`), servido en `www.servitec.net.ar/comercio`
 

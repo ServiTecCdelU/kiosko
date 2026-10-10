@@ -4,7 +4,7 @@ import { apiUrl } from "@/lib/utils/api-url"
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera, MonitorSmartphone } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera, MonitorSmartphone, Settings2, Wallet } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -45,6 +45,9 @@ import { MercadoPagoQrDialog } from "@/components/pos/mercadopago-qr-dialog";
 import { MercadoPagoPointDialog } from "@/components/pos/mercadopago-point-dialog";
 import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
 import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
+import { ImpresoraDialog } from "@/components/pos/impresora-dialog";
+import { abrirCajon, imprimirTicket as imprimirTicketConfigurado } from "@/lib/impresora/imprimir";
+import { leerConfigImpresora, modoPuedeAbrirCajon, type ConfigImpresora } from "@/lib/impresora/config";
 import type { Caja, Product } from "@/lib/types";
 
 /** Ofertas que se imprimen al pie de cada ticket. */
@@ -84,6 +87,10 @@ function PosScreen() {
   const cartRef = useRef<CartPanelHandle>(null);
   const { isOnline, pendientes, pendingCount, conError, refreshPendingCount, syncVentasPendientes } = useOfflineSync();
   const [offlineOpen, setOfflineOpen] = useState(false);
+  const [impresoraOpen, setImpresoraOpen] = useState(false);
+  // Configuracion de impresion de esta PC (localStorage): se lee al montar para no
+  // desfasar el render del servidor.
+  const [configImpresora, setConfigImpresora] = useState<ConfigImpresora | null>(null);
 
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
@@ -111,6 +118,7 @@ function PosScreen() {
       .then(setFavoritos)
       .catch(() => getFavoritosOffline().then(setFavoritos));
     setTicketsEspera(listarTicketsEnEspera());
+    setConfigImpresora(leerConfigImpresora());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusInput]);
 
@@ -316,21 +324,30 @@ function PosScreen() {
   );
 
   const imprimirTicket = useCallback((ticket: TicketData) => {
-    // Fallback: si la Zebra RAW no responde, se imprime el ticket HTML por el navegador.
-    const fallbackNavegador = (motivo: string) => {
-      toast.error(`${motivo} — se abre la impresión del navegador`);
-      setTimeout(() => window.print(), 150);
-    };
-    fetch(apiUrl("/api/imprimir-ticket"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ticket),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: "Error al imprimir" }));
-        fallbackNavegador(error ?? "Error al imprimir el ticket");
-      }
-    }).catch(() => fallbackNavegador("No se pudo conectar con la impresora"));
+    // Segun la configuracion de esta PC: termica ESC/POS (USB o agente), Zebra o
+    // navegador. Si la impresora no responde, se cae al ticket HTML del navegador
+    // para que el cliente igual se lleve su ticket.
+    const porNavegador = () => setTimeout(() => window.print(), 150);
+    imprimirTicketConfigurado(ticket, configImpresora ?? leerConfigImpresora())
+      .then((r) => {
+        if (r === "navegador") porNavegador();
+      })
+      .catch((e) => {
+        toast.error(`${e instanceof Error ? e.message : "No se pudo imprimir"} — se abre la impresión del navegador`);
+        porNavegador();
+      });
+  }, [configImpresora]);
+
+  const handleAbrirCajon = useCallback(() => {
+    abrirCajon(configImpresora ?? leerConfigImpresora())
+      .then(() => focusInput())
+      .catch((e) => toast.error(e instanceof Error ? e.message : "No se pudo abrir el cajón"));
+  }, [configImpresora, focusInput]);
+
+  // Ticket de prueba en modo navegador: se muestra como "ultimo ticket" y se imprime.
+  const handlePruebaNavegador = useCallback((ticket: TicketData) => {
+    setLastTicket(ticket);
+    setTimeout(() => window.print(), 150);
   }, []);
 
   const finalizarTicket = useCallback(
@@ -592,6 +609,22 @@ function PosScreen() {
           >
             <MonitorSmartphone className="h-3.5 w-3.5" /> Pantalla cliente
           </button>
+          {configImpresora && modoPuedeAbrirCajon(configImpresora.modo) && (
+            <button
+              onClick={handleAbrirCajon}
+              title="Abrir el cajón de dinero"
+              className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Wallet className="h-3.5 w-3.5" /> Abrir cajón
+            </button>
+          )}
+          <button
+            onClick={() => setImpresoraOpen(true)}
+            title="Configurar la impresora de tickets de esta PC"
+            className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Settings2 className="h-3.5 w-3.5" /> Impresora
+          </button>
           {lastTicket && (
             <button
               onClick={() => lastTicket && imprimirTicket(lastTicket)}
@@ -780,6 +813,16 @@ function PosScreen() {
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
       <TicketPrint ticket={lastTicket} />
+      <ImpresoraDialog
+        open={impresoraOpen}
+        onOpenChange={(o) => {
+          setImpresoraOpen(o);
+          if (!o) focusInput();
+        }}
+        nombreComercio={nombreComercio.trim() || undefined}
+        onChanged={setConfigImpresora}
+        onPruebaNavegador={handlePruebaNavegador}
+      />
       <VentasOfflineDialog
         open={offlineOpen}
         onOpenChange={setOfflineOpen}

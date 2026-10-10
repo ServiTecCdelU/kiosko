@@ -154,8 +154,26 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   cuenta de MP que cobró (`user_id`, Point). La demo no puede conectar MP.
 
 ### Impresión
-- Ticket ZPL directo a **Zebra ZD220** (`lib/server/zpl.ts`,
-  `app/api/imprimir-ticket/`), alto dinámico, fallback al ticket del navegador.
+- **El ticket se imprime desde el navegador** (el servidor está en Vercel y no llega a
+  la impresora del local). Modo por PC y por comercio en `localStorage`
+  (`lib/impresora/config.ts`), se elige en POS → "Impresora":
+  - `navegador` (default): `window.print()` del ticket HTML (`components/pos/ticket-print.tsx`).
+  - `webusb`: bytes **ESC/POS** (`lib/escpos.ts`, puro y testeado; 80 o 58 mm, corte,
+    cajón) directo a la térmica por WebUSB (`lib/impresora/webusb.ts`, Chrome/Edge).
+    En Windows, si el driver `usbprint.sys` tiene la impresora, Chrome no la puede
+    reclamar: ahí va el agente.
+  - `agente`: los mismos bytes al **agente local** (`herramientas/agente-impresora/`,
+    Node sin dependencias en `127.0.0.1:9123`) que escribe en la impresora de Windows
+    por `winspool` (PowerShell) o en una de red (`host:9100`). README en la carpeta.
+  - `zebra`: ZPL a la **Zebra ZD220** por `/api/imprimir-ticket` (`lib/server/zpl.ts`);
+    solo sirve con la app corriendo en la misma PC que la impresora.
+  - Si la impresora falla, siempre se cae al ticket del navegador. Orquestador:
+    `lib/impresora/imprimir.ts` (`imprimirTicket`, `abrirCajon`).
+- **Cajón de dinero**: enchufado a la impresora (RJ11). Se abre solo al cobrar en
+  efectivo o mixto (opción) y a mano con "Abrir cajón" en POS y Caja. Solo con
+  `webusb` o `agente`. Spec: `docs/superpowers/specs/2026-10-10-impresora-escpos-design.md`.
+- La factura electrónica (`components/facturacion/comprobante-fiscal.tsx`) sigue por
+  navegador con su QR; pasarla a ESC/POS es el siguiente paso.
 - Etiquetas de góndola, carteles A4/A5/A6, folleto e imagen de oferta para
   WhatsApp/Instagram (`lib/imagen-oferta.ts`, `lib/cartel-temas.ts`).
 
@@ -211,7 +229,17 @@ costo/margen; clientes con fiado, límite de crédito y puntos; ofertas con
 vigencia, combos, simulador, historial y ranking, centro de ofertas, carteles,
 pantalla TV, premio por compras y sorteos; reportes con Excel/PDF; empleados;
 superadmin con modo soporte; aviso de pago mensual (día 7 al 10); landing;
-demo con datos; panel por slug.
+demo con datos; panel por slug; impresora térmica ESC/POS (USB o agente local)
+con cajón de dinero (2026-10-10).
+
+### Lo que falta para un supermercado (relevado 2026-10-10, en orden sugerido)
+
+1. ~~Impresora térmica ESC/POS y cajón~~ (hecho).
+2. Cuenta corriente de proveedores (pagado/pendiente/pagos parciales) y unidades por bulto.
+3. Recuento físico de inventario por rubro con lector, y mermas como pérdida en reportes.
+4. Vencimientos por lote (hoy una sola fecha por producto).
+5. Alícuota de IVA por producto, y después Factura A/B.
+6. Reportes por hora y día de semana, gastos por categoría, método "Tarjeta (posnet externo)".
 
 ### Pendiente (lo que sigue del plan maestro)
 

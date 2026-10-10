@@ -34,6 +34,8 @@ import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
 import { SaleDetailDialog } from "@/components/ventas/sale-detail-dialog";
 import { CobrosSinResolver } from "@/components/caja/cobros-sin-resolver";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { abrirCajon } from "@/lib/impresora/imprimir";
+import { leerConfigImpresora, modoPuedeAbrirCajon } from "@/lib/impresora/config";
 import type { Caja, CajaMovimiento, CajaMovTipo, Sale } from "@/lib/types";
 
 type Tab = "actual" | "historial";
@@ -67,6 +69,13 @@ export default function CajaPage() {
   const [puestosOpen, setPuestosOpen] = useState(false);
   const [pcsOpen, setPcsOpen] = useState(false);
   const [mostrarApertura, setMostrarApertura] = useState(false);
+  // Esta PC imprime por USB o agente: puede abrir el cajon sin vender (lo configura el POS).
+  const [puedeAbrirCajon, setPuedeAbrirCajon] = useState(false);
+  useEffect(() => setPuedeAbrirCajon(modoPuedeAbrirCajon(leerConfigImpresora().modo)), []);
+
+  const handleAbrirCajon = () => {
+    abrirCajon().catch((e) => toast.error(e instanceof Error ? e.message : "No se pudo abrir el cajón"));
+  };
 
   const user = getCurrentUser();
   const esAdmin = user?.rol === "admin";
@@ -231,26 +240,37 @@ export default function CajaPage() {
 
   return (
     <AppShell title="Caja">
-      <div className="mb-4 inline-flex rounded-2xl border bg-card p-1">
-        <button
-          onClick={() => setTab("actual")}
-          className={cn(
-            "rounded-xl px-4 py-1.5 text-sm font-medium transition-colors",
-            tab === "actual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-2xl border bg-card p-1">
+          <button
+            onClick={() => setTab("actual")}
+            className={cn(
+              "rounded-xl px-4 py-1.5 text-sm font-medium transition-colors",
+              tab === "actual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Caja actual
+          </button>
+          {puedeGestionar && (
+          <button
+            onClick={() => setTab("historial")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-medium transition-colors",
+              tab === "historial" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <History className="h-3.5 w-3.5" /> Historial
+          </button>
           )}
-        >
-          Caja actual
-        </button>
-        {puedeGestionar && (
-        <button
-          onClick={() => setTab("historial")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-medium transition-colors",
-            tab === "historial" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <History className="h-3.5 w-3.5" /> Historial
-        </button>
+        </div>
+        {puedeAbrirCajon && (
+          <button
+            onClick={handleAbrirCajon}
+            title="Abrir el cajón de dinero (la impresora manda el pulso)"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Wallet className="h-3.5 w-3.5" /> Abrir cajón
+          </button>
         )}
       </div>
 
