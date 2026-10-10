@@ -9,6 +9,8 @@ import { apiUrl } from "@/lib/utils/api-url";
 import type { TicketData } from "@/components/pos/ticket-print";
 import type { PaymentMethod } from "@/lib/types";
 import { columnasPorAncho, comandoAbrirCajon, generarTicketEscPos } from "@/lib/escpos";
+import { generarComprobanteEscPos } from "@/lib/escpos-comprobante";
+import type { Comprobante } from "@/services/facturacion-service";
 import { leerConfigImpresora, modoPuedeAbrirCajon, type ConfigImpresora } from "@/lib/impresora/config";
 import { enviarPorUsb } from "@/lib/impresora/webusb";
 import { enviarAlAgente } from "@/lib/impresora/agente";
@@ -56,6 +58,17 @@ export async function imprimirTicket(ticket: TicketData, config: ConfigImpresora
   }
   const abrirCajon = config.cajonAlCobrar && cobroConEfectivo(ticket.paymentMethod);
   await enviarBytes(config, generarTicketEscPos(ticket, { columnas: columnasPorAncho(config.ancho), abrirCajon }));
+  return "impreso";
+}
+
+/**
+ * Factura o nota de credito autorizada, con el QR impreso por la termica.
+ * Con "navegador" o "zebra" devuelve "navegador": el comprobante sale por
+ * window.print() (la Zebra solo tiene el ticket no fiscal).
+ */
+export async function imprimirComprobante(datos: Comprobante, config: ConfigImpresora = leerConfigImpresora()): Promise<ResultadoImpresion> {
+  if (!modoPuedeAbrirCajon(config.modo)) return "navegador";
+  await enviarBytes(config, generarComprobanteEscPos(datos, { columnas: columnasPorAncho(config.ancho) }));
   return "impreso";
 }
 

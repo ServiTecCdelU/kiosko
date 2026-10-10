@@ -47,9 +47,10 @@ Fecha: 2026-10-10. Estado: implementado en el mismo commit que este spec.
 
 ## Qué NO cubre esta versión
 
-- La **factura electrónica** (`components/facturacion/comprobante-fiscal.tsx`) sigue
-  saliendo por el navegador con su QR. Pasarla a ESC/POS (comando `GS ( k` para el QR)
-  es el siguiente paso natural.
+- ~~La factura electrónica sigue saliendo por el navegador.~~ Hecho el mismo día:
+  `lib/escpos-comprobante.ts` arma la factura o nota de crédito (A, B o C) con el QR de
+  AFIP impreso por la propia térmica (`GS ( k`, modelo 2, corrección M). Con modo `webusb`
+  o `agente` sale por ESC/POS; con `navegador` o `zebra`, por `window.print()` como antes.
 - Etiquetas de góndola y carteles: siguen por navegador o Zebra.
 - Firefox y Safari no tienen WebUSB: ahí va agente o navegador.
 - No se distribuye un `.exe` del agente. Hace falta Node instalado en la PC. Se puede

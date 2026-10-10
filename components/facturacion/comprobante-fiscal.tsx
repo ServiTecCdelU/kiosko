@@ -16,6 +16,7 @@ import { LETRA_CBTE, NOMBRE_CBTE } from "@/lib/afip/constantes";
 import { numeroComprobante } from "@/lib/afip/comprobante";
 import { CONDICION_EMISOR_LABEL } from "@/lib/afip/iva";
 import { getComprobante, type Comprobante } from "@/services/facturacion-service";
+import { imprimirComprobante } from "@/lib/impresora/imprimir";
 
 const DOC_LABEL: Record<number, string> = { 80: "CUIT", 86: "CUIL", 96: "DNI", 99: "Consumidor final" };
 const CONDICION_RECEPTOR_LABEL: Record<number, string> = {
@@ -117,6 +118,13 @@ export function useImprimirComprobante() {
     setCargando(true);
     try {
       const comprobante = await getComprobante(facturaId);
+      // Termica configurada en esta PC (USB o agente): sale por ESC/POS con el QR
+      // nativo de la impresora. Si falla, cae al navegador para no dejar sin factura.
+      try {
+        if ((await imprimirComprobante(comprobante)) === "impreso") return;
+      } catch (e) {
+        toast.error(`${e instanceof Error ? e.message : "No se pudo imprimir"} — se abre la impresión del navegador`);
+      }
       const qr = await QRCode.toDataURL(comprobante.comprobante.qr, { margin: 0, width: 192 });
       setDatos({ comprobante, qr });
     } catch (e) {

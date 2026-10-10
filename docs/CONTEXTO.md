@@ -175,8 +175,10 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
 - **Cajón de dinero**: enchufado a la impresora (RJ11). Se abre solo al cobrar en
   efectivo o mixto (opción) y a mano con "Abrir cajón" en POS y Caja. Solo con
   `webusb` o `agente`. Spec: `docs/superpowers/specs/2026-10-10-impresora-escpos-design.md`.
-- La factura electrónica (`components/facturacion/comprobante-fiscal.tsx`) sigue por
-  navegador con su QR; pasarla a ESC/POS es el siguiente paso.
+- La factura electrónica también sale por la térmica: `lib/escpos-comprobante.ts` arma
+  el comprobante (A, B o C y notas de crédito) con el QR de AFIP impreso por la propia
+  impresora (`GS ( k`). `useImprimirComprobante` lo intenta primero y cae al navegador
+  (`components/facturacion/comprobante-fiscal.tsx`) si no hay térmica o falla.
 - Etiquetas de góndola, carteles A4/A5/A6, folleto e imagen de oferta para
   WhatsApp/Instagram (`lib/imagen-oferta.ts`, `lib/cartel-temas.ts`).
 
@@ -243,8 +245,8 @@ por categoría y pérdidas (todo 2026-10-10, specs en `docs/superpowers/specs/20
 
 ### Lo que falta para un supermercado (relevado 2026-10-10)
 
-Los seis puntos relevados ese día están hechos, y también Factura A/B. Quedan como siguientes pasos naturales:
-- Factura electrónica por ESC/POS (hoy sale por el navegador con su QR).
+Los seis puntos relevados ese día están hechos, y también Factura A/B y la factura por
+ESC/POS. Quedan como siguientes pasos naturales:
 - Recordatorios de vencimiento de pago a proveedores (`compras.vence` ya existe).
 - Descontar lotes al vender (hoy la cantidad del lote es informativa).
 
