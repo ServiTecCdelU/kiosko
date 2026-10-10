@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/format";
 import { explicarErrorAfip, type PasoTutorial } from "@/lib/afip/explicar-error";
 import {
-  guardarOperacionAfip, probarAfip, subirCertificadoAfip, type PasoPrueba,
+  emitirPruebaAfip, guardarOperacionAfip, probarAfip, subirCertificadoAfip, type PasoPrueba,
 } from "@/services/facturacion-service";
 import { BotonArca, TareasArca, type Tarea } from "./tareas-arca";
 import type { PropsPaso } from "./pasos-sistema";
@@ -158,18 +158,55 @@ export function PasoProbar({ estado, correr, ocupado, irA }: PropsPaso & { irA: 
       return r.estado;
     }, "¡Facturación activada!");
 
+  const [emision, setEmision] = useState<PasoPrueba[] | null>(null);
+  const emitir = () =>
+    correr("emitir", async () => {
+      const r = await emitirPruebaAfip();
+      setEmision(r.pasos);
+      if (!r.ok) throw new Error("La emisión de prueba no salió bien: mirá abajo qué pasó");
+      return r.estado;
+    }, "Factura de prueba y nota de crédito autorizadas por ARCA");
+
   const error = pasos?.find((p) => !p.ok);
   const explicacion = error ? explicarErrorAfip(error.detalle) : null;
+  const errorEmision = emision?.find((p) => !p.ok);
 
   if (estado.activo) {
     return (
-      <div className="space-y-3 rounded-2xl border border-success/40 bg-success/5 p-5 text-center">
-        <PartyPopper className="mx-auto h-8 w-8 text-success" />
-        <p className="text-lg font-semibold">¡Listo! Ya podés facturar.</p>
-        <p className="text-sm text-muted-foreground">
-          {estado.ambiente === "produccion" ? "Las facturas son reales." : "Estás en modo prueba: las facturas salen marcadas “sin validez fiscal”. Cuando quieras facturar de verdad, volvé al paso 1 y elegí “Facturar de verdad”."}
-          {" "}{estado.modo === "automatico" ? "Cada venta se factura sola." : "Facturá con el botón “Facturar” en el punto de venta o en Ventas."}
-        </p>
+      <div className="space-y-4">
+        <div className="space-y-3 rounded-2xl border border-success/40 bg-success/5 p-5 text-center">
+          <PartyPopper className="mx-auto h-8 w-8 text-success" />
+          <p className="text-lg font-semibold">¡Listo! Ya podés facturar.</p>
+          <p className="text-sm text-muted-foreground">
+            {estado.ambiente === "produccion" ? "Las facturas son reales." : "Estás en modo prueba: las facturas salen marcadas “sin validez fiscal”. Cuando quieras facturar de verdad, volvé al paso 1 y elegí “Facturar de verdad”."}
+            {" "}{estado.modo === "automatico" ? "Cada venta se factura sola." : "Facturá con el botón “Facturar” en el punto de venta o en Ventas."}
+          </p>
+        </div>
+        {estado.ambiente === "homologacion" && (
+          <div className="space-y-3 rounded-2xl border p-4">
+            <p className="text-sm font-semibold">Prueba completa de emisión</p>
+            <p className="text-sm text-muted-foreground">
+              Emite una factura de prueba de $121 a consumidor final, la consulta en ARCA y le emite la nota de crédito.
+              Si tenés contingencia activada, también pide el CAEA. No queda atada a ninguna venta.
+            </p>
+            <Button variant="outline" className="rounded-xl" disabled={!!ocupado} onClick={emitir}>
+              {ocupado === "emitir" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlugZap className="mr-2 h-4 w-4" />} Emitir factura de prueba
+            </Button>
+            {emision && (
+              <ul className="space-y-1 text-sm">
+                {emision.map((p, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    {p.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
+                    <span><b>{p.paso}</b> <span className="text-muted-foreground">· {p.detalle}</span></span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {errorEmision && (
+              <p className="text-sm text-destructive">{explicarErrorAfip(errorEmision.detalle).queHacer}</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }

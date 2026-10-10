@@ -433,6 +433,88 @@ export async function facturarSiEsAutomatico(comercioId: string, ventaId: string
   }
 }
 
+export interface PasoPruebaEmision {
+  paso: string;
+  ok: boolean;
+  detalle: string;
+}
+
+/**
+ * Prueba completa en HOMOLOGACION: emite una factura de $121 a consumidor
+ * final (C si es monotributo, B si es inscripto, con IVA desglosado), la
+ * consulta en AFIP y le emite la nota de credito. No esta atada a ninguna
+ * venta. Solo se permite en homologacion: en produccion seria un comprobante
+ * real.
+ */
+export async function pruebaEmisionHomologacion(comercioId: string): Promise<PasoPruebaEmision[]> {
+  const cfg = await configActiva(comercioId);
+  if (cfg.ambiente !== "homologacion") throw new Error("La prueba de emisión solo se hace en homologación (ambiente de pruebas).");
+  const pasos: PasoPruebaEmision[] = [];
+  const emisor = cfg.condicion_iva ?? "monotributo";
+  const total = 121;
+  const desglose = emisor === "responsable_inscripto" ? desglosarIva([{ subtotal: total, iva: 21 }], total) : null;
+  const cbteTipo = tipoComprobante(emisor, "consumidor_final", false);
+
+  const factura = await crearOReusar(
+    {
+      comercio_id: comercioId, venta_id: null, devolucion_id: null, factura_asociada_id: null,
+      ambiente: cfg.ambiente, cbte_tipo: cbteTipo, punto_venta: cfg.punto_venta, fecha: hoyArgentinaIso(),
+      total, doc_tipo: 99, doc_nro: "0", receptor_nombre: "Prueba de homologación", receptor_condicion: 5,
+      ...columnasDesglose(desglose),
+    },
+    async () => null,
+  );
+  const f = await procesar(factura, cfg);
+  const nombre = f.cbte_tipo === 11 ? "Factura C" : f.cbte_tipo === 6 ? "Factura B" : `Comprobante ${f.cbte_tipo}`;
+  if (f.estado !== "autorizada") {
+    pasos.push({ paso: `${nombre} de prueba`, ok: false, detalle: f.error ?? "AFIP no la autorizó" });
+    return pasos;
+  }
+  pasos.push({
+    paso: `${nombre} de prueba`, ok: true,
+    detalle: `N° ${f.punto_venta}-${f.numero} · ${f.tipo_autorizacion} ${f.cae ?? f.caea} · vence ${f.cae_vto}` + (f.tipo_autorizacion === "CAEA" ? " (salió en contingencia: AFIP no respondió)" : ""),
+  });
+
+  if (f.tipo_autorizacion === "CAE" && f.numero !== null) {
+    try {
+      const c = await conAcceso(cfg, (auth) => consultarComprobante({ ...cfg, punto_venta: f.punto_venta }, auth, f.cbte_tipo, f.numero!));
+      pasos.push({ paso: "Consulta del comprobante en AFIP", ok: c.existe, detalle: c.existe ? `AFIP lo tiene registrado por $${c.total}` : "AFIP no lo encuentra" });
+    } catch (e) {
+      pasos.push({ paso: "Consulta del comprobante en AFIP", ok: false, detalle: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const nc = await crearOReusar(
+    {
+      comercio_id: comercioId, venta_id: null, devolucion_id: null, factura_asociada_id: f.id,
+      ambiente: f.ambiente, cbte_tipo: notaCreditoDe(f.cbte_tipo), punto_venta: f.punto_venta, fecha: hoyArgentinaIso(),
+      total, doc_tipo: 99, doc_nro: "0", receptor_nombre: "Prueba de homologación", receptor_condicion: 5,
+      ...columnasDesglose(desglose),
+    },
+    async () => null,
+  );
+  const n = await procesar(nc, cfg);
+  pasos.push({
+    paso: "Nota de crédito de prueba (anula la factura anterior)",
+    ok: n.estado === "autorizada",
+    detalle: n.estado === "autorizada" ? `N° ${n.punto_venta}-${n.numero} · ${n.tipo_autorizacion} ${n.cae ?? n.caea}` : n.error ?? "AFIP no la autorizó",
+  });
+
+  if (cfg.caea_activo) {
+    try {
+      const pedidos = await asegurarCaeas(cfg);
+      pasos.push({ paso: "CAEA de la quincena", ok: true, detalle: pedidos ? `Se pidieron ${pedidos} CAEA` : "Ya estaban pedidos" });
+      const inf = await informarPendientes(cfg, (fila) => detalleParaInformar(fila, cfg));
+      if (inf.informados || inf.rechazados) {
+        pasos.push({ paso: "Informe de comprobantes CAEA", ok: inf.rechazados === 0, detalle: `informados ${inf.informados}, rechazados ${inf.rechazados}` });
+      }
+    } catch (e) {
+      pasos.push({ paso: "CAEA de la quincena", ok: false, detalle: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return pasos;
+}
+
 /** Anulacion/devolucion de una venta facturada: la NC no frena la operacion. */
 export async function notaDeCreditoSiCorresponde(comercioId: string, ventaId: string, devolucionId: string | null): Promise<void> {
   try {

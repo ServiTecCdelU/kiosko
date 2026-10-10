@@ -90,6 +90,9 @@ export const generarPedidoCertificado = () => pedir<EstadoConfigAfip>("/api/afip
 export const subirCertificadoAfip = (certificado: string) => pedir<EstadoConfigAfip>("/api/afip/certificado", "POST", { certificado });
 export const probarAfip = (activar: boolean) =>
   pedir<{ ok: boolean; pasos: PasoPrueba[]; estado: EstadoConfigAfip }>("/api/afip/probar", "POST", { activar });
+/** Solo homologacion: emite una factura de prueba y su nota de credito. */
+export const emitirPruebaAfip = () =>
+  pedir<{ ok: boolean; pasos: PasoPrueba[]; estado: EstadoConfigAfip }>("/api/afip/probar", "POST", { emitir: true });
 
 export async function descargarPedidoCertificado(): Promise<void> {
   const res = await fetch(apiUrl("/api/afip/pedido"));

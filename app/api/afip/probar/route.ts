@@ -1,11 +1,14 @@
 // app/api/afip/probar/route.ts — "Probar conexion" (solo admin, proxy.ts):
 // servidores de AFIP, acceso con el certificado y ultimo comprobante del punto
 // de venta. Con {activar:true} y todo OK, deja la facturacion activa.
+// Con {emitir:true} (solo homologacion, ya activa) emite una factura de prueba
+// y su nota de credito: la prueba completa de punta a punta.
 import { NextResponse } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { esComercioDemo } from "@/lib/server/demo";
 import { configOperativa, estadoPublico, leerConfigAfip, marcarActivo } from "@/lib/server/afip/config";
 import { conAcceso, estadoServidores, ultimoAutorizado } from "@/lib/server/afip/cliente";
+import { pruebaEmisionHomologacion } from "@/lib/server/afip/facturar";
 import { CBTE, NOMBRE_CBTE } from "@/lib/afip/constantes";
 
 export const runtime = "nodejs";
@@ -23,9 +26,20 @@ export async function POST(req: Request) {
   if (await esComercioDemo(comercioId)) {
     return NextResponse.json({ error: "La facturación electrónica está disponible en la versión paga." }, { status: 403 });
   }
-  const activar = (await req.json().catch(() => null))?.activar === true;
-  const pasos: Paso[] = [];
+  const body = (await req.json().catch(() => null)) as { activar?: unknown; emitir?: unknown } | null;
   const fila = await leerConfigAfip(comercioId);
+
+  if (body?.emitir === true) {
+    try {
+      const pasos = await pruebaEmisionHomologacion(comercioId);
+      return NextResponse.json({ ok: pasos.every((p) => p.ok), pasos, estado: estadoPublico(fila) });
+    } catch (e) {
+      return NextResponse.json({ ok: false, pasos: [{ paso: "Error", ok: false, detalle: e instanceof Error ? e.message : String(e) }], estado: estadoPublico(fila) });
+    }
+  }
+
+  const activar = body?.activar === true;
+  const pasos: Paso[] = [];
 
   try {
     const cfg = configOperativa(fila);
