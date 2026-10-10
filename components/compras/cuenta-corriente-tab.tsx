@@ -17,10 +17,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { errorPago, repartirPago, resumenSaldos, type CompraConSaldo } from "@/lib/proveedores-saldo";
+import { estadoPago, ordenarPorUrgencia, resumenPagos, textoPago, type EstadoPago } from "@/lib/proveedores-vencimientos";
+import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import {
-  anularPagoProveedor, getComprasConSaldo, getPagosProveedor, registrarPagoProveedor,
+  actualizarVencimientoCompra, anularPagoProveedor, getComprasConSaldo, getPagosProveedor, registrarPagoProveedor,
   type Compra, type PagoMetodo, type PagoProveedor, type Proveedor,
 } from "@/services/compras-service";
+
+const CLASE_ESTADO: Record<EstadoPago, string> = {
+  vencido: "text-destructive font-semibold",
+  hoy: "text-destructive font-semibold",
+  pronto: "text-warning font-semibold",
+  ok: "text-muted-foreground",
+  "sin-fecha": "text-muted-foreground",
+};
 import { getCajasAbiertas } from "@/services/caja-service";
 import { getCurrentUser } from "@/hooks/use-auth";
 import type { Caja } from "@/lib/types";
@@ -57,11 +67,24 @@ export function CuentaCorrienteTab({ proveedores }: { proveedores: Proveedor[] }
     getPagosProveedor(seleccionado).then(setPagos).catch(() => setPagos([]));
   }, [seleccionado, compras]);
 
+  const hoy = hoyArgentinaISO();
   const saldos = useMemo(() => resumenSaldos((compras ?? []).map(aConSaldo)), [compras]);
+  const pagos_ = useMemo(() => resumenPagos(compras ?? [], hoy), [compras, hoy]);
   const nombreDe = (id: string) => proveedores.find((p) => p.id === id)?.nombre ?? "—";
   const deudaTotal = saldos.reduce((s, x) => s + x.saldo, 0);
-  const comprasDelSeleccionado = (compras ?? []).filter((c) => c.proveedorId === seleccionado);
+  const comprasDelSeleccionado = ordenarPorUrgencia((compras ?? []).filter((c) => c.proveedorId === seleccionado), hoy);
   const provSel = seleccionado ? proveedores.find((p) => p.id === seleccionado) : undefined;
+
+  const cambiarVence = async (c: Compra, valor: string) => {
+    const nuevo = valor || null;
+    if ((c.vence ?? null) === nuevo) return;
+    try {
+      await actualizarVencimientoCompra(c.id, nuevo);
+      setCompras((prev) => (prev ?? []).map((x) => (x.id === c.id ? { ...x, vence: nuevo ?? undefined } : x)));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar la fecha");
+    }
+  };
 
   const abrirPago = (compraId?: string) => {
     setCompraPago(compraId);
@@ -91,6 +114,13 @@ export function CuentaCorrienteTab({ proveedores }: { proveedores: Proveedor[] }
             <div className="eyebrow flex items-center gap-1.5"><Wallet className="h-4 w-4" /> Deuda con proveedores</div>
             <p className="cifra-hero text-money mt-1.5 text-4xl">{formatCurrency(deudaTotal)}</p>
             <p className="text-xs text-muted-foreground">{saldos.length} proveedor(es) · {compras.length} compra(s) con saldo</p>
+            {(pagos_.vencidas > 0 || pagos_.proximas > 0) && (
+              <p className="mt-1 text-xs">
+                {pagos_.vencidas > 0 && <span className="font-semibold text-destructive">{pagos_.vencidas} vencida(s) · {formatCurrency(pagos_.montoVencido)}</span>}
+                {pagos_.vencidas > 0 && pagos_.proximas > 0 && <span className="text-muted-foreground"> · </span>}
+                {pagos_.proximas > 0 && <span className="font-semibold text-warning">{pagos_.proximas} vence(n) esta semana · {formatCurrency(pagos_.montoProximo)}</span>}
+              </p>
+            )}
           </CardContent>
         </Card>
         {saldos.map((s) => (
@@ -140,6 +170,7 @@ export function CuentaCorrienteTab({ proveedores }: { proveedores: Proveedor[] }
                       <TableRow>
                         <TableHead>Fecha</TableHead>
                         <TableHead className="hidden sm:table-cell">Remito</TableHead>
+                        <TableHead>Pagar antes del</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Pagado</TableHead>
                         <TableHead className="text-right">Saldo</TableHead>
@@ -147,10 +178,22 @@ export function CuentaCorrienteTab({ proveedores }: { proveedores: Proveedor[] }
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {comprasDelSeleccionado.map((c) => (
+                      {comprasDelSeleccionado.map((c) => {
+                        const v = estadoPago(c.vence, hoy);
+                        return (
                         <TableRow key={c.id}>
                           <TableCell className="whitespace-nowrap text-sm">{formatDateTime(c.createdAt)}</TableCell>
                           <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{c.remito ?? "—"}</TableCell>
+                          <TableCell>
+                            <input
+                              type="date"
+                              defaultValue={c.vence ?? ""}
+                              onBlur={(e) => cambiarVence(c, e.target.value)}
+                              className="h-8 rounded-lg border bg-transparent px-2 text-xs"
+                              aria-label="Fecha pactada de pago"
+                            />
+                            {textoPago(v, c.vence) && <p className={cn("mt-0.5 text-xs", CLASE_ESTADO[v.estado])}>{textoPago(v, c.vence)}</p>}
+                          </TableCell>
                           <TableCell className="cifra text-right">{formatCurrency(c.total)}</TableCell>
                           <TableCell className="cifra text-right text-muted-foreground">{formatCurrency(c.pagado)}</TableCell>
                           <TableCell className="cifra text-right font-semibold text-warning">{formatCurrency(c.saldo)}</TableCell>
@@ -158,7 +201,8 @@ export function CuentaCorrienteTab({ proveedores }: { proveedores: Proveedor[] }
                             <Button size="sm" variant="outline" className="h-7 rounded-lg" onClick={() => abrirPago(c.id)}>Pagar</Button>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

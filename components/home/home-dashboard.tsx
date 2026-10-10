@@ -30,6 +30,9 @@ import { visibleNavItems } from "@/lib/nav";
 import { getReporte } from "@/services/reportes-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { getProductsPage, getVencimientosProximos } from "@/services/products-service";
+import { getComprasConSaldo } from "@/services/compras-service";
+import { resumenPagos, type ResumenPagos } from "@/lib/proveedores-vencimientos";
+import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { formatCurrency } from "@/lib/utils/format";
 import type { Caja, UserRol } from "@/lib/types";
 
@@ -256,6 +259,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [stockBajo, setStockBajo] = useState<number | null>(null);
   const [vencimientos, setVencimientos] = useState<number | null>(null);
+  const [pagos, setPagos] = useState<ResumenPagos | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -285,6 +289,10 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
           getVencimientosProximos(7)
             .then((ps) => alive && setVencimientos(ps.length))
             .catch(() => {}),
+          // Recordatorio de pagos a proveedores (compras en cuenta corriente con fecha pactada).
+          getComprasConSaldo()
+            .then((cs) => alive && setPagos(resumenPagos(cs, hoyArgentinaISO())))
+            .catch(() => {}),
         );
       }
       await Promise.allSettled(tasks);
@@ -309,10 +317,13 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
 
   const textoVentasHoy = formatCurrency(ventasHoy);
 
+  const grilla = showStock ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4";
+  const pagosUrgentes = (pagos?.vencidas ?? 0) + (pagos?.proximas ?? 0);
+
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: showStock ? 4 : 2 }).map((_, i) => (
+      <div className={grilla}>
+        {Array.from({ length: showStock ? 5 : 2 }).map((_, i) => (
           <div key={i} className="h-28 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
         ))}
       </div>
@@ -320,7 +331,7 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={grilla}>
       {/* Ventas de hoy — protagonista */}
       <div className="card-premium relative min-w-0 overflow-hidden rounded-2xl p-5">
         <div
@@ -386,6 +397,32 @@ function DashboardStats({ rol }: { rol: UserRol | null }) {
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {vencimientos && vencimientos > 0 ? "productos a revisar" : "sin vencimientos cerca"}
+          </p>
+        </Link>
+      )}
+
+      {/* Pagos a proveedores vencidos o por vencer (solo admin) */}
+      {showStock && (
+        <Link href="/compras?tab=cuenta" className="card-premium group rounded-2xl p-5 hover:-translate-y-0.5">
+          <div className="eyebrow flex items-center gap-1.5">
+            <Truck className={`h-4 w-4 ${(pagos?.vencidas ?? 0) > 0 ? "text-destructive" : pagosUrgentes > 0 ? "text-warning" : "text-primary"}`} />
+            Pagos a proveedores
+          </div>
+          <p
+            className={`cifra-hero mt-2 text-4xl sm:text-[2.75rem] ${(pagos?.vencidas ?? 0) > 0 ? "text-destructive" : pagosUrgentes > 0 ? "text-warning" : "text-foreground"}`}
+          >
+            {pagos ? pagosUrgentes : "—"}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {!pagos
+              ? "—"
+              : pagos.vencidas > 0
+                ? `${pagos.vencidas} vencido(s) · ${formatCurrency(pagos.montoVencido)}`
+                : pagos.proximas > 0
+                  ? `vencen esta semana · ${formatCurrency(pagos.montoProximo)}`
+                  : pagos.sinFecha > 0
+                    ? `${pagos.sinFecha} compra(s) con saldo sin fecha`
+                    : "nada por pagar esta semana"}
           </p>
         </Link>
       )}

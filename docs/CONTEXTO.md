@@ -245,9 +245,10 @@ por categoría y pérdidas (todo 2026-10-10, specs en `docs/superpowers/specs/20
 
 ### Lo que falta para un supermercado (relevado 2026-10-10)
 
-Los seis puntos relevados ese día están hechos, y también Factura A/B y la factura por
-ESC/POS. Quedan como siguientes pasos naturales:
-- Recordatorios de vencimiento de pago a proveedores (`compras.vence` ya existe).
+Los seis puntos relevados ese día están hechos, y también Factura A/B, la factura por
+ESC/POS y los recordatorios de pago a proveedores (fecha pactada en la recepción y en
+Cuenta corriente, tarjeta "Pagos a proveedores" en el inicio; `lib/proveedores-vencimientos.ts`).
+Queda como siguiente paso natural:
 - Descontar lotes al vender (hoy la cantidad del lote es informativa).
 
 ### Pendiente (lo que sigue del plan maestro)

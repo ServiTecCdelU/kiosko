@@ -51,6 +51,12 @@ export default function ComprasPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // La tarjeta "Pagos a proveedores" del inicio llega con /compras?tab=cuenta
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "cuenta" || t === "historial" || t === "proveedores") setTab(t);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -113,6 +119,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
   const [remito, setRemito] = useState("");
   const [condicion, setCondicion] = useState<CompraCondicion>("contado");
   const [pagada, setPagada] = useState(true);
+  const [vence, setVence] = useState("");
   const [working, setWorking] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -198,6 +205,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
         remito: remito.trim() || undefined,
         condicion,
         pagada,
+        vence: !pagada && vence ? vence : undefined,
         usuarioId: user?.id,
         usuarioNombre: user?.nombre,
       });
@@ -206,6 +214,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
       setRemito("");
       setCondicion("contado");
       setPagada(true);
+      setVence("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo registrar la compra");
     } finally {
@@ -261,6 +270,13 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
               </label>
             </div>
           </div>
+          {!pagada && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Label htmlFor="vence" className="text-xs">¿Cuándo hay que pagarla?</Label>
+              <Input id="vence" type="date" value={vence} onChange={(e) => setVence(e.target.value)} className="h-9 w-44 rounded-xl" />
+              <span className="text-xs text-muted-foreground">Opcional. Te lo recordamos en el inicio y en Cuenta corriente.</span>
+            </div>
+          )}
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

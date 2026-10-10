@@ -23,10 +23,38 @@ const compraSchema = z.object({
   remito: z.string().optional(),
   condicion: z.enum(["contado", "cuenta_corriente"]).default("contado"),
   pagada: z.boolean().default(true),
+  /** Fecha pactada de pago (YYYY-MM-DD) para los recordatorios de cuenta corriente. */
+  vence: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de pago invalida").optional().nullable(),
   notas: z.string().optional(),
   usuarioId: z.string().optional(),
   usuarioNombre: z.string().optional(),
 });
+
+/** PATCH: cambiar (o borrar) la fecha pactada de pago de una compra del comercio. */
+export async function PATCH(req: Request) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
+  }
+  const compraId = String(body?.compraId ?? "");
+  if (!compraId) return NextResponse.json({ error: "Falta la compra" }, { status: 400 });
+  const vence = body?.vence == null || body.vence === "" ? null : String(body.vence);
+  if (vence !== null && !/^\d{4}-\d{2}-\d{2}$/.test(vence)) {
+    return NextResponse.json({ error: "Fecha de pago invalida" }, { status: 400 });
+  }
+  const { data, error } = await supabaseAdmin
+    .from("compras")
+    .update({ vence })
+    .eq("comercio_id", comercioIdDeSesion(req))
+    .eq("id", compraId)
+    .eq("estado", "recibida")
+    .select("id");
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (!data?.length) return NextResponse.json({ error: "Compra inexistente o anulada" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -56,5 +84,15 @@ export async function POST(req: Request) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // La RPC no conoce la fecha de pago (su firma es anterior a la 44): se guarda aparte.
+  // Solo tiene sentido si queda saldo.
+  if (input.vence && !input.pagada && data?.compraId) {
+    await supabaseAdmin
+      .from("compras")
+      .update({ vence: input.vence })
+      .eq("comercio_id", comercioIdDeSesion(req))
+      .eq("id", String(data.compraId));
+  }
   return NextResponse.json(data);
 }

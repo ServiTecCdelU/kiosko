@@ -42,7 +42,22 @@ Fecha: 2026-10-10. SQL: `supabase/44_proveedores_cuenta_corriente.sql` (correr a
 - `/api/consultas/compras`: acciones `saldosProveedores`, `comprasConSaldo`, `pagosProveedor`.
 - `/api/caja/movimiento`: acepta `categoria`.
 
+## Recordatorios de vencimiento (agregado el mismo día)
+
+- La fecha pactada (`compras.vence`) se carga en la recepción cuando la compra queda
+  impaga ("¿Cuándo hay que pagarla?") y se puede cambiar en Cuenta corriente. La RPC de
+  recepción no cambió de firma: la ruta `POST /api/compras` guarda la fecha aparte, y
+  `PATCH /api/compras` la edita (admin).
+- `lib/proveedores-vencimientos.ts` (puro, testeado): vencido / vence hoy / vence en N
+  días (hasta 7) / más adelante / sin fecha, resumen con montos y orden por urgencia.
+- Dónde se ve: tarjeta **Pagos a proveedores** en el inicio (solo admin; rojo si hay
+  vencidas, amarillo si vencen esta semana; lleva a `/compras?tab=cuenta`), resumen en la
+  tarjeta de deuda de Cuenta corriente y una columna "Pagar antes del" por compra, con las
+  compras ordenadas por urgencia.
+- Sin notificaciones push ni correos: el dueño abre el inicio todos los días y ahí lo ve.
+
 ## Tests
 
 - `lib/proveedores-saldo.test.ts`: reparto FIFO de un pago y resumen de saldos (misma
   regla que la RPC, para la vista previa en pantalla).
+- `lib/proveedores-vencimientos.test.ts`: estados, textos, resumen y orden por urgencia.

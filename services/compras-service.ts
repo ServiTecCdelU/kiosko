@@ -141,9 +141,22 @@ export interface RecibirCompraInput {
   remito?: string;
   condicion: CompraCondicion;
   pagada: boolean;
+  /** Fecha pactada de pago (YYYY-MM-DD); solo si queda saldo. */
+  vence?: string;
   notas?: string;
   usuarioId?: string;
   usuarioNombre?: string;
+}
+
+/** Cambia (o borra con null) la fecha pactada de pago de una compra con saldo. */
+export async function actualizarVencimientoCompra(compraId: string, vence: string | null): Promise<void> {
+  const res = await fetch(apiUrl("/api/compras"), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ compraId, vence }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo guardar la fecha de pago");
 }
 
 export async function recibirCompra(input: RecibirCompraInput): Promise<{ compraId: string; total: number }> {
