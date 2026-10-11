@@ -74,7 +74,34 @@ export const ESTADO_COLOR: Record<Comercio["estado"], string> = {
   baja: "border-muted-foreground text-muted-foreground",
 };
 
+export const ESTADO_LABEL: Record<Comercio["estado"], string> = {
+  activo: "Activo", prueba: "En prueba", suspendido: "Suspendido", baja: "Baja",
+};
+
+/** Punto de color del estado (fila y chips de filtro). */
+export const ESTADO_PUNTO: Record<Comercio["estado"], string> = {
+  activo: "bg-success", prueba: "bg-warning", suspendido: "bg-destructive", baja: "bg-muted-foreground",
+};
+
+export const ESTADOS: Comercio["estado"][] = ["activo", "prueba", "suspendido", "baja"];
+
 export const PLAN_LABEL: Record<Comercio["plan"], string> = { free: "Free", basico: "Básico", pro: "Pro" };
+
+/** Badge del plan: Pro resaltado, Básico neutro, Free apagado. */
+export const PLAN_CLASE: Record<Comercio["plan"], string> = {
+  pro: "border-primary/40 bg-primary/10 text-primary",
+  basico: "border-border bg-muted/60 text-foreground",
+  free: "border-border text-muted-foreground",
+};
+
+/** Precio mensual de cada plan (viene en "listar"); sin dato = 0 = no se cobra. */
+export type PreciosPlan = Partial<Record<Comercio["plan"], number>>;
+
+export function preciosDe(planes: PlanSaas[] | undefined): PreciosPlan {
+  const out: PreciosPlan = {};
+  for (const p of planes ?? []) out[p.plan] = p.precioMensual;
+  return out;
+}
 
 // Solo para el badge visual: mismo criterio que lib/aviso-pago.ts pero sin
 // cruzar el import server->client.
@@ -104,24 +131,57 @@ export function whatsappDe(telefono: string | null | undefined): string | null {
   return `https://wa.me/${digitos.startsWith("54") ? digitos : `549${digitos.replace(/^0/, "")}`}`;
 }
 
-/** Situacion de la prueba para el badge: misma regla que aplica proxy.ts. */
-export function avisoPrueba(c: Comercio): { texto: string; clase: string; titulo: string } | null {
+export interface AvisoAcceso {
+  texto: string;
+  clase: string;
+  titulo: string;
+  /** Bloqueado = ya esta en modo consulta. */
+  nivel: "aviso" | "gracia" | "bloqueado";
+}
+
+const CLASE_AVISO: Record<AvisoAcceso["nivel"], string> = {
+  aviso: "border-warning text-warning",
+  gracia: "border-destructive/50 text-destructive",
+  bloqueado: "border-destructive bg-destructive/10 text-destructive",
+};
+
+/**
+ * Situacion de acceso para el badge (prueba o pago): misma regla que aplica
+ * proxy.ts. `precios` viene de "listar"; sin precio el plan no se cobra.
+ */
+export function avisoAcceso(c: Comercio, precios: PreciosPlan = {}): AvisoAcceso | null {
   if (c.slug === DEMO_SLUG) return null; // la demo nunca vence
-  const a = evaluarAcceso(c);
-  if (a.motivo === "prueba_por_vencer") {
-    return { texto: `vence en ${a.dias} d`, clase: "border-warning text-warning", titulo: "La prueba vence pronto" };
+  const a = evaluarAcceso({ ...c, precio_mensual: precios[c.plan] ?? 0 });
+  const aviso = (nivel: AvisoAcceso["nivel"], texto: string, titulo: string): AvisoAcceso =>
+    ({ nivel, texto, titulo, clase: CLASE_AVISO[nivel] });
+  switch (a.motivo) {
+    case "prueba_por_vencer": return aviso("aviso", `Prueba vence en ${a.dias} d`, "La prueba vence pronto");
+    case "prueba_en_gracia": return aviso("gracia", `Gracia ${a.dias} d`, "Prueba vencida: le quedan días de gracia antes del bloqueo");
+    case "prueba_vencida": return aviso("bloqueado", "Bloqueado", "Prueba vencida: en modo consulta");
+    case "pago_por_vencer": return aviso("aviso", `Pago vence en ${a.dias} d`, "La suscripción vence pronto");
+    case "pago_en_gracia": return aviso("gracia", `Debe · gracia ${a.dias} d`, "Suscripción vencida: le quedan días de gracia antes del bloqueo");
+    case "pago_vencido": return aviso("bloqueado", "Bloqueado por pago", "Suscripción vencida: en modo consulta");
+    default: return null;
   }
-  if (a.motivo === "prueba_en_gracia") {
-    return { texto: `gracia ${a.dias} d`, clase: "border-destructive/50 text-destructive", titulo: "Prueba vencida: le quedan días de gracia antes del bloqueo" };
-  }
-  if (a.motivo === "prueba_vencida") {
-    return { texto: "bloqueado", clase: "border-destructive bg-destructive/10 text-destructive", titulo: "Prueba vencida: en modo consulta" };
-  }
-  return null;
 }
 
 export function pagoAlDia(c: Comercio): boolean {
   return !!c.suscripcion_hasta && anioMesArgentina(c.suscripcion_hasta) === anioMesArgentina(new Date().toISOString());
+}
+
+/** Comercios a los que el dueño del SaaS deberia mirar hoy. */
+export function motivosAtencion(c: Comercio, precios: PreciosPlan = {}): string[] {
+  const m: string[] = [];
+  if (c.estado === "baja") return m;
+  const aviso = avisoAcceso(c, precios);
+  if (aviso) m.push(aviso.titulo);
+  if (c.uso.accesos === 0 && c.slug !== DEMO_SLUG) m.push("Nadie puede entrar con Google");
+  if (c.estado === "activo" && (precios[c.plan] ?? 0) > 0 && !pagoAlDia(c) && !aviso) m.push("Falta registrar el pago de este mes");
+  return m;
+}
+
+export function necesitaAtencion(c: Comercio, precios: PreciosPlan = {}): boolean {
+  return motivosAtencion(c, precios).length > 0;
 }
 
 /** POST/PATCH a /api/superadmin/comercios; lanza con el mensaje del server si falla. */

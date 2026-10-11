@@ -74,7 +74,10 @@ export async function POST(req: Request) {
       })),
     );
 
-    return NextResponse.json({ comercios: conUso, grupos: await listarGrupos().catch(() => []) });
+    // Los planes van para que el panel calcule el aviso de pago (precio > 0)
+    // con la misma regla que proxy.ts (lib/acceso-comercio.ts).
+    const [grupos, planes] = await Promise.all([listarGrupos().catch(() => []), listarPlanes().catch(() => [])]);
+    return NextResponse.json({ comercios: conUso, grupos, planes });
   }
 
   // Grupos de sucursales (53): mismo dueño, descuento para las sucursales que no son la principal.

@@ -3,7 +3,9 @@
 // estado, plan, suscripcion (pagos y pago manual) y correos con acceso de Google.
 import { toast } from "sonner";
 import { useCallback, useEffect, useState } from "react";
-import { Check, CircleDollarSign, Download, Loader2, LogIn } from "lucide-react";
+import {
+  CalendarClock, Check, CircleDollarSign, Download, Loader2, LogIn, Mail, MessageCircle, Store, type LucideIcon,
+} from "lucide-react";
 import { descargarBackupDeComercio } from "@/services/backup-service";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -15,16 +17,40 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { AccesosGoogle } from "@/components/superadmin/accesos-google";
-import { nombreRubro, pagoAlDia, superadminApi, whatsappDe, type Comercio, type GrupoSaas, type PagoSaas } from "@/components/superadmin/comun";
+import {
+  ESTADO_LABEL, ESTADO_PUNTO, PLAN_CLASE, PLAN_LABEL, avisoAcceso, nombreRubro, pagoAlDia, superadminApi, whatsappDe,
+  type Comercio, type GrupoSaas, type PagoSaas, type PreciosPlan,
+} from "@/components/superadmin/comun";
 import { DIAS_GRACIA, DIAS_GRACIA_PAGO } from "@/lib/acceso-comercio";
 import { coberturaDelPago, METODO_PAGO_LABEL, textoPeriodo } from "@/lib/suscripcion";
 
 interface ComercioDialogProps {
   comercio: Comercio | null;
   grupos: GrupoSaas[];
+  precios?: PreciosPlan;
   onOpenChange: (open: boolean) => void;
   onCambio: () => Promise<void>;
   onEntrar: (c: Comercio) => void;
+}
+
+/** Bloque del dialogo: icono, titulo, explicacion corta y contenido. */
+function Seccion({ icono: Icono, titulo, descripcion, extra, children }: {
+  icono: LucideIcon; titulo: string; descripcion?: string; extra?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2.5 rounded-xl border bg-card/40 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
+            <Icono className="h-4 w-4 text-primary" /> {titulo}
+          </p>
+          {descripcion && <p className="mt-0.5 text-xs text-muted-foreground">{descripcion}</p>}
+        </div>
+        {extra}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 /**
@@ -69,11 +95,11 @@ function Sucursales({ comercio, grupos, onCambiar, onGruposCambiados }: {
   };
 
   return (
-    <div className="space-y-2 rounded-xl border p-3">
-      <p className="text-sm font-semibold">Sucursales (mismo dueño)</p>
-      <p className="text-xs text-muted-foreground">
-        Las sucursales de un grupo pagan con descuento, salvo la más antigua, que paga completo. Cada sucursal sigue siendo un comercio aparte.
-      </p>
+    <Seccion
+      icono={Store}
+      titulo="Sucursales (mismo dueño)"
+      descripcion="Las sucursales de un grupo pagan con descuento, salvo la más antigua, que paga completo. Cada sucursal sigue siendo un comercio aparte."
+    >
       <div className="flex flex-col gap-2 sm:flex-row">
         <select
           value={comercio.grupo_id ?? ""}
@@ -107,11 +133,20 @@ function Sucursales({ comercio, grupos, onCambiar, onGruposCambiados }: {
           <Button size="sm" variant="ghost" className="h-9 rounded-xl" onClick={() => setCreando(false)}>Cancelar</Button>
         </div>
       )}
-    </div>
+    </Seccion>
   );
 }
 
 const selectClase = "border-input h-9 w-full rounded-xl border bg-transparent px-2 text-sm outline-none";
+
+function Dato({ valor, etiqueta }: { valor: number; etiqueta: string }) {
+  return (
+    <div>
+      <p className="cifra text-lg font-semibold leading-tight">{valor.toLocaleString("es-AR")}</p>
+      <p className="text-[11px] text-muted-foreground">{etiqueta}</p>
+    </div>
+  );
+}
 
 const DIAS_EXTENSION = 7;
 
@@ -137,14 +172,16 @@ function FinDePrueba({ trialHasta, onCambiar }: { trialHasta: string | null; onC
   };
 
   return (
-    <div>
-      <Label htmlFor="fin-prueba" className="mb-1 block text-xs text-muted-foreground">
-        Prueba hasta (después: {DIAS_GRACIA} días de gracia y modo consulta)
-      </Label>
+    <Seccion
+      icono={CalendarClock}
+      titulo="Período de prueba"
+      descripcion={`Al vencer tiene ${DIAS_GRACIA} días de gracia y después queda en modo consulta.`}
+    >
       <div className="flex gap-2">
         <input
           id="fin-prueba"
           type="date"
+          aria-label="Prueba hasta"
           value={trialHasta ? diaArgentina(trialHasta) : ""}
           onChange={(e) => e.target.value && onCambiar(finDelDiaArgentina(e.target.value))}
           className={selectClase}
@@ -153,7 +190,7 @@ function FinDePrueba({ trialHasta, onCambiar }: { trialHasta: string | null; onC
           +{DIAS_EXTENSION} días
         </Button>
       </div>
-    </div>
+    </Seccion>
   );
 }
 
@@ -214,18 +251,17 @@ function Suscripcion({ comercio, onCambio }: { comercio: Comercio; onCambio: () 
   };
 
   return (
-    <div className="space-y-2 rounded-xl border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">Suscripción</p>
-        <Badge variant="outline" className={cn(alDia ? "border-success/50 text-success" : "border-warning text-warning")}>
+    <Seccion
+      icono={CircleDollarSign}
+      titulo="Suscripción"
+      descripcion={`El próximo pago cubre ${textoPeriodo(proximo.periodo)}. Un comercio activo con plan con precio y fecha vencida tiene ${DIAS_GRACIA_PAGO} días de gracia y después queda en modo consulta. Sin fecha no se bloquea nunca.`}
+      extra={
+        <Badge variant="outline" className={cn("shrink-0", alDia ? "border-success/50 text-success" : "border-warning text-warning")}>
           {alDia ? <Check className="mr-1 h-3 w-3" /> : <CircleDollarSign className="mr-1 h-3 w-3" />}
           {comercio.suscripcion_hasta ? `Pagada hasta el ${formatDate(comercio.suscripcion_hasta)}` : "Sin fecha de pago"}
         </Badge>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        El próximo pago cubre {textoPeriodo(proximo.periodo)}. Un comercio activo con plan con precio y fecha vencida tiene
-        {" "}{DIAS_GRACIA_PAGO} días de gracia y después queda en modo consulta. Sin fecha no se bloquea nunca.
-      </p>
+      }
+    >
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (ej. transferencia, efectivo)" className="h-9 rounded-xl" maxLength={120} />
         <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl" disabled={registrando} onClick={registrar}>
@@ -256,14 +292,15 @@ function Suscripcion({ comercio, onCambio }: { comercio: Comercio; onCambio: () 
           ))}
         </ul>
       )}
-    </div>
+    </Seccion>
   );
 }
 
-export function ComercioDialog({ comercio, grupos, onOpenChange, onCambio, onEntrar }: ComercioDialogProps) {
+export function ComercioDialog({ comercio, grupos, precios = {}, onOpenChange, onCambio, onEntrar }: ComercioDialogProps) {
   if (!comercio) return null;
   const rubro = nombreRubro(comercio.config?.rubro);
   const whatsapp = whatsappDe(comercio.config?.telefono);
+  const aviso = avisoAcceso(comercio, precios);
 
   const cambiar = async (cambios: Record<string, unknown>) => {
     try {
@@ -277,32 +314,45 @@ export function ComercioDialog({ comercio, grupos, onOpenChange, onCambio, onEnt
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-lg">
+      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{comercio.nombre}</DialogTitle>
-          <DialogDescription>
-            {comercio.slug} · desde {formatDate(comercio.created_at)}
-            {comercio.trial_hasta && ` · prueba hasta ${formatDate(comercio.trial_hasta)}`}
-          </DialogDescription>
-          {(rubro || whatsapp) && (
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              {comercio.config?.origen === "autoregistro" && <span>Se dio de alta solo</span>}
-              {rubro && <span>Rubro: <b className="text-foreground">{rubro}</b></span>}
-              {whatsapp && (
-                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                  WhatsApp {comercio.config?.telefono}
-                </a>
-              )}
-            </p>
-          )}
+          <div className="flex items-start gap-3">
+            <span className="grad-brand flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white">
+              {comercio.nombre.charAt(0).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="truncate">{comercio.nombre}</DialogTitle>
+              <DialogDescription>
+                /{comercio.slug} · desde {formatDate(comercio.created_at)}
+                {comercio.config?.origen === "autoregistro" && " · se dio de alta solo"}
+              </DialogDescription>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <Badge variant="outline" className="gap-1.5">
+              <span className={cn("h-2 w-2 rounded-full", ESTADO_PUNTO[comercio.estado])} />
+              {ESTADO_LABEL[comercio.estado]}
+            </Badge>
+            <Badge variant="outline" className={PLAN_CLASE[comercio.plan]}>Plan {PLAN_LABEL[comercio.plan]}</Badge>
+            {aviso && <Badge variant="outline" className={aviso.clase} title={aviso.titulo}>{aviso.texto}</Badge>}
+            {rubro && <Badge variant="outline" className="text-muted-foreground">{rubro}</Badge>}
+            {whatsapp && (
+              <a
+                href={whatsapp} target="_blank" rel="noopener noreferrer"
+                className="inline-flex h-[22px] items-center gap-1 rounded-md border border-success/50 px-2 text-xs font-medium text-success hover:bg-success/10"
+              >
+                <MessageCircle className="h-3 w-3" /> {comercio.config?.telefono}
+              </a>
+            )}
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border bg-card/40 p-3">
             <div>
               <Label className="mb-1 block text-xs text-muted-foreground">Estado</Label>
               <select value={comercio.estado} onChange={(e) => cambiar({ estado: e.target.value })} className={selectClase}>
-                <option value="prueba">Prueba</option>
+                <option value="prueba">En prueba</option>
                 <option value="activo">Activo</option>
                 <option value="suspendido">Suspendido</option>
                 <option value="baja">Baja</option>
@@ -315,6 +365,11 @@ export function ComercioDialog({ comercio, grupos, onOpenChange, onCambio, onEnt
                 <option value="basico">Básico</option>
                 <option value="pro">Pro</option>
               </select>
+            </div>
+            <div className="col-span-2 grid grid-cols-3 gap-2 border-t pt-3 text-center">
+              <Dato valor={comercio.uso.productos} etiqueta="productos" />
+              <Dato valor={comercio.uso.ventas} etiqueta="ventas" />
+              <Dato valor={comercio.uso.usuarios} etiqueta="empleados" />
             </div>
           </div>
 
@@ -329,9 +384,15 @@ export function ComercioDialog({ comercio, grupos, onOpenChange, onCambio, onEnt
 
           <Sucursales comercio={comercio} grupos={grupos} onCambiar={cambiar} onGruposCambiados={onCambio} />
 
-          <AccesosGoogle comercioId={comercio.id} onCambio={onCambio} />
+          <Seccion
+            icono={Mail}
+            titulo="Acceso con Google"
+            descripcion="Estos correos entran como administradores de este comercio con el botón “Entrar con Google”."
+          >
+            <AccesosGoogle comercioId={comercio.id} onCambio={onCambio} />
+          </Seccion>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
             <BotonBackup comercioId={comercio.id} />
             <Button className="flex-1 rounded-xl" onClick={() => onEntrar(comercio)}>
               <LogIn className="mr-2 h-4 w-4" /> Entrar al panel de {comercio.nombre}

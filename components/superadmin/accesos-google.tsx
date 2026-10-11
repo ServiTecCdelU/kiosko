@@ -3,7 +3,7 @@
 // entrar como administrador a un comercio (usuarios rol admin con email).
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Mail, Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -65,15 +65,9 @@ export function AccesosGoogle({ comercioId, onCambio }: AccesosGoogleProps) {
 
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
+  // El titulo y la explicacion los pone el contenedor (Seccion del dialogo).
   return (
     <div>
-      <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-        <Mail className="h-4 w-4 text-primary" /> Acceso con Google
-      </p>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Estos correos entran como administradores de este comercio con el botón “Entrar con Google”.
-      </p>
-
       {accesos == null ? (
         <p className="py-3 text-center text-xs text-muted-foreground">Cargando…</p>
       ) : accesos.length === 0 ? (
