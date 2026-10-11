@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 Guía para Claude Code al trabajar en este repositorio.
 
@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `57`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `58`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -140,7 +140,7 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 - Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui
 - Supabase PostgreSQL (proyecto propio) + Supabase Auth solo para login con Google
 - Forms: react-hook-form + zod · Charts: recharts · Toasts: sonner
-- Excel: xlsx-js-style · PDF: jspdf + autotable · Códigos: @zxing (lector), qrcode
+- Excel: xlsx-js-style · PDF: jspdf + autotable (generar), pdfjs-dist (leer facturas de proveedores) · Códigos: @zxing (lector), qrcode
 - Impresión: desde el navegador. Térmica ESC/POS (`lib/escpos.ts`, puro) por WebUSB o por
   el agente local (`herramientas/agente-impresora/`), con cajón; Zebra ZPL (`lib/server/zpl.ts`)
   solo con la app en la misma PC; fallback al navegador. Orquestador: `lib/impresora/imprimir.ts`

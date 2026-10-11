@@ -1,8 +1,10 @@
 // app/api/compras/route.ts — recepcion de mercaderia via RPC recibir_compra_kiosko
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { leerQrAfip, type ComprobanteAfip } from "@/lib/afip/qr-comprobante";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +20,9 @@ const compraSchema = z.object({
         // Crea un lote de vencimiento para ese item (migracion 46).
         fechaVencimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de vencimiento invalida").optional(),
       }),
-    )
-    .min(1, "La compra no tiene items"),
+    ),
+  /** QR de la factura electronica del proveedor: con el, la compra puede ir sin items (solo cuenta corriente). */
+  qrAfip: z.string().optional(),
   remito: z.string().optional(),
   condicion: z.enum(["contado", "cuenta_corriente"]).default("contado"),
   pagada: z.boolean().default(true),
@@ -70,12 +73,63 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: detalle }, { status: 400 });
   }
   const input = parsed.data;
+  const comercioId = comercioIdDeSesion(req);
+
+  // Factura electronica (58): se vuelve a leer el QR aca para no confiar en lo que mando el navegador.
+  let comprobante: ComprobanteAfip | null = null;
+  if (input.qrAfip) {
+    const lectura = leerQrAfip(input.qrAfip);
+    if (!lectura.ok) return NextResponse.json({ error: lectura.error }, { status: 400 });
+    if (lectura.comprobante.esNotaCredito) {
+      return NextResponse.json({ error: `Es una ${lectura.comprobante.nombreTipo}: no se carga como compra` }, { status: 400 });
+    }
+    comprobante = lectura.comprobante;
+  }
+  if (input.items.length === 0 && !comprobante) {
+    return NextResponse.json({ error: "La compra no tiene items" }, { status: 400 });
+  }
+  const remito = input.remito?.trim() || comprobante?.nombre || null;
+  const datosFactura = comprobante
+    ? {
+        clave: comprobante.clave, cuit: comprobante.cuit, tipo: comprobante.tipo, nombreTipo: comprobante.nombreTipo,
+        numero: comprobante.numero, fecha: comprobante.fecha, importe: comprobante.importe, cae: comprobante.cae, moneda: comprobante.moneda,
+      }
+    : null;
+  const errorFactura = (e: { code?: string; message: string }) =>
+    NextResponse.json({ error: e.code === "23505" ? "Esa factura ya está cargada en una compra" : e.message }, { status: 400 });
+
+  // Solo cabecera: la factura va a cuenta corriente sin tocar stock (los productos se cargan despues o nunca).
+  if (input.items.length === 0 && comprobante) {
+    const { data: prov, error: errorProv } = await supabaseAdmin
+      .from("proveedores").select("id").eq("comercio_id", comercioId).eq("id", input.proveedorId).eq("activo", true).maybeSingle();
+    if (errorProv) return NextResponse.json({ error: errorProv.message }, { status: 400 });
+    if (!prov) return NextResponse.json({ error: "Proveedor inexistente o inactivo" }, { status: 400 });
+    const compraId = `compra_${comprobante.fecha.replace(/-/g, "")}_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
+    const { error } = await supabaseAdmin.from("compras").insert({
+      id: compraId,
+      comercio_id: comercioId,
+      proveedor_id: input.proveedorId,
+      estado: "recibida",
+      remito,
+      condicion: input.condicion,
+      pagada: input.pagada,
+      pagado: input.pagada ? comprobante.importe : 0,
+      total: comprobante.importe,
+      notas: input.notas?.trim() || null,
+      usuario_id: input.usuarioId ?? null,
+      usuario_nombre: input.usuarioNombre ?? null,
+      vence: !input.pagada && input.vence ? input.vence : null,
+      comprobante_afip: datosFactura,
+    });
+    if (error) return errorFactura(error as any);
+    return NextResponse.json({ compraId, total: comprobante.importe, items: 0 });
+  }
 
   const { data, error } = await supabaseAdmin.rpc("recibir_compra_kiosko", {
-    p_comercio_id: comercioIdDeSesion(req),
+    p_comercio_id: comercioId,
     p_proveedor_id: input.proveedorId,
     p_items: input.items,
-    p_remito: input.remito?.trim() || null,
+    p_remito: remito,
     p_condicion: input.condicion,
     p_pagada: input.pagada,
     p_notas: input.notas?.trim() || null,
@@ -84,15 +138,24 @@ export async function POST(req: Request) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const compraId = data?.compraId ? String(data.compraId) : null;
 
-  // La RPC no conoce la fecha de pago (su firma es anterior a la 44): se guarda aparte.
-  // Solo tiene sentido si queda saldo.
-  if (input.vence && !input.pagada && data?.compraId) {
-    await supabaseAdmin
-      .from("compras")
-      .update({ vence: input.vence })
-      .eq("comercio_id", comercioIdDeSesion(req))
-      .eq("id", String(data.compraId));
+  // La RPC no conoce la fecha de pago ni la factura (su firma es anterior): se guardan aparte.
+  // Con factura, la deuda es el total de la factura (IVA y percepciones incluidos), no la suma de items.
+  const cambios: Record<string, unknown> = {};
+  if (input.vence && !input.pagada) cambios.vence = input.vence;
+  if (comprobante) {
+    cambios.comprobante_afip = datosFactura;
+    cambios.total = comprobante.importe;
+    cambios.pagado = input.pagada ? comprobante.importe : 0;
   }
-  return NextResponse.json(data);
+  if (compraId && Object.keys(cambios).length > 0) {
+    const { error: errorCambios } = await supabaseAdmin.from("compras").update(cambios).eq("comercio_id", comercioId).eq("id", compraId);
+    if (errorCambios) {
+      // Factura repetida: se deshace la compra (y el stock) para no dejarla a medias.
+      await supabaseAdmin.rpc("anular_compra_kiosko", { p_compra_id: compraId, p_comercio_id: comercioId, p_usuario_id: input.usuarioId ?? null });
+      return errorFactura(errorCambios as any);
+    }
+  }
+  return NextResponse.json(comprobante ? { ...data, total: comprobante.importe } : data);
 }

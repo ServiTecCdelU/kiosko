@@ -4,7 +4,9 @@
 // Spec: docs/superpowers/specs/2026-09-18-proveedores-compras-design.md
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Truck, Search, Trash2, History, Users, Plus, Ban, Wallet } from "lucide-react";
+import { Truck, Search, Trash2, History, Users, Plus, Ban, Wallet, ScanLine, X } from "lucide-react";
+import { FacturaAfipDialog, type ResultadoFactura } from "@/components/compras/factura-afip-dialog";
+import { formatearCuit } from "@/lib/afip/qr-comprobante";
 import { CuentaCorrienteTab } from "@/components/compras/cuenta-corriente-tab";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDateTime } from "@/lib/utils/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { totalCompra, margenPct } from "@/lib/compras";
 import { searchProducts } from "@/services/products-service";
 import {
@@ -72,6 +74,15 @@ export default function ComprasPage() {
     load();
   }, [load]);
 
+  // Sin el skeleton: la recepcion no pierde lo cargado cuando se crea un proveedor desde la factura.
+  const recargarProveedores = useCallback(async () => {
+    try {
+      setProveedores(await getProveedores());
+    } catch {
+      toast.error("No se pudieron actualizar los proveedores");
+    }
+  }, []);
+
   return (
     <AppShell title="Compras">
       <div className="mb-4 inline-flex rounded-2xl border bg-card p-1">
@@ -97,7 +108,7 @@ export default function ComprasPage() {
       {loading ? (
         <Skeleton className="h-96 w-full rounded-2xl" />
       ) : tab === "recepcion" ? (
-        <RecepcionTab proveedores={proveedores.filter((p) => p.activo)} />
+        <RecepcionTab proveedores={proveedores.filter((p) => p.activo)} onProveedoresChanged={recargarProveedores} />
       ) : tab === "cuenta" ? (
         <CuentaCorrienteTab proveedores={proveedores} />
       ) : tab === "historial" ? (
@@ -111,7 +122,7 @@ export default function ComprasPage() {
 
 // ── Recepción ─────────────────────────────────────────────────
 
-function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
+function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Proveedor[]; onProveedoresChanged: () => Promise<void> }) {
   const [proveedorId, setProveedorId] = useState("");
   const [items, setItems] = useState<ItemCarrito[]>([]);
   const [query, setQuery] = useState("");
@@ -121,7 +132,33 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
   const [pagada, setPagada] = useState(true);
   const [vence, setVence] = useState("");
   const [working, setWorking] = useState(false);
+  const [facturaOpen, setFacturaOpen] = useState(false);
+  // Factura electronica leida del QR (58): la deuda queda por su total.
+  const [factura, setFactura] = useState<ResultadoFactura | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cargarFactura = (r: ResultadoFactura) => {
+    setFactura(r);
+    setProveedorId(r.proveedorId);
+    setRemito(r.comprobante.nombre);
+    setCondicion("cuenta_corriente");
+    setPagada(false);
+    setItems((prev) => {
+      const nuevos = r.items
+        .filter((it) => !prev.some((p) => p.productoId === it.productoId))
+        .map((it) => ({
+          productoId: it.productoId, nombre: it.nombre, precioVenta: it.precioVenta, lote: it.lote,
+          cantidad: String(it.cantidad), costoUnitario: String(it.costoUnitario), fechaVencimiento: "",
+        }));
+      return [...prev, ...nuevos];
+    });
+    toast.success(`${r.comprobante.nombre} leída${r.items.length ? ` · ${r.items.length} producto${r.items.length === 1 ? "" : "s"}` : ""}`);
+  };
+
+  const quitarFactura = () => {
+    setFactura(null);
+    setRemito("");
+  };
 
   const buscar = (q: string) => {
     setQuery(q);
@@ -187,7 +224,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
       .filter((i) => Number.isFinite(i.cantidadNum) && Number.isFinite(i.costoNum))
       .map((i) => ({ cantidad: i.cantidadNum, costoUnitario: i.costoNum })),
   );
-  const puedeRegistrar = !!proveedorId && items.length > 0 && itemsValidos && !working;
+  const puedeRegistrar = !!proveedorId && (items.length > 0 || !!factura) && itemsValidos && !working;
 
   const handleRegistrar = async () => {
     if (!puedeRegistrar) return;
@@ -202,6 +239,7 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
           costoUnitario: i.costoNum,
           fechaVencimiento: i.fechaVencimiento || undefined,
         })),
+        qrAfip: factura?.qr,
         remito: remito.trim() || undefined,
         condicion,
         pagada,
@@ -209,12 +247,17 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
         usuarioId: user?.id,
         usuarioNombre: user?.nombre,
       });
-      toast.success(`Compra registrada · ${formatCurrency(r.total)} · stock actualizado`);
+      toast.success(
+        factura
+          ? `${factura.comprobante.nombre} registrada · ${formatCurrency(r.total)}${items.length ? " · stock actualizado" : " · a cuenta corriente"}`
+          : `Compra registrada · ${formatCurrency(r.total)} · stock actualizado`,
+      );
       setItems([]);
       setRemito("");
       setCondicion("contado");
       setPagada(true);
       setVence("");
+      setFactura(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo registrar la compra");
     } finally {
@@ -222,12 +265,26 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
     }
   };
 
-  if (proveedores.length === 0) {
+  const dialogoFactura = (
+    <FacturaAfipDialog
+      open={facturaOpen}
+      onOpenChange={setFacturaOpen}
+      proveedores={proveedores}
+      onProveedorCreado={onProveedoresChanged}
+      onCargar={cargarFactura}
+    />
+  );
+
+  if (proveedores.length === 0 && !factura) {
     return (
       <Card className="card-premium rounded-2xl">
-        <CardContent className="py-12 text-center text-sm text-muted-foreground">
-          Primero cargá un proveedor en la pestaña Proveedores
+        <CardContent className="flex flex-col items-center gap-3 py-12 text-center text-sm text-muted-foreground">
+          <p>Primero cargá un proveedor en la pestaña Proveedores, o leé una factura de AFIP: el proveedor se crea solo con su CUIT.</p>
+          <Button variant="outline" className="rounded-2xl" onClick={() => setFacturaOpen(true)}>
+            <ScanLine className="mr-2 h-4 w-4" /> Leer factura de AFIP
+          </Button>
         </CardContent>
+        {dialogoFactura}
       </Card>
     );
   }
@@ -236,11 +293,26 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
     <div className="space-y-4">
       <Card className="card-premium rounded-2xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Truck className="h-4 w-4 text-primary" /> Nueva recepción
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+            <span className="flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /> Nueva recepción</span>
+            {!factura && (
+              <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setFacturaOpen(true)} title="Del PDF o del QR de la factura electrónica: proveedor, número, total y productos">
+                <ScanLine className="mr-1.5 h-4 w-4" /> Leer factura de AFIP
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {factura && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-success/40 bg-success/5 px-3 py-2 text-sm">
+              <span>
+                <b>{factura.comprobante.nombre}</b> · {formatDate(factura.comprobante.fecha)} · CUIT {formatearCuit(factura.comprobante.cuit)} ·
+                {" "}total factura <b className="cifra">{formatCurrency(factura.comprobante.importe)}</b>
+                <span className="block text-xs text-muted-foreground">La deuda con el proveedor queda por el total de la factura, aunque los productos cargados sumen distinto (IVA, percepciones).</span>
+              </span>
+              <Button size="sm" variant="ghost" className="rounded-xl" onClick={quitarFactura}><X className="mr-1 h-4 w-4" /> Quitar</Button>
+            </div>
+          )}
           <div className="grid gap-2 sm:grid-cols-3">
             <select
               value={proveedorId}
@@ -389,14 +461,22 @@ function RecepcionTab({ proveedores }: { proveedores: Proveedor[] }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <p className="cifra text-lg font-bold">Total: {formatCurrency(total)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {factura ? (
+              <p className="cifra text-lg font-bold">
+                Total factura: {formatCurrency(factura.comprobante.importe)}
+                <span className="ml-2 text-sm font-normal text-muted-foreground">productos {formatCurrency(total)}</span>
+              </p>
+            ) : (
+              <p className="cifra text-lg font-bold">Total: {formatCurrency(total)}</p>
+            )}
             <Button className="rounded-2xl" disabled={!puedeRegistrar} onClick={handleRegistrar}>
-              {working ? "Registrando..." : "Registrar compra"}
+              {working ? "Registrando..." : factura && items.length === 0 ? "Registrar a cuenta corriente" : "Registrar compra"}
             </Button>
           </div>
         </CardContent>
       </Card>
+      {dialogoFactura}
     </div>
   );
 }
@@ -522,7 +602,12 @@ function HistorialTab({ proveedores }: { proveedores: Proveedor[] }) {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-2 text-sm">
-                {detalle.compra.remito && <p className="text-muted-foreground">Remito: {detalle.compra.remito}</p>}
+                {detalle.compra.comprobanteAfip ? (
+                  <p className="text-muted-foreground">
+                    {detalle.compra.comprobanteAfip.nombreTipo} {detalle.compra.comprobanteAfip.numero} del {formatDate(detalle.compra.comprobanteAfip.fecha)} · CUIT {formatearCuit(detalle.compra.comprobanteAfip.cuit)} · CAE {detalle.compra.comprobanteAfip.cae}
+                  </p>
+                ) : detalle.compra.remito && <p className="text-muted-foreground">Remito: {detalle.compra.remito}</p>}
+                {detalle.items.length === 0 && <p className="text-xs text-muted-foreground">Cargada solo a cuenta corriente, sin detalle de productos.</p>}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -543,7 +628,9 @@ function HistorialTab({ proveedores }: { proveedores: Proveedor[] }) {
                     ))}
                   </TableBody>
                 </Table>
-                <p className="cifra text-right text-base font-bold">Total: {formatCurrency(detalle.compra.total)}</p>
+                <p className="cifra text-right text-base font-bold">
+                  Total{detalle.compra.comprobanteAfip ? " según factura" : ""}: {formatCurrency(detalle.compra.total)}
+                </p>
               </div>
               {detalle.compra.estado === "recibida" && (
                 <DialogFooter>
@@ -567,6 +654,7 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
   const [editando, setEditando] = useState<Proveedor | null>(null);
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [cuit, setCuit] = useState("");
   const [notas, setNotas] = useState("");
   const [activo, setActivo] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -575,6 +663,7 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
     setEditando(p);
     setNombre(p?.nombre ?? "");
     setTelefono(p?.telefono ?? "");
+    setCuit(p?.cuit ? formatearCuit(p.cuit) : "");
     setNotas(p?.notas ?? "");
     setActivo(p?.activo ?? true);
     setDialogOpen(true);
@@ -585,10 +674,10 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
     setSaving(true);
     try {
       if (editando) {
-        await actualizarProveedor(editando.id, { nombre: nombre.trim(), telefono, notas, activo });
+        await actualizarProveedor(editando.id, { nombre: nombre.trim(), telefono, cuit, notas, activo });
         toast.success("Proveedor actualizado");
       } else {
-        await crearProveedor({ nombre: nombre.trim(), telefono, notas });
+        await crearProveedor({ nombre: nombre.trim(), telefono, cuit, notas });
         toast.success("Proveedor creado");
       }
       setDialogOpen(false);
@@ -625,7 +714,10 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
               <TableBody>
                 {proveedores.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      {p.nombre}
+                      {p.cuit && <span className="block text-xs font-normal text-muted-foreground">CUIT {formatearCuit(p.cuit)}</span>}
+                    </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{p.telefono ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn(!p.activo && "border-destructive text-destructive")}>
@@ -655,10 +747,17 @@ function ProveedoresTab({ proveedores, onChanged }: { proveedores: Proveedor[]; 
               <Label className="mb-1 block text-xs">Nombre</Label>
               <Input value={nombre} onChange={(e) => setNombre(e.target.value)} className="rounded-xl" autoFocus />
             </div>
-            <div>
-              <Label className="mb-1 block text-xs">Teléfono</Label>
-              <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} className="rounded-xl" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="mb-1 block text-xs">Teléfono</Label>
+                <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} className="rounded-xl" />
+              </div>
+              <div>
+                <Label className="mb-1 block text-xs">CUIT</Label>
+                <Input value={cuit} onChange={(e) => setCuit(e.target.value)} placeholder="30-12345678-9" inputMode="numeric" className="rounded-xl" />
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">Con el CUIT, las facturas electrónicas de este proveedor se reconocen solas al leer el QR.</p>
             <div>
               <Label className="mb-1 block text-xs">Notas</Label>
               <Input value={notas} onChange={(e) => setNotas(e.target.value)} className="rounded-xl" />

@@ -1,14 +1,29 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/compras-service.ts — proveedores y recepcion de mercaderia (client)
 import { consultar } from "@/services/api-client";
+import type { ComprobanteAfip } from "@/lib/afip/qr-comprobante";
 
 export interface Proveedor {
   id: string;
   nombre: string;
   telefono?: string;
+  /** 11 digitos; con el se reconoce al proveedor en el QR de su factura (58). */
+  cuit?: string;
   notas?: string;
   activo: boolean;
   createdAt: Date;
+}
+
+/** Factura electronica con la que se cargo la compra (58). */
+export interface FacturaDeCompra {
+  clave: string;
+  cuit: string;
+  tipo: number;
+  nombreTipo: string;
+  numero: string;
+  fecha: string;
+  importe: number;
+  cae: string;
 }
 
 export type CompraEstado = "recibida" | "anulada";
@@ -31,6 +46,7 @@ export interface Compra {
   vence?: string;
   notas?: string;
   usuarioNombre?: string;
+  comprobanteAfip?: FacturaDeCompra;
   createdAt: Date;
 }
 
@@ -62,6 +78,7 @@ function mapProveedor(d: Record<string, any>): Proveedor {
     id: d.id,
     nombre: d.nombre,
     telefono: d.telefono ?? undefined,
+    cuit: d.cuit ?? undefined,
     notas: d.notas ?? undefined,
     activo: !!d.activo,
     createdAt: new Date(d.created_at),
@@ -83,6 +100,14 @@ function mapCompra(d: Record<string, any>): Compra {
     vence: d.vence ? String(d.vence).slice(0, 10) : undefined,
     notas: d.notas ?? undefined,
     usuarioNombre: d.usuario_nombre ?? undefined,
+    comprobanteAfip: d.comprobante_afip && typeof d.comprobante_afip === "object"
+      ? {
+          clave: String(d.comprobante_afip.clave ?? ""), cuit: String(d.comprobante_afip.cuit ?? ""),
+          tipo: Number(d.comprobante_afip.tipo) || 0, nombreTipo: String(d.comprobante_afip.nombreTipo ?? ""),
+          numero: String(d.comprobante_afip.numero ?? ""), fecha: String(d.comprobante_afip.fecha ?? ""),
+          importe: Number(d.comprobante_afip.importe) || 0, cae: String(d.comprobante_afip.cae ?? ""),
+        }
+      : undefined,
     createdAt: new Date(d.created_at),
   };
 }
@@ -110,8 +135,8 @@ export async function getProveedores(): Promise<Proveedor[]> {
 }
 
 export async function crearProveedor(input: {
-  nombre: string; telefono?: string; notas?: string;
-}): Promise<void> {
+  nombre: string; telefono?: string; notas?: string; cuit?: string;
+}): Promise<Proveedor> {
   const res = await fetch(apiUrl("/api/proveedores"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -119,11 +144,12 @@ export async function crearProveedor(input: {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el proveedor");
+  return mapProveedor(data);
 }
 
 export async function actualizarProveedor(
   id: string,
-  cambios: { nombre?: string; telefono?: string; notas?: string; activo?: boolean },
+  cambios: { nombre?: string; telefono?: string; notas?: string; activo?: boolean; cuit?: string },
 ): Promise<void> {
   const res = await fetch(apiUrl("/api/proveedores"), {
     method: "PATCH",
@@ -134,10 +160,31 @@ export async function actualizarProveedor(
   if (!res.ok) throw new Error(data?.error ?? "No se pudo actualizar el proveedor");
 }
 
+/** Lo que el servidor dice de un QR de factura: a que proveedor va, si ya se cargo, avisos. */
+export interface LecturaFacturaAfip {
+  comprobante: ComprobanteAfip;
+  proveedor: { id: string; nombre: string; activo: boolean } | null;
+  duplicada: { compraId: string; fecha: string; total: number } | null;
+  avisos: string[];
+}
+
+export async function leerFacturaAfip(qr: string): Promise<LecturaFacturaAfip> {
+  const res = await fetch(apiUrl("/api/compras/factura-afip"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ qr }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo leer la factura");
+  return data as LecturaFacturaAfip;
+}
+
 export interface RecibirCompraInput {
   proveedorId: string;
-  /** fechaVencimiento (YYYY-MM-DD) crea un lote de vencimiento para ese item. */
+  /** fechaVencimiento (YYYY-MM-DD) crea un lote de vencimiento para ese item. Puede ir vacio si hay qrAfip. */
   items: { productoId: string; cantidad: number; costoUnitario: number; fechaVencimiento?: string }[];
+  /** QR de la factura electronica (58): la deuda queda por el total de la factura. */
+  qrAfip?: string;
   remito?: string;
   condicion: CompraCondicion;
   pagada: boolean;
