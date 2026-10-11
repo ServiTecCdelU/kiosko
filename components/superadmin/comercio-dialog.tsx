@@ -4,9 +4,11 @@
 import { toast } from "sonner";
 import { useCallback, useEffect, useState } from "react";
 import {
-  CalendarClock, Check, CircleDollarSign, Download, Loader2, LogIn, Mail, MessageCircle, RefreshCcw, Store, type LucideIcon,
+  AlertTriangle, CalendarClock, Check, CircleDollarSign, Download, Loader2, LogIn, Mail, MessageCircle, RefreshCcw, Store, Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import { descargarBackupDeComercio } from "@/services/backup-service";
+import { DEMO_SLUG } from "@/lib/demo";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -214,6 +216,68 @@ function BotonBackup({ comercioId }: { comercioId: string }) {
       {descargando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
       Backup
     </Button>
+  );
+}
+
+/**
+ * Zona peligrosa: borra el comercio con TODOS sus datos (RPC eliminar_comercio,
+ * 57). Pide escribir el slug exacto; no hay vuelta atras, por eso sugiere el backup.
+ */
+function EliminarComercio({ comercio, onEliminado }: { comercio: Comercio; onEliminado: () => Promise<void> }) {
+  const [abierto, setAbierto] = useState(false);
+  const [slug, setSlug] = useState("");
+  const [borrando, setBorrando] = useState(false);
+  const coincide = slug.trim().toLowerCase() === comercio.slug;
+  const tieneDatos = comercio.uso.ventas > 0 || comercio.uso.productos > 0;
+
+  const eliminar = async () => {
+    setBorrando(true);
+    try {
+      await superadminApi({ accion: "eliminar", id: comercio.id, slug: slug.trim() });
+      toast.success(`"${comercio.nombre}" eliminado con todos sus datos`);
+      await onEliminado();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+      setBorrando(false);
+    }
+  };
+
+  if (!abierto) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2">
+        <p className="text-xs text-muted-foreground">
+          <b className="text-foreground">Eliminar comercio.</b> Borra el comercio y todo lo suyo: productos, ventas, caja, usuarios, pagos.
+          {" "}Para dejar de cobrarle sin perder nada, usá el estado <b>Baja</b>.
+        </p>
+        <Button size="sm" variant="outline" className="h-8 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setAbierto(true)}>
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar…
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5 rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-destructive">
+        <AlertTriangle className="h-4 w-4" /> Esto no se puede deshacer
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Se van a borrar {comercio.uso.productos} productos, {comercio.uso.ventas} ventas y {comercio.uso.usuarios} usuarios de
+        {" "}<b className="text-foreground">{comercio.nombre}</b>. Los correos con acceso dejan de poder entrar.
+        {tieneDatos && " Si hay algo que quieras conservar, bajá el backup antes."}
+      </p>
+      <Label htmlFor="confirmar-slug" className="block text-xs text-muted-foreground">
+        Para confirmar escribí <code className="rounded bg-muted px-1 text-foreground">{comercio.slug}</code>
+      </Label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input id="confirmar-slug" value={slug} onChange={(e) => setSlug(e.target.value)} className="h-9 rounded-xl" autoFocus autoComplete="off" spellCheck={false} />
+        <Button size="sm" variant="destructive" className="h-9 shrink-0 rounded-xl" disabled={!coincide || borrando} onClick={eliminar}>
+          {borrando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+          Eliminar definitivamente
+        </Button>
+        <Button size="sm" variant="ghost" className="h-9 rounded-xl" disabled={borrando} onClick={() => { setAbierto(false); setSlug(""); }}>Cancelar</Button>
+      </div>
+    </div>
   );
 }
 
@@ -480,6 +544,16 @@ function Contenido({ comercio, grupos, precios = {}, onOpenChange, onCambio, onE
               <LogIn className="mr-2 h-4 w-4" /> Entrar al panel de {comercio.nombre}
             </Button>
           </div>
+
+          {comercio.slug !== DEMO_SLUG && (
+            <EliminarComercio
+              comercio={comercio}
+              onEliminado={async () => {
+                onOpenChange(false);
+                await onCambio();
+              }}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>

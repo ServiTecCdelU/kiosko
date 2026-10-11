@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { patronCorreoExacto } from "@/lib/correo";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { esSlugReservado } from "@/lib/panel";
+import { DEMO_SLUG } from "@/lib/demo";
 import { olvidarAcceso } from "@/lib/server/acceso";
 import {
   estadoSuscripcion, guardarGrupo, guardarPlan, listarGrupos, listarPlanes, pagosDeComercio, registrarPagoManual,
@@ -252,6 +253,23 @@ export async function POST(req: Request) {
     } catch (e) {
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo guardar el plan" }, { status: 400 });
     }
+  }
+
+  // Borra el comercio con todos sus datos (RPC eliminar_comercio, 57). Pide el
+  // slug exacto como confirmacion; la demo nunca se borra.
+  if (accion === "eliminar") {
+    const id = String(body?.id ?? "");
+    const confirmacion = String(body?.slug ?? "").trim().toLowerCase();
+    if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+    const { data: c, error } = await supabaseAdmin.from("comercios").select("id, slug, nombre").eq("id", id).maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (!c) return NextResponse.json({ error: "Comercio no encontrado" }, { status: 404 });
+    if (c.slug === DEMO_SLUG) return NextResponse.json({ error: "La demo no se puede eliminar" }, { status: 400 });
+    if (confirmacion !== c.slug) return NextResponse.json({ error: `Para confirmar escribí exactamente "${c.slug}"` }, { status: 400 });
+    const { data: borrado, error: errorRpc } = await supabaseAdmin.rpc("eliminar_comercio", { p_comercio_id: id });
+    if (errorRpc) return NextResponse.json({ error: errorRpc.message }, { status: 400 });
+    olvidarAcceso(id);
+    return NextResponse.json({ ok: true, nombre: c.nombre, borrado });
   }
 
   if (accion === "entrar") return entrarAComercio(req, String(body?.id ?? ""));
