@@ -22,6 +22,7 @@ interface Crudo {
   pagos: PagoM[];
   debitos: DebitoM[];
   eventos: EventoM[] | null;
+  eventosError?: string | null;
   planes: PlanSaas[];
 }
 
@@ -84,10 +85,20 @@ export function Metricas() {
       {!m.conEventos && (
         <div className="flex items-start gap-2 rounded-2xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <p>
-            Todavía no corrió la migración <b>56_saas_eventos.sql</b>. Hasta entonces las <b>bajas por mes</b> no se conocen y
-            los <b>pasajes a Pro</b> se infieren del primer pago en Pro. El resto de los números es exacto.
-          </p>
+          <div>
+            <p>
+              No se pudo leer la tabla <b>saas_eventos</b> (migración <b>56_saas_eventos.sql</b>). Hasta entonces las <b>bajas por mes</b> no
+              se conocen y los <b>pasajes a Pro</b> se infieren del primer pago en Pro. El resto de los números es exacto.
+            </p>
+            {crudo?.eventosError && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Supabase respondió: <code className="rounded bg-muted px-1">{crudo.eventosError}</code>
+                {/schema cache|does not exist|PGRST/i.test(crudo.eventosError) && (
+                  <> · Si ya corriste el SQL, ejecutá <code className="rounded bg-muted px-1">notify pgrst, &apos;reload schema&apos;;</code> en el editor SQL y recargá.</>
+                )}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

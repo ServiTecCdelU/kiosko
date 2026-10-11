@@ -186,6 +186,8 @@ export async function POST(req: Request) {
       })),
       debitos: debitos.data ?? [],
       eventos: eventos.error ? null : (eventos.data ?? []),
+      // Para diagnosticar desde el panel por que no se leyo saas_eventos.
+      eventosError: eventos.error?.message ?? null,
       planes,
     });
   }
