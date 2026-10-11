@@ -9,7 +9,10 @@ import { patronCorreoExacto } from "@/lib/correo";
 import { crearCookieSesion, esSuperadmin, getSesion } from "@/lib/server/sesion";
 import { esSlugReservado } from "@/lib/panel";
 import { olvidarAcceso } from "@/lib/server/acceso";
-import { guardarGrupo, guardarPlan, listarGrupos, listarPlanes, pagosDeComercio, registrarPagoManual } from "@/lib/server/billing";
+import {
+  estadoSuscripcion, guardarGrupo, guardarPlan, listarGrupos, listarPlanes, pagosDeComercio, registrarPagoManual,
+} from "@/lib/server/billing";
+import { debitoDeComercio } from "@/lib/server/billing-debito";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,11 +63,16 @@ export async function POST(req: Request) {
       .order("created_at", { ascending: true });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
+    // Debito automatico de Mercado Pago (saas_debitos): una consulta para todos.
+    const { data: debitos } = await supabaseAdmin.from("saas_debitos").select("comercio_id, estado");
+    const debitoDe = new Map((debitos ?? []).map((d: any) => [d.comercio_id, d.estado]));
+
     // Pocos comercios en la practica (SaaS chico): una consulta de conteo por
     // tabla y por comercio es aceptable; no vale la pena una vista SQL todavia.
     const conUso = await Promise.all(
       (comercios ?? []).map(async (c: any) => ({
         ...c,
+        debito: debitoDe.get(c.id) ?? null,
         uso: {
           productos: await contar("productos", c.id),
           ventas: await contar("ventas", c.id),
@@ -152,6 +160,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ comercio: data, periodo: r.periodo });
     } catch (e) {
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo registrar el pago" }, { status: 400 });
+    }
+  }
+
+  // Ficha completa para "Administrar": correos del dueño, cuanto paga por mes
+  // (plan + cajas extra - descuento de grupo), debito automatico de Mercado
+  // Pago y el historial de pagos.
+  if (accion === "ficha") {
+    const id = String(body?.id ?? "");
+    if (!id) return NextResponse.json({ error: "Falta el comercio" }, { status: 400 });
+    try {
+      const [s, debito, { data: admins }] = await Promise.all([
+        estadoSuscripcion(id),
+        debitoDeComercio(id).catch(() => null),
+        supabaseAdmin.from("usuarios").select("nombre, email").eq("comercio_id", id).eq("rol", "admin").eq("activo", true)
+          .not("email", "is", null).order("created_at", { ascending: true }),
+      ]);
+      return NextResponse.json({
+        ficha: {
+          correos: (admins ?? []).map((a: any) => ({ nombre: a.nombre ?? "", email: a.email })),
+          nombrePlan: s.nombrePlan,
+          monto: s.monto,
+          cajasActivas: s.monto.cajas,
+          suscripcionHasta: s.suscripcionHasta,
+          proximo: s.proximo,
+          grupo: s.grupo ? { nombre: s.grupo.nombre, descuentoPct: s.grupo.descuentoAplicado } : null,
+          debito,
+          pagos: s.pagos,
+        },
+      });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer la ficha" }, { status: 400 });
     }
   }
 

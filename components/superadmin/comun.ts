@@ -25,7 +25,41 @@ export interface Comercio {
   config: { origen?: string; rubro?: string | null; telefono?: string | null } | null;
   /** Grupo de sucursales del mismo dueño (53). */
   grupo_id: string | null;
+  /** Estado del debito automatico de Mercado Pago (saas_debitos); null = nunca lo activo. */
+  debito?: EstadoDebito | null;
   uso: ComercioUso;
+}
+
+export type EstadoDebito = "pending" | "authorized" | "paused" | "cancelled";
+
+export const DEBITO_LABEL: Record<EstadoDebito, { texto: string; clase: string; titulo: string }> = {
+  authorized: { texto: "Débito automático", clase: "border-success/50 bg-success/10 text-success", titulo: "Mercado Pago le cobra la suscripción solo cada mes" },
+  pending: { texto: "Débito sin autorizar", clase: "border-warning text-warning", titulo: "Empezó a activar el débito automático pero no terminó de autorizarlo en Mercado Pago" },
+  paused: { texto: "Débito pausado", clase: "border-destructive/50 text-destructive", titulo: "Mercado Pago no pudo cobrar (tarjeta rechazada o sin saldo)" },
+  cancelled: { texto: "Débito cancelado", clase: "border-border text-muted-foreground", titulo: "Tuvo débito automático y lo canceló" },
+};
+
+export interface DebitoSaas {
+  preapprovalId: string;
+  estado: EstadoDebito;
+  monto: number;
+  payerEmail: string | null;
+  proximoCobro: string | null;
+  creadoAt: string;
+  canceladoAt: string | null;
+}
+
+/** Respuesta de la accion "ficha": todo lo del comercio que no viene en el listado. */
+export interface FichaComercio {
+  correos: { nombre: string; email: string }[];
+  nombrePlan: string;
+  monto: { base: number; cajas: number; cajasExtra: number; extra: number; descuentoPct: number; descuento: number; total: number };
+  cajasActivas: number;
+  suscripcionHasta: string | null;
+  proximo: { periodo: string; hasta: string };
+  grupo: { nombre: string; descuentoPct: number } | null;
+  debito: DebitoSaas | null;
+  pagos: PagoSaas[];
 }
 
 export interface GrupoSaas {
