@@ -12,11 +12,26 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   readSheet, guessMappingFromHeaders, parseRows, importProducts,
-  loadSavedMapping, saveMapping,
+  loadSavedMapping, saveMapping, descargarPlantilla, EXTENSIONES_PLANILLA,
   IMPORT_FIELD_LABELS,
   type ColumnMapping, type ImportField, type ParsedRow, type StockStrategy, type ImportSummary,
 } from "@/services/import-service";
+import { AyudaArchivo } from "@/components/importacion/ayuda-archivo";
 import type * as XLSX from "xlsx-js-style";
+
+const COLUMNAS_AYUDA = [
+  { nombre: "Descripción", ejemplo: "Coca Cola 1.5 L", obligatoria: true },
+  { nombre: "Precio de venta", ejemplo: "1.850,00", obligatoria: true },
+  { nombre: "Código de barra o Código", ejemplo: "7790895000997", obligatoria: true },
+  { nombre: "Costo", ejemplo: "1.200" },
+  { nombre: "Rubro", ejemplo: "Bebidas" },
+  { nombre: "Subrubro", ejemplo: "Gaseosas" },
+  { nombre: "Stock", ejemplo: "24" },
+  { nombre: "Lote (unidades por paquete)", ejemplo: "6" },
+];
+
+const PLANTILLA_ENCABEZADOS = ["Código de barra", "Código", "Descripción", "Precio", "Costo", "Rubro", "Subrubro", "Stock", "Lote"];
+const PLANTILLA_EJEMPLO = ["7790895000997", "CC15", "Coca Cola 1.5 L", 1850, 1200, "Bebidas", "Gaseosas", 24, 6];
 
 interface ImportDialogProps {
   open: boolean;
@@ -144,13 +159,21 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
 
         {step === "archivo" && (
           <div className="space-y-4">
-            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-8 text-center hover:bg-muted/50">
+            <AyudaArchivo
+              que="productos"
+              columnas={COLUMNAS_AYUDA}
+              ubicacion="importar-productos"
+              abiertoAlInicio={!workbook}
+              onPlantilla={(f) => descargarPlantilla("productos", PLANTILLA_ENCABEZADOS, PLANTILLA_EJEMPLO, f)}
+            />
+            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center hover:bg-muted/50">
               <Upload className="h-6 w-6 text-muted-foreground" />
               <span className="text-sm font-medium">
-                {workbook ? "Archivo cargado — elegí otro si querés cambiarlo" : "Elegí tu lista de precios (.xlsx)"}
+                {workbook ? "Archivo cargado — elegí otro si querés cambiarlo" : "Elegí tu lista de precios (Excel o CSV)"}
               </span>
+              <span className="text-xs text-muted-foreground">Sirve la lista de tu proveedor, la exportación de tu sistema anterior o la plantilla de arriba.</span>
               <input
-                type="file" accept=".xlsx,.xls" className="hidden"
+                type="file" accept={EXTENSIONES_PLANILLA} className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
               />
             </label>

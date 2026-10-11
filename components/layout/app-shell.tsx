@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Store, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LogOut, MessageCircle, Store, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WhatsAppLink } from "@/components/analytics/whatsapp-link";
 import { hrefDe, visibleNavItems } from "@/lib/nav";
 import { useAuth, AUTH_DISABLED } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth/auth-guard";
@@ -42,6 +43,8 @@ export function AppShell({ title, children }: AppShellProps) {
     logout();
     router.push("/login");
   };
+
+  const mensajeSoporte = `Hola! Escribo desde ${user?.comercioNombre ?? "mi comercio"} (MultiComercioPanel). Necesito ayuda con: `;
 
   return (
     <AuthGuard>
@@ -82,6 +85,21 @@ export function AppShell({ title, children }: AppShellProps) {
             );
           })}
         </nav>
+
+        {/* Soporte por WhatsApp: siempre a mano, abre el chat con el nombre del comercio */}
+        <WhatsAppLink
+          ubicacion="menu"
+          conversion={false}
+          mensaje={mensajeSoporte}
+          title={colapsado ? "Soporte por WhatsApp" : undefined}
+          className={cn(
+            "mx-3 mb-1 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            colapsado && "justify-center px-0",
+          )}
+        >
+          <MessageCircle className="h-4 w-4 shrink-0 text-success" />
+          {!colapsado && "Soporte por WhatsApp"}
+        </WhatsAppLink>
 
         <button
           onClick={toggleColapsado}
@@ -135,8 +153,17 @@ export function AppShell({ title, children }: AppShellProps) {
             </Link>
           );
         })}
+        <WhatsAppLink
+          ubicacion="menu-movil"
+          conversion={false}
+          mensaje={mensajeSoporte}
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-medium text-sidebar-foreground/80"
+          aria-label="Soporte por WhatsApp"
+        >
+          <MessageCircle className="h-4 w-4 text-success" /> Soporte
+        </WhatsAppLink>
         {user && !AUTH_DISABLED && (
-          <button onClick={handleLogout} className="ml-auto shrink-0 px-2 text-sidebar-foreground/70" aria-label="Salir">
+          <button onClick={handleLogout} className="shrink-0 px-2 text-sidebar-foreground/70" aria-label="Salir">
             <LogOut className="h-4 w-4" />
           </button>
         )}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Search, Plus, Users, Wallet, Star } from "lucide-react";
+import { Search, Plus, Upload, Users, Wallet, Star } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { formatCurrency } from "@/lib/utils/format";
 import { listClientes } from "@/services/clientes-service";
 import { DeudoresPanel } from "@/components/clientes/deudores-panel";
 import { NuevoClienteDialog } from "@/components/clientes/nuevo-cliente-dialog";
+import { ImportarClientesDialog } from "@/components/clientes/importar-clientes-dialog";
 import { ClienteDetailDialog } from "@/components/clientes/cliente-detail-dialog";
 import type { Cliente } from "@/lib/types";
 
@@ -24,6 +25,7 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [importarOpen, setImportarOpen] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [detalleOpen, setDetalleOpen] = useState(false);
 
@@ -85,6 +87,9 @@ export default function ClientesPage() {
             className="rounded-2xl pl-10"
           />
         </div>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setImportarOpen(true)} title="Cargar varios clientes de una vez desde un Excel o CSV">
+          <Upload className="mr-1 h-4 w-4" /> Importar
+        </Button>
         <Button className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
         </Button>
@@ -146,6 +151,7 @@ export default function ClientesPage() {
       </div>
 
       <NuevoClienteDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={() => load()} />
+      <ImportarClientesDialog open={importarOpen} onOpenChange={setImportarOpen} onImported={() => load()} />
       <ClienteDetailDialog
         clienteId={detalleId}
         open={detalleOpen}

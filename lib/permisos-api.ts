@@ -27,6 +27,7 @@ const RUTAS_ADMIN = [
   "/api/proveedores",
   "/api/consultas/compras",
   "/api/productos/importar",
+  "/api/clientes/importar",
   "/api/sync",
   "/api/consultas/reportes",
   "/api/mercadopago/conexion",

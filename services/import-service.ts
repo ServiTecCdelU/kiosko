@@ -1,8 +1,9 @@
 import { apiUrl } from "@/lib/utils/api-url"
-// services/import-service.ts — importación masiva de productos desde lista de precios (Excel)
+// services/import-service.ts — importación masiva de productos desde lista de precios (Excel o CSV)
 import * as XLSX from "xlsx-js-style";
-import { mapRow } from "@/services/products-service";
-import type { Product } from "@/lib/types";
+import { indexToLetter, letterToIndex, parsearNumero } from "@/lib/importar-filas";
+
+export { indexToLetter, letterToIndex };
 
 export type ImportField =
   | "barra"
@@ -36,40 +37,71 @@ export interface SheetPreview {
   sampleRows: string[][];
 }
 
-function indexToLetter(i: number): string {
-  let n = i;
-  let s = "";
-  do {
-    s = String.fromCharCode(65 + (n % 26)) + s;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return s;
-}
-
-function readRawRows(workbook: XLSX.WorkBook): string[][] {
+export function readRawRows(workbook: XLSX.WorkBook): string[][] {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" }) as string[][];
 }
 
-export function readSheet(file: File): Promise<{ workbook: XLSX.WorkBook; preview: SheetPreview }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
-    reader.onload = () => {
-      try {
-        const data = new Uint8Array(reader.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const rows = readRawRows(workbook);
-        const columnCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
-        const columnLetters = Array.from({ length: columnCount }, (_, i) => indexToLetter(i));
-        const sampleRows = rows.slice(0, 5).map((r) => r.map((c) => String(c ?? "")));
-        resolve({ workbook, preview: { columnLetters, sampleRows } });
-      } catch {
-        reject(new Error("El archivo no parece ser un Excel válido"));
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
+export const EXTENSIONES_PLANILLA = ".xlsx,.xls,.csv,.txt";
+
+function esCsv(file: File): boolean {
+  return /\.(csv|txt)$/i.test(file.name) || file.type === "text/csv" || file.type === "text/plain";
+}
+
+/** Un CSV guardado desde Excel suele venir en Windows-1252; si no es UTF-8 valido se decodifica asi. */
+function decodificarTexto(buf: ArrayBuffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder("windows-1252").decode(buf);
+  }
+}
+
+/** Lee un Excel (.xlsx/.xls) o un CSV (coma, punto y coma o tabulacion; lo detecta solo). */
+export async function readSheet(file: File): Promise<{ workbook: XLSX.WorkBook; preview: SheetPreview }> {
+  let buf: ArrayBuffer;
+  try {
+    buf = await file.arrayBuffer();
+  } catch {
+    throw new Error("No se pudo leer el archivo");
+  }
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = esCsv(file)
+      ? XLSX.read(decodificarTexto(buf).replace(/^﻿/, ""), { type: "string", raw: true })
+      : XLSX.read(new Uint8Array(buf), { type: "array" });
+  } catch {
+    throw new Error("El archivo no parece ser un Excel ni un CSV válido");
+  }
+  const rows = readRawRows(workbook);
+  if (rows.length === 0) throw new Error("El archivo está vacío");
+  const columnCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
+  const columnLetters = Array.from({ length: columnCount }, (_, i) => indexToLetter(i));
+  const sampleRows = rows.slice(0, 5).map((r) => r.map((c) => String(c ?? "")));
+  return { workbook, preview: { columnLetters, sampleRows } };
+}
+
+/**
+ * Descarga una plantilla con los encabezados y una fila de ejemplo, en Excel o
+ * en CSV (separado por punto y coma, con BOM, como lo abre Excel en Argentina).
+ */
+export function descargarPlantilla(nombre: string, encabezados: string[], ejemplo: (string | number)[], formato: "xlsx" | "csv"): void {
+  const hoja = XLSX.utils.aoa_to_sheet([encabezados, ejemplo]);
+  hoja["!cols"] = encabezados.map((h) => ({ wch: Math.max(14, h.length + 2) }));
+  if (formato === "xlsx") {
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Datos");
+    XLSX.writeFile(libro, `${nombre}.xlsx`);
+    return;
+  }
+  const csv = XLSX.utils.sheet_to_csv(hoja, { FS: ";" });
+  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${nombre}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const AUTO_MATCH: Record<ImportField, RegExp> = {
@@ -134,15 +166,6 @@ export interface ParsedRow {
   warnings: string[];
 }
 
-function letterToIndex(letter?: string): number {
-  if (!letter) return -1;
-  let n = 0;
-  for (const ch of letter.toUpperCase()) {
-    n = n * 26 + (ch.charCodeAt(0) - 64);
-  }
-  return n - 1;
-}
-
 export function parseRows(
   workbook: XLSX.WorkBook,
   mapping: ColumnMapping,
@@ -172,14 +195,12 @@ export function parseRows(
     const barra = get(idx.barra);
     const codigo = get(idx.codigo);
     const descripcion = get(idx.descripcion);
-    const precioRaw = get(idx.precio).replace(/[^\d,.-]/g, "").replace(",", ".");
-    const precio = Number(precioRaw) || 0;
-    const costoRaw = get(idx.costo).replace(/[^\d,.-]/g, "").replace(",", ".");
-    const costo = costoRaw ? Number(costoRaw) || undefined : undefined;
+    // Numeros como vienen en las listas argentinas: "1.500,50", "$ 1.500", "12,5".
+    const precio = parsearNumero(get(idx.precio)) ?? 0;
+    const costo = parsearNumero(get(idx.costo)) ?? undefined;
     const rubro = get(idx.rubro);
     const subrubro = get(idx.subrubro);
-    const stockRaw = get(idx.stock).replace(/[^\d.-]/g, "");
-    const stock = Number(stockRaw) || 0;
+    const stock = parsearNumero(get(idx.stock)) ?? 0;
     const loteRaw = get(idx.lote).replace(/[^\d]/g, "");
     const lote = loteRaw ? Number(loteRaw) : undefined;
 
@@ -221,11 +242,6 @@ export interface ImportSummary {
   actualizados: number;
   omitidos: number;
   conAdvertencias: number;
-}
-
-function toCategory(rubro: string, subrubro: string): string {
-  if (rubro && subrubro) return `${rubro} / ${subrubro}`;
-  return rubro || subrubro || "";
 }
 
 export async function importProducts(
