@@ -163,6 +163,33 @@ export async function POST(req: Request) {
     }
   }
 
+  // Dashboard de metricas (lib/superadmin-metricas.ts calcula en el navegador):
+  // todos los comercios, los pagos aprobados, los debitos y el historial de
+  // eventos (56). Si la migracion 56 no corrio, eventos va null y el panel avisa.
+  if (accion === "metricas") {
+    const [comercios, pagos, debitos, eventos, planes] = await Promise.all([
+      supabaseAdmin.from("comercios").select("id, created_at, estado, plan, trial_hasta, config"),
+      supabaseAdmin.from("saas_pagos").select("comercio_id, plan, monto, metodo, aprobado_at, created_at").eq("estado", "aprobado"),
+      supabaseAdmin.from("saas_debitos").select("comercio_id, estado, created_at, cancelado_at"),
+      supabaseAdmin.from("saas_eventos").select("comercio_id, tipo, de, a, created_at"),
+      listarPlanes().catch(() => []),
+    ]);
+    const error = comercios.error ?? pagos.error ?? debitos.error;
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({
+      comercios: (comercios.data ?? []).map((c: any) => ({
+        id: c.id, created_at: c.created_at, estado: c.estado, plan: c.plan, trial_hasta: c.trial_hasta,
+        origen: c.config?.origen ?? null, rubro: c.config?.rubro ?? null,
+      })),
+      pagos: (pagos.data ?? []).map((p: any) => ({
+        comercio_id: p.comercio_id, plan: p.plan, monto: Number(p.monto) || 0, metodo: p.metodo, fecha: p.aprobado_at ?? p.created_at,
+      })),
+      debitos: debitos.data ?? [],
+      eventos: eventos.error ? null : (eventos.data ?? []),
+      planes,
+    });
+  }
+
   // Ficha completa para "Administrar": correos del dueño, cuanto paga por mes
   // (plan + cajas extra - descuento de grupo), debito automatico de Mercado
   // Pago y el historial de pagos.

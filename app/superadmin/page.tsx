@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowDownAZ, Building2, CircleDollarSign, LogOut, Loader2, Chrome, Plus, RefreshCw, Search, SearchX, ShieldCheck,
+  ArrowDownAZ, BarChart3, Building2, CircleDollarSign, LogOut, Loader2, Chrome, Plus, RefreshCw, Search, SearchX, ShieldCheck,
 } from "lucide-react";
 import { PlanesDialog } from "@/components/superadmin/planes-dialog";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { ComercioFila } from "@/components/superadmin/comercio-fila";
 import { ComercioDialog } from "@/components/superadmin/comercio-dialog";
 import { NuevoComercioDialog } from "@/components/superadmin/nuevo-comercio-dialog";
 import { Resumen, resumenDe, type FiltroRapido } from "@/components/superadmin/resumen";
+import { Metricas } from "@/components/superadmin/metricas";
 import {
   ESTADO_LABEL, ESTADO_PUNTO, ESTADOS, PLAN_LABEL, esNuevo, necesitaAtencion, pagoAlDia, preciosDe, superadminApi,
   type Comercio, type GrupoSaas, type PlanSaas, type PreciosPlan,
@@ -105,6 +106,7 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
   const [orden, setOrden] = useState<Orden>("recientes");
   const [administrando, setAdministrando] = useState<string | null>(null);
   const [entrando, setEntrando] = useState<string | null>(null);
+  const [vista, setVista] = useState<"comercios" | "metricas">("comercios");
 
   const load = useCallback(async () => {
     try {
@@ -197,6 +199,20 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-full border border-border/70 bg-card/60 p-0.5" role="tablist" aria-label="Vista">
+              <button
+                type="button" role="tab" aria-selected={vista === "comercios"} onClick={() => setVista("comercios")}
+                className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors", vista === "comercios" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Building2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Comercios</span>
+              </button>
+              <button
+                type="button" role="tab" aria-selected={vista === "metricas"} onClick={() => setVista("metricas")}
+                className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors", vista === "metricas" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+              >
+                <BarChart3 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Métricas</span>
+              </button>
+            </div>
             <Button variant="ghost" size="sm" className="rounded-xl" onClick={refrescar} disabled={refrescando || loading} title="Actualizar">
               <RefreshCw className={cn("h-4 w-4", refrescando && "animate-spin")} />
             </Button>
@@ -214,7 +230,7 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
+      <div className={cn("mx-auto max-w-6xl space-y-5 p-4 sm:p-6", vista !== "comercios" && "hidden")}>
         {loading ? (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
@@ -310,6 +326,12 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
           )}
         </section>
       </div>
+
+      {vista === "metricas" && (
+        <div className="mx-auto max-w-6xl p-4 sm:p-6">
+          <Metricas />
+        </div>
+      )}
 
       <ComercioDialog
         comercio={seleccionado}

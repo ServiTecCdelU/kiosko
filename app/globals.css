@@ -44,6 +44,12 @@
   --money: oklch(0.74 0.19 152);
   --money-foreground: oklch(0.22 0.05 160);
 
+  /* Series de graficos (dashboard del superadmin): orden fijo, validadas para daltonismo */
+  --viz-1: oklch(0.62 0.14 225);
+  --viz-2: oklch(0.74 0.19 152);
+  --viz-3: oklch(0.55 0.10 250);
+  --viz-4: oklch(0.75 0.15 85);
+
   /* ── Identidad de marca "Mostrador" (gradientes + sombras tonalizadas) ── */
   --brand-1: oklch(0.64 0.16 222);
   --brand-2: oklch(0.44 0.13 236);
@@ -95,6 +101,11 @@
   --warning-foreground: oklch(0.12 0.02 240);
   --money: oklch(0.80 0.19 152);
   --money-foreground: oklch(0.14 0.04 160);
+
+  --viz-1: oklch(0.64 0.13 225);
+  --viz-2: oklch(0.64 0.16 152);
+  --viz-3: oklch(0.58 0.11 250);
+  --viz-4: oklch(0.66 0.14 85);
 
   --brand-1: oklch(0.70 0.14 220);
   --brand-2: oklch(0.50 0.13 234);
