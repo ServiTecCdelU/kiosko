@@ -9,7 +9,9 @@ import { IMAGEN_OG, OG_BASE, conBase, siteOrigin } from "@/lib/site";
 import { DESCRIPCION_SEO, MARCA, NOMBRE_APP, PALABRAS_CLAVE, TITULO_SEO } from "@/lib/marketing/seo";
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+// Sin preload: la mono solo va en etiquetas chicas; preloadarla la ponia en la ruta
+// critica de la carga junto con el CSS y las otras dos fuentes (PageSpeed movil).
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", preload: false });
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600", "700"],

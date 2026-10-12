@@ -32,7 +32,8 @@ export function SiteHeader() {
         <div className="flex items-center gap-4">
           <Link
             href={ROUTES.login}
-            className="inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_6px_24px_-8px_rgba(59,139,255,0.7)] transition hover:bg-[#5a9dff]"
+            prefetch={false}
+            className="inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-[0_6px_24px_-8px_rgba(59,139,255,0.7)] transition hover:bg-blue-500"
           >
             Ingresar
           </Link>

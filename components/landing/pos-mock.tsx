@@ -15,10 +15,10 @@ import {
 } from 'lucide-react'
 
 const KPIS = [
-  { icon: TrendingUp, label: 'Ventas de hoy', value: '$ 284.650', note: '112 ventas', tone: 'text-emerald-500' },
+  { icon: TrendingUp, label: 'Ventas de hoy', value: '$ 284.650', note: '112 ventas', tone: 'text-emerald-600' },
   { icon: Wallet, label: 'Cajas abiertas', value: '2', note: 'Caja 1 · Caja 2', tone: 'text-slate-900', dot: true },
-  { icon: TriangleAlert, label: 'Stock bajo', value: '6', note: 'reponer esta semana', tone: 'text-amber-500' },
-  { icon: CalendarClock, label: 'Vencen esta semana', value: '3', note: 'lácteos y fiambres', tone: 'text-rose-500' },
+  { icon: TriangleAlert, label: 'Stock bajo', value: '6', note: 'reponer esta semana', tone: 'text-amber-700' },
+  { icon: CalendarClock, label: 'Vencen esta semana', value: '3', note: 'lácteos y fiambres', tone: 'text-rose-600' },
 ]
 
 const MODULES = [

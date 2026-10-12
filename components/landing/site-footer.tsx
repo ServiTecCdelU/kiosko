@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { CONTACT, LEGAL } from '@/lib/marketing/contact'
 import { Brand } from './shared'
 import { WhatsAppLink } from '@/components/analytics/whatsapp-link'
@@ -16,7 +17,7 @@ export function SiteFooter() {
             </p>
           </div>
           <div>
-            <h4 className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Producto</h4>
+            <h3 className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Producto</h3>
             <ul className="flex flex-col gap-2.5">
               <li><a className={linkCls} href="#rubros">Rubros</a></li>
               <li><a className={linkCls} href="#plataforma">Plataforma</a></li>
@@ -26,7 +27,7 @@ export function SiteFooter() {
             </ul>
           </div>
           <div>
-            <h4 className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Contacto</h4>
+            <h3 className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Contacto</h3>
             <ul className="flex flex-col gap-2.5">
               <li><a className={linkCls} href={`mailto:${CONTACT.email}`}>Escribinos por email</a></li>
               <li>
@@ -34,8 +35,9 @@ export function SiteFooter() {
                   Hablar por WhatsApp
                 </WhatsAppLink>
               </li>
-              <li><a className={linkCls} href="/terms">Términos y Condiciones</a></li>
-              <li><a className={linkCls} href="/privacy">Política de Privacidad</a></li>
+              {/* Link (no <a>): en produccion agrega el basePath /comercio */}
+              <li><Link className={linkCls} href="/terms" prefetch={false}>Términos y Condiciones</Link></li>
+              <li><Link className={linkCls} href="/privacy" prefetch={false}>Política de Privacidad</Link></li>
             </ul>
           </div>
         </div>
@@ -43,7 +45,7 @@ export function SiteFooter() {
           <span>© 2026 {LEGAL.ownerDisplayName} · {LEGAL.jurisdiction}</span>
           <span>
             Desarrollado por{' '}
-            <a href={CONTACT.servitecUrl} target="_blank" rel="noopener noreferrer" className="text-sky-300 hover:text-white">
+            <a href={CONTACT.servitecUrl} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline underline-offset-2 hover:text-white">
               {LEGAL.developerName}
             </a>
           </span>

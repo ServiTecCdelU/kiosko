@@ -111,6 +111,7 @@ export function CtaFinal() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href={ROUTES.signup}
+              prefetch={false}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-7 py-3.5 font-semibold text-blue-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50"
             >
               Crear mi comercio gratis

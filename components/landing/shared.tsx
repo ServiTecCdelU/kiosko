@@ -63,8 +63,10 @@ export function SectionHead({
   )
 }
 
+// Boton solido: azul 600 (#2563eb) y no --primary (#3b8bff): el texto blanco sobre
+// #3b8bff da 3,3:1 y PageSpeed/axe exigen 4,5:1 para texto normal.
 export const btnPrimary =
-  'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 font-semibold text-primary-foreground shadow-[0_8px_32px_-8px_rgba(59,139,255,0.65)] transition hover:-translate-y-0.5 hover:bg-[#5a9dff] hover:shadow-[0_14px_40px_-8px_rgba(59,139,255,0.75)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary/40'
+  'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-7 py-3.5 font-semibold text-white shadow-[0_8px_32px_-8px_rgba(59,139,255,0.65)] transition hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-[0_14px_40px_-8px_rgba(59,139,255,0.75)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary/40'
 
 export const btnGhost =
   'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-7 py-3.5 font-semibold text-slate-200 transition hover:border-accent/50 hover:bg-accent/5 hover:text-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent/40'

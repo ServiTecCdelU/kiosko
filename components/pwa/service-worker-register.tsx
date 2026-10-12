@@ -10,9 +10,15 @@ export function ServiceWorkerRegister() {
     // su alcance tiene que ser /comercio/ (registrar "/sw.js" daba 404 y la app
     // nunca funcionaba sin internet).
     const base = apiUrl("/");
-    navigator.serviceWorker.register(apiUrl("/sw.js"), { scope: base }).catch(() => {
-      // navegador sin soporte o registro bloqueado: la app sigue funcionando online igual
-    });
+    // Despues de load: que el registro del SW no compita con la carga de la pagina.
+    const registrar = () => {
+      navigator.serviceWorker.register(apiUrl("/sw.js"), { scope: base }).catch(() => {
+        // navegador sin soporte o registro bloqueado: la app sigue funcionando online igual
+      });
+    };
+    if (document.readyState === "complete") registrar();
+    else window.addEventListener("load", registrar, { once: true });
+    return () => window.removeEventListener("load", registrar);
   }, []);
 
   return null;

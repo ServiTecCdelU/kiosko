@@ -43,7 +43,7 @@ export function Hero() {
         </p>
 
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href={ROUTES.signup} className={btnPrimary}>
+          <Link href={ROUTES.signup} prefetch={false} className={btnPrimary}>
             Probar gratis {TRIAL_DAYS} días
             <ArrowRight className="h-4 w-4" />
           </Link>
@@ -59,7 +59,7 @@ export function Hero() {
         <div className="relative mx-auto mt-16 max-w-5xl">
           <div
             aria-hidden="true"
-            className="absolute -inset-x-10 -top-10 bottom-0 rounded-[3rem] bg-primary/20 blur-3xl"
+            className="absolute -inset-x-16 -top-16 -bottom-8 bg-[radial-gradient(ellipse_at_center,rgba(59,139,255,0.32),transparent_68%)]"
           />
           <div className="relative">
             <PosMock />
