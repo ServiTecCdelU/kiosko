@@ -8,7 +8,11 @@ import { GoogleTag } from "@/components/analytics/google-tag";
 import { IMAGEN_OG, OG_BASE, conBase, siteOrigin } from "@/lib/site";
 import { DESCRIPCION_SEO, MARCA, NOMBRE_APP, PALABRAS_CLAVE, TITULO_SEO } from "@/lib/marketing/seo";
 
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+// display "optional" en las dos fuentes que usa el hero: si la fuente no llego antes
+// del primer render se queda la de respaldo (con metricas ajustadas por next/font,
+// sin salto). Con "swap" Chrome repintaba el h1 al llegar la fuente y el LCP movil
+// se iba a 5 s (PageSpeed). En visitas siguientes la fuente ya esta en cache.
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "optional" });
 // Sin preload: la mono solo va en etiquetas chicas; preloadarla la ponia en la ruta
 // critica de la carga junto con el CSS y las otras dos fuentes (PageSpeed movil).
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", preload: false });
@@ -16,6 +20,7 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-space-grotesk",
+  display: "optional",
 });
 
 // Titulo y descripcion pensados para la busqueda (lib/marketing/seo.ts). Las
