@@ -1,6 +1,8 @@
 import Link from 'next/link'
-import { Store } from 'lucide-react'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
+// Import estático: Next le agrega el basePath (/comercio) a la URL del logo.
+import logoServitec from '@/public/servitec-logo.png'
 
 export function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -18,12 +20,8 @@ export function WhatsAppIcon({ className }: { className?: string }) {
 export function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight text-white">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-primary text-white shadow-[0_6px_20px_-6px_rgba(59,139,255,0.7)]">
-        <Store className="size-4" strokeWidth={2.2} aria-hidden="true" />
-      </span>
-      <span className="text-[1.05rem]">
-        Comercio<span className="text-accent">Platform</span>
-      </span>
+      <Image src={logoServitec} alt="" aria-hidden="true" width={32} height={32} className="size-8 rounded-lg" />
+      <span className="text-[1.05rem]">ServiTec</span>
     </Link>
   )
 }

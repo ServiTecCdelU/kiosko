@@ -9,14 +9,16 @@
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
-import { Store, Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX } from "lucide-react";
+import { Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { login, loginDemo } from "@/services/auth-service";
 import { getEstaPc, type EstaPc } from "@/services/dispositivo-service";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
 import { DEMO_PIN } from "@/lib/demo";
+import logoServitec from "@/public/servitec-logo.png";
 import { LARGO_PIN, LARGO_PIN_VIEJO } from "@/lib/pin";
 import { panelHref } from "@/lib/panel";
 import type { Usuario } from "@/lib/types";
@@ -129,10 +131,8 @@ function LoginContent() {
   return (
     <main className="bg-mesh flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/30 p-6">
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="grad-brand shadow-brand flex h-16 w-16 items-center justify-center rounded-3xl text-white">
-          <Store className="h-8 w-8" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">Comercio Platform</h1>
+        <Image src={logoServitec} alt="" aria-hidden="true" width={64} height={64} priority className="h-16 w-16 rounded-3xl" />
+        <h1 className="text-2xl font-bold tracking-tight">ServiTec</h1>
         <p className="text-sm text-muted-foreground">
           {modo === "inicio" ? "Punto de venta para tu comercio" : modo === "demo" ? "Acceso a la demo" : "Ingresá tu PIN de empleado"}
         </p>

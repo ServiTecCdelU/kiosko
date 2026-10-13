@@ -1,4 +1,4 @@
-export const PRODUCT_NAME = 'Comercio Platform'
+export const PRODUCT_NAME = 'ServiTec'
 
 export const CONTACT = {
   email: 'informaticabalbin@gmail.com',
