@@ -40,14 +40,15 @@ export const metadata: Metadata = {
     icon: [{ url: conBase("/icons/favicon-32.png"), sizes: "32x32", type: "image/png" }],
     apple: [{ url: conBase("/icons/icon-192.png"), sizes: "192x192", type: "image/png" }],
   },
-  alternates: { canonical: conBase("/") || "/" },
+  // Sin barra final: /comercio/ redirige (308) a /comercio y el canonical no puede apuntar a un redirect.
+  alternates: { canonical: conBase("") || "/" },
   // Search Console: verificacion por etiqueta (si se verifica el dominio por DNS no hace falta).
   verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
     ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
     : undefined,
   openGraph: {
     ...OG_BASE,
-    url: conBase("/") || "/",
+    url: conBase("") || "/",
     title: `${NOMBRE_APP} - ${MARCA}`,
     description: DESCRIPCION_OG,
   },

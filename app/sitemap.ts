@@ -11,7 +11,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteOrigin();
   const url = (ruta: string) => `${base}${conBase(ruta)}`;
   return [
-    { url: url("/"), changeFrequency: "weekly", priority: 1 },
+    // La landing sin barra final: /comercio/ redirige a /comercio.
+    { url: `${base}${conBase("") || "/"}`, changeFrequency: "weekly", priority: 1 },
     { url: url("/registro"), changeFrequency: "monthly", priority: 0.8 },
     { url: url("/terms"), changeFrequency: "yearly", priority: 0.2 },
     { url: url("/privacy"), changeFrequency: "yearly", priority: 0.2 },
