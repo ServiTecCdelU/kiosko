@@ -131,7 +131,10 @@ function LoginContent() {
   return (
     <main className="bg-mesh flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/30 p-6">
       <div className="flex flex-col items-center gap-3 text-center">
-        <Image src={logoServitec} alt="" aria-hidden="true" width={64} height={64} priority className="h-16 w-16 rounded-3xl" />
+        {/* El logo es blanco: va sobre el fondo de marca para verse en el tema claro. */}
+        <div className="grad-brand shadow-brand flex h-16 w-16 items-center justify-center rounded-3xl">
+          <Image src={logoServitec} alt="" aria-hidden="true" width={48} height={48} priority className="h-12 w-12" />
+        </div>
         <h1 className="text-2xl font-bold tracking-tight">ServiTec</h1>
         <p className="text-sm text-muted-foreground">
           {modo === "inicio" ? "Punto de venta para tu comercio" : modo === "demo" ? "Acceso a la demo" : "Ingresá tu PIN de empleado"}

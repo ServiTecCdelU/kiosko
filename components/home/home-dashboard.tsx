@@ -8,7 +8,6 @@ import {
   Wallet,
   Package,
   BarChart3,
-  Store,
   ArrowRight,
   TrendingUp,
   AlertTriangle,
@@ -22,7 +21,9 @@ import {
   CircleHelp,
   CircleDollarSign,
 } from "lucide-react";
+import Image from "next/image";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import logoServitec from "@/public/servitec-logo.png";
 import { PrimerosPasosCard } from "@/components/home/primeros-pasos-card";
 import { CuentaCard } from "@/components/home/cuenta-card";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
@@ -215,8 +216,9 @@ function BrandHeader({ nombre }: { nombre?: string }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3.5">
-        <span className="grad-brand shadow-brand flex h-12 w-12 items-center justify-center rounded-2xl text-white">
-          <Store className="h-6 w-6" />
+        {/* El logo es blanco: va sobre el fondo de marca para verse en el tema claro. */}
+        <span className="grad-brand shadow-brand flex h-12 w-12 items-center justify-center rounded-2xl">
+          <Image src={logoServitec} alt="ServiTec" width={36} height={36} className="h-9 w-9" />
         </span>
         <div>
           <h1 className="text-xl font-bold leading-none text-foreground sm:text-2xl">

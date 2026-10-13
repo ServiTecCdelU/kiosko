@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, MessageCircle, Store, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import logoServitec from "@/public/servitec-logo.png";
 import { cn } from "@/lib/utils";
 import { WhatsAppLink } from "@/components/analytics/whatsapp-link";
 import { hrefDe, visibleNavItems } from "@/lib/nav";
@@ -57,9 +59,7 @@ export function AppShell({ title, children }: AppShellProps) {
         )}
       >
         <div className={cn("flex items-center gap-3 px-5 py-5", colapsado && "justify-center px-0")}>
-          <span className="grad-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md shadow-black/30">
-            <Store className="h-5 w-5" />
-          </span>
+          <Image src={logoServitec} alt="ServiTec" width={40} height={40} className="h-10 w-10 shrink-0 rounded-2xl" />
           {!colapsado && <span className="truncate text-base font-bold tracking-tight">{user?.comercioNombre ?? "Mi comercio"}</span>}
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
