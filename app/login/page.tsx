@@ -200,7 +200,7 @@ function LoginContent() {
               <p className="text-sm font-medium">Esta PC no está registrada</p>
               <p className="text-xs text-muted-foreground">
                 Para entrar con PIN, el dueño tiene que registrarla una vez: entra con Google en esta PC y va a
-                <b> Caja → Registrar esta PC</b>.
+                <b> Caja → PCs… → Registrar esta PC</b>.
               </p>
             </div>
           )}
