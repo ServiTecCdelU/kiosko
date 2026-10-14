@@ -167,6 +167,11 @@ export function UsuarioDialog({ usuario, open, onOpenChange, onSave }: UsuarioDi
               {pinInvalido && pinTocado && (
                 <p className="text-xs text-destructive">{errorPinNuevo(pin) ?? "Los dos PIN no coinciden"}</p>
               )}
+              <p className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground [&_b]:text-foreground">
+                <b>¿Cómo entra?</b> Pasale el PIN en persona. Lo usa en la <b>PC de la caja</b>, tocando{" "}
+                <b>“Soy empleado”</b> en la pantalla de ingreso. Esa PC la registrás <b>vos</b>, una sola vez: entrás con
+                Google en ella y vas a <b>Caja → PCs… → Registrar esta PC</b>.
+              </p>
             </>
           )}
 

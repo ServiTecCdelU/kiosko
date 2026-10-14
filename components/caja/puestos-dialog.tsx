@@ -3,7 +3,7 @@
 // Administracion de puestos de cobro (solo admin): crear, renombrar, activar.
 import { useState } from "react";
 import { toast } from "sonner";
-import { Lock, Monitor, Plus } from "lucide-react";
+import { Laptop, Lock, Monitor, Plus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,9 +21,11 @@ interface PuestosDialogProps {
   puestos: PuestoConEstado[];
   /** Recargar la pantalla de caja despues de un cambio. */
   onChanged: () => void;
+  /** Paso siguiente al crear una caja: registrar la PC donde se cobra. */
+  onAbrirPcs?: () => void;
 }
 
-export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: PuestosDialogProps) {
+export function PuestosDialog({ open, onOpenChange, puestos, onChanged, onAbrirPcs }: PuestosDialogProps) {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [working, setWorking] = useState(false);
   const [modalPro, setModalPro] = useState(false);
@@ -43,7 +45,9 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
     setWorking(true);
     try {
       await crearPuesto(nombre);
-      toast.success(`Puesto "${nombre}" creado`);
+      toast.success(`Puesto "${nombre}" creado`, {
+        description: "Ahora registrá la PC donde se cobra en esa caja (Caja → PCs…), desde esa misma computadora.",
+      });
       setNuevoNombre("");
       onChanged();
     } catch (e) {
@@ -99,6 +103,11 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
             <Monitor className="h-4 w-4 text-primary" /> Puestos de cobro
           </DialogTitle>
         </DialogHeader>
+
+        <p className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground [&_b]:text-foreground">
+          Cada puesto es una <b>caja</b> donde se cobra (ej. “Caja 1”), con su propio arqueo. Después de crearla,
+          registrá <b>la computadora de esa caja</b> en <b>PCs…</b>: ahí entran tus empleados con su PIN.
+        </p>
 
         <div className="space-y-2">
           {puestos.map((p) => (
@@ -158,6 +167,11 @@ export function PuestosDialog({ open, onOpenChange, puestos, onChanged }: Puesto
             <span className="inline-flex items-center gap-1 font-medium text-primary"><Lock className="h-3 w-3" /> Plan Básico: una caja.</span>{" "}
             Para sumar cajas, pasá al plan Pro desde Suscripción.
           </p>
+        )}
+        {onAbrirPcs && (
+          <Button variant="outline" className="w-full rounded-xl" onClick={onAbrirPcs}>
+            <Laptop className="mr-2 h-4 w-4" /> Siguiente paso: registrar la PC de una caja
+          </Button>
         )}
         <ModalPlanPro funcion={modalPro ? "cajas" : null} onOpenChange={setModalPro} />
       </DialogContent>

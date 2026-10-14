@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import Link from "next/link";
-import { KeyRound, Laptop, MonitorX, UserCog, UserPlus } from "lucide-react";
+import { UserCog, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,7 @@ import {
   getUsuarios, crearUsuario, actualizarUsuario,
 } from "@/services/usuarios-service";
 import { UsuarioDialog, type UsuarioDialogInput } from "@/components/usuarios/usuario-dialog";
-import { listarPcs, type PcRegistrada } from "@/services/dispositivo-service";
+import { GuiaAccesoEmpleados } from "@/components/usuarios/guia-acceso-empleados";
 import { LARGO_PIN } from "@/lib/pin";
 import type { Usuario } from "@/lib/types";
 
@@ -25,8 +24,8 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Usuario | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  // PCs donde los empleados pueden entrar con PIN (null = cargando o sin datos).
-  const [pcs, setPcs] = useState<PcRegistrada[] | null>(null);
+  // Sube con cada alta/edicion: la guia vuelve a tildar sus pasos.
+  const [version, setVersion] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,7 +40,6 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     load();
-    listarPcs().then(setPcs).catch(() => setPcs(null));
   }, [load]);
 
   const openNuevo = () => {
@@ -70,9 +68,11 @@ export default function UsuariosPage() {
         toast.success("Empleado creado", {
           description: input.rol === "admin"
             ? "Entra con su cuenta de Google."
-            : `Entra en una PC registrada: "Soy empleado" y su PIN de ${LARGO_PIN} números.`,
+            : `Pasale su PIN de ${LARGO_PIN} números. Entra en la PC de la caja tocando "Soy empleado"; esa PC la registrás vos una vez (Caja → PCs…). Mirá los pasos arriba.`,
+          duration: 10000,
         });
       }
+      setVersion((v) => v + 1);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar el empleado");
@@ -88,7 +88,7 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
-      <ComoEntra pcs={pcs} />
+      <GuiaAccesoEmpleados version={version} />
 
       <div className="card-premium rounded-2xl">
         {loading ? (
@@ -142,46 +142,5 @@ export default function UsuariosPage() {
 
       <UsuarioDialog usuario={selected} open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSave} />
     </AppShell>
-  );
-}
-
-/** Guia para el dueño: como entra un cajero/encargado a su cuenta. */
-function ComoEntra({ pcs }: { pcs: PcRegistrada[] | null }) {
-  const sinPcs = pcs !== null && pcs.length === 0;
-  return (
-    <div className="card-premium mb-4 rounded-2xl p-4">
-      <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <KeyRound className="h-4 w-4 text-primary" /> ¿Cómo entra un cajero o encargado?
-      </p>
-      <ol className="space-y-2 text-sm text-muted-foreground">
-        <li>
-          <b className="text-foreground">1. Creá el empleado</b> acá con un PIN de {LARGO_PIN} números y pasáselo en
-          persona. Cada empleado tiene su propio PIN: las ventas y la caja quedan a su nombre.
-        </li>
-        <li>
-          <b className="text-foreground">2. Registrá la PC de la caja (una sola vez).</b> En esa computadora entrá vos
-          con Google y andá a <b className="text-foreground">Caja → PCs… → Registrar esta PC</b>. El PIN solo funciona
-          en PCs registradas: así nadie puede entrar desde otro lugar.
-        </li>
-        <li>
-          <b className="text-foreground">3. Cerrá tu sesión.</b> En esa PC el empleado toca{" "}
-          <b className="text-foreground">Soy empleado</b>, pone su PIN y entra directo al Punto de Venta de esa caja.
-        </li>
-      </ol>
-      {pcs !== null && (
-        <div className={cn(
-          "mt-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs",
-          sinPcs ? "border-warning/40 bg-warning/10" : "bg-muted/40",
-        )}>
-          {sinPcs ? <MonitorX className="h-4 w-4 text-warning" /> : <Laptop className="h-4 w-4 text-primary" />}
-          <span className="flex-1">
-            {sinPcs
-              ? "Todavía no registraste ninguna PC: los empleados no van a poder entrar."
-              : `PCs registradas: ${pcs.map((p) => `${p.nombre} (${p.puestoNombre})`).join(", ")}`}
-          </span>
-          <Link href="/caja" className="font-medium text-primary hover:underline">Ir a Caja</Link>
-        </div>
-      )}
-    </div>
   );
 }

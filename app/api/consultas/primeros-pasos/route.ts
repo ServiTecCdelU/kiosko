@@ -27,11 +27,14 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (error) throw new Error(error.message);
 
-    const [productos, venta, cajeros] = await Promise.all([
+    // Un cajero sin PC registrada no puede entrar: el paso se tilda con las dos cosas.
+    const [productos, venta, empleados, pcs] = await Promise.all([
       hay("productos", comercioId),
       hay("ventas", comercioId),
       hay("usuarios", comercioId, (q) => q.neq("rol", "admin").eq("activo", true)),
+      hay("dispositivos", comercioId, (q) => q.eq("activo", true)),
     ]);
+    const cajeros = empleados && pcs;
 
     return NextResponse.json({
       mostrar: comercio?.config?.origen === "autoregistro",

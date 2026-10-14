@@ -199,8 +199,8 @@ function LoginContent() {
               <MonitorX className="mx-auto h-6 w-6 text-warning" />
               <p className="text-sm font-medium">Esta PC no está registrada</p>
               <p className="text-xs text-muted-foreground">
-                Para entrar con PIN, el dueño tiene que registrarla una vez: entra con Google en esta PC y va a
-                <b> Caja → PCs… → Registrar esta PC</b>.
+                El PIN solo funciona en la PC de la caja. Pedile al <b>dueño</b> que la registre una vez: entra con
+                Google en <b>esta</b> PC, va a <b>Caja → PCs… → Registrar esta PC</b> y cierra su sesión.
               </p>
             </div>
           )}

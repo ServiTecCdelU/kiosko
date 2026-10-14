@@ -28,6 +28,7 @@ import {
 import { consolidarDia, type CajaDelDia } from "@/lib/consolidado";
 import { PuestosDialog } from "@/components/caja/puestos-dialog";
 import { PcsDialog } from "@/components/caja/pcs-dialog";
+import { GuiaAccesoEmpleados } from "@/components/usuarios/guia-acceso-empleados";
 import { getVentasDeCaja, anularVenta } from "@/services/sales-service";
 import { MovimientoDialog } from "@/components/caja/movimiento-dialog";
 import { AnularVentaDialog } from "@/components/caja/anular-venta-dialog";
@@ -69,6 +70,8 @@ export default function CajaPage() {
   const [cajasDelDia, setCajasDelDia] = useState<CajaDelDia[]>([]);
   const [puestosOpen, setPuestosOpen] = useState(false);
   const [pcsOpen, setPcsOpen] = useState(false);
+  // Sube al cambiar cajas o PCs: la guia de acceso de empleados se vuelve a tildar.
+  const [versionGuia, setVersionGuia] = useState(0);
   const [mostrarApertura, setMostrarApertura] = useState(false);
   // Esta PC imprime por USB o agente: puede abrir el cajon sin vender (lo configura el POS).
   const [puedeAbrirCajon, setPuedeAbrirCajon] = useState(false);
@@ -291,6 +294,9 @@ export default function CajaPage() {
           <div className="mb-4">
             <CobrosSinResolver />
           </div>
+
+          {/* Dueño: que le falta para que sus empleados entren con PIN (se oculta al completarse). */}
+          {esAdmin && <GuiaAccesoEmpleados version={versionGuia} ocultarSiCompleta />}
 
           {/* Encargado/admin: una pastilla por caja abierta para cambiar de cajon */}
           {!loading && puedeGestionar && (cajasAbiertas.length > 0 || esAdmin) && (
@@ -669,8 +675,12 @@ export default function CajaPage() {
       )}
 
       <MovimientoDialog tipo={movTipo} onOpenChange={(o) => !o && setMovTipo(null)} onSubmit={handleMovimiento} />
-      <PuestosDialog open={puestosOpen} onOpenChange={setPuestosOpen} puestos={puestos} onChanged={load} />
-      <PcsDialog open={pcsOpen} onOpenChange={setPcsOpen} puestos={puestos} />
+      <PuestosDialog
+        open={puestosOpen} onOpenChange={setPuestosOpen} puestos={puestos}
+        onChanged={() => { load(); setVersionGuia((v) => v + 1); }}
+        onAbrirPcs={() => { setPuestosOpen(false); setPcsOpen(true); }}
+      />
+      <PcsDialog open={pcsOpen} onOpenChange={setPcsOpen} puestos={puestos} onChanged={() => setVersionGuia((v) => v + 1)} />
       <SaleDetailDialog
         venta={ventaDetalle}
         onOpenChange={(o) => !o && setVentaDetalle(null)}
