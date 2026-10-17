@@ -14,6 +14,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { AvisoPagoBanner } from "@/components/layout/aviso-pago-banner";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { AvisoSoporte } from "@/components/layout/aviso-soporte";
+import { AvisoDemo } from "@/components/layout/aviso-demo";
 
 interface AppShellProps {
   title?: string;
@@ -171,6 +172,7 @@ export function AppShell({ title, children }: AppShellProps) {
 
       <main className="bg-mesh flex-1 overflow-y-auto bg-muted/20">
         <AvisoSoporte />
+        <AvisoDemo />
         <AvisoAccesoBanner rol={rol} />
         <AvisoPagoBanner rol={rol} />
         {title && (

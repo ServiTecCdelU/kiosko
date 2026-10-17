@@ -116,6 +116,13 @@ export function CtaFinal() {
             >
               Crear mi comercio gratis
             </Link>
+            <Link
+              href={ROUTES.demo}
+              prefetch={false}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/40 px-7 py-3.5 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
+            >
+              Mirá el sistema ya
+            </Link>
             <WhatsAppLink
               ubicacion="cierre"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/40 px-7 py-3.5 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"

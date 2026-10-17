@@ -18,4 +18,6 @@ export const LEGAL = {
 export const ROUTES = {
   login: '/login',
   signup: '/registro',
+  /** Entrada directa a la demo: pide nombre y WhatsApp (components/demo/entrar-demo-form.tsx). */
+  demo: '/login?demo=landing',
 } as const

@@ -1,7 +1,8 @@
 "use client";
 
 // app/login/page.tsx — tres formas de entrar:
-//   · "Acceso a demo": teclado numerico con el PIN publico de la demo a la vista.
+//   · "Acceso a demo": pide nombre y WhatsApp y entra directo a la demo
+//     (components/demo/entrar-demo-form.tsx). /login?demo=landing la abre de una.
 //   · "Entrar con Google": dueños (admin) de cada comercio.
 //   · "Soy empleado": PIN de 6 numeros, SOLO en una PC registrada por el dueño
 //     (la PC sabe su comercio y su caja: "Super Patricia · Caja 1"). El PIN
@@ -13,11 +14,11 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { login, loginDemo } from "@/services/auth-service";
+import { login } from "@/services/auth-service";
 import { getEstaPc, type EstaPc } from "@/services/dispositivo-service";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
-import { DEMO_PIN } from "@/lib/demo";
+import { EntrarDemoForm } from "@/components/demo/entrar-demo-form";
 import logoServitec from "@/public/servitec-logo.png";
 import { LARGO_PIN, LARGO_PIN_VIEJO } from "@/lib/pin";
 import { panelHref } from "@/lib/panel";
@@ -38,14 +39,16 @@ export default function LoginPage() {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [modo, setModo] = useState<Modo>("inicio");
+  // /login?demo=landing (boton "Mirá el sistema ya" de la landing) abre la demo de una.
+  const origenDemo = searchParams.get("demo") === "landing" ? "landing" : "login";
+  const [modo, setModo] = useState<Modo>(searchParams.get("demo") ? "demo" : "inicio");
   const [pin, setPin] = useState("");
   const [working, setWorking] = useState(false);
   const [entrandoGoogle, setEntrandoGoogle] = useState(false);
   // undefined = consultando; la PC tiene que estar registrada para entrar con PIN.
   const [pc, setPc] = useState<EstaPc | undefined>(undefined);
 
-  const largo = modo === "demo" ? DEMO_PIN.length : LARGO_PIN;
+  const largo = LARGO_PIN;
 
   useEffect(() => {
     if (searchParams.get("error") === "no_autorizado") {
@@ -71,13 +74,13 @@ function LoginContent() {
     async (value: string) => {
       setWorking(true);
       try {
-        const user: Usuario = modo === "demo" ? await loginDemo(value) : await login(value);
+        const user: Usuario = await login(value);
         if (user.debeCambiarPin) {
           toast.info("Ahora el PIN es de 6 números: elegí el tuyo.");
           router.replace("/cambiar-pin");
           return;
         }
-        toast.success(modo === "demo" ? "¡Bienvenido a la demo!" : `Hola, ${user.nombre}`);
+        toast.success(`Hola, ${user.nombre}`);
         router.replace(user.rol === "admin" ? panelHref(user.comercioSlug) : "/pos");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "PIN incorrecto");
@@ -86,7 +89,7 @@ function LoginContent() {
         setWorking(false);
       }
     },
-    [router, modo],
+    [router],
   );
 
   const press = useCallback(
@@ -117,7 +120,8 @@ function LoginContent() {
 
   // Con teclado fisico tambien: numeros, borrar, Enter (PIN viejo de 4) y Escape.
   useEffect(() => {
-    if (modo === "inicio" || !pcLista) return;
+    // Solo el teclado del PIN: en la demo los numeros van al campo de WhatsApp.
+    if (modo !== "pin" || !pcLista) return;
     const onKey = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") press("del");
@@ -156,7 +160,7 @@ function LoginContent() {
             <PlayCircle className="h-6 w-6 shrink-0" />
             <span>
               <span className="block text-sm font-semibold">Acceso a demo</span>
-              <span className="block text-xs text-white/80">Probá el sistema con datos de ejemplo</span>
+              <span className="block text-xs text-white/80">Mirá el sistema ya, con datos de ejemplo</span>
             </span>
           </button>
 
@@ -184,13 +188,8 @@ function LoginContent() {
           </button>
         </div>
       ) : (
-        <div className="flex w-full max-w-[260px] animate-in fade-in flex-col items-center gap-6 duration-300">
-          {modo === "demo" && (
-            <div className="w-full rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-center">
-              <p className="text-xs text-muted-foreground">La contraseña de la demo es</p>
-              <p className="cifra text-3xl font-bold tracking-[0.3em] text-primary">{DEMO_PIN}</p>
-            </div>
-          )}
+        <div className={cn("flex w-full animate-in fade-in flex-col items-center gap-6 duration-300", modo === "demo" ? "max-w-sm" : "max-w-[260px]")}>
+          {modo === "demo" && <EntrarDemoForm origen={origenDemo} />}
 
           {modo === "pin" && pc === undefined && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
 
@@ -205,7 +204,7 @@ function LoginContent() {
             </div>
           )}
 
-          {pcLista && (modo === "demo" || pc !== undefined) && (
+          {modo === "pin" && pcLista && pc !== undefined && (
             <>
               {modo === "pin" && pc?.registrada && (
                 <p className="text-center text-sm">

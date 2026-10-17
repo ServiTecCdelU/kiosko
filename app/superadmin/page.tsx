@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowDownAZ, BarChart3, Building2, CircleDollarSign, LogOut, Loader2, Chrome, Plus, RefreshCw, Search, SearchX, ShieldCheck,
+  ArrowDownAZ, BarChart3, Building2, CircleDollarSign, LogOut, Loader2, Chrome, PlayCircle, Plus, RefreshCw, Search, SearchX, ShieldCheck,
 } from "lucide-react";
 import { PlanesDialog } from "@/components/superadmin/planes-dialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { ComercioDialog } from "@/components/superadmin/comercio-dialog";
 import { NuevoComercioDialog } from "@/components/superadmin/nuevo-comercio-dialog";
 import { Resumen, resumenDe, type FiltroRapido } from "@/components/superadmin/resumen";
 import { Metricas } from "@/components/superadmin/metricas";
+import { DemoVisitas } from "@/components/superadmin/demo-visitas";
 import {
   ESTADO_LABEL, ESTADO_PUNTO, ESTADOS, PLAN_LABEL, esNuevo, necesitaAtencion, pagoAlDia, preciosDe, superadminApi,
   type Comercio, type GrupoSaas, type PlanSaas, type PreciosPlan,
@@ -106,7 +107,7 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
   const [orden, setOrden] = useState<Orden>("recientes");
   const [administrando, setAdministrando] = useState<string | null>(null);
   const [entrando, setEntrando] = useState<string | null>(null);
-  const [vista, setVista] = useState<"comercios" | "metricas">("comercios");
+  const [vista, setVista] = useState<"comercios" | "metricas" | "demo">("comercios");
 
   const load = useCallback(async () => {
     try {
@@ -211,6 +212,12 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
                 className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors", vista === "metricas" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
               >
                 <BarChart3 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Métricas</span>
+              </button>
+              <button
+                type="button" role="tab" aria-selected={vista === "demo"} onClick={() => setVista("demo")}
+                className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors", vista === "demo" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+              >
+                <PlayCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Demo</span>
               </button>
             </div>
             <Button variant="ghost" size="sm" className="rounded-xl" onClick={refrescar} disabled={refrescando || loading} title="Actualizar">
@@ -330,6 +337,12 @@ function Panel({ nombre, email, onLogout }: { nombre: string; email: string; onL
       {vista === "metricas" && (
         <div className="mx-auto max-w-6xl p-4 sm:p-6">
           <Metricas />
+        </div>
+      )}
+
+      {vista === "demo" && (
+        <div className="mx-auto max-w-6xl p-4 sm:p-6">
+          <DemoVisitas />
         </div>
       )}
 

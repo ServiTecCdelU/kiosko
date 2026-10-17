@@ -193,6 +193,26 @@ export async function POST(req: Request) {
     });
   }
 
+  // Quien entro a la demo (60_demo_visitas.sql), las ultimas 500. Si despues
+  // creo su comercio con el mismo WhatsApp, va el comercio para verlo al lado.
+  if (accion === "demoVisitas") {
+    const [visitas, comercios] = await Promise.all([
+      supabaseAdmin.from("demo_visitas").select("id, nombre, telefono, origen, created_at").order("created_at", { ascending: false }).limit(500),
+      supabaseAdmin.from("comercios").select("id, nombre, config").not("config->>telefono", "is", null),
+    ]);
+    if (visitas.error) return NextResponse.json({ error: visitas.error.message }, { status: 400 });
+    // Los ultimos 10 digitos: "+54 9 3442..." y "3442..." son el mismo numero.
+    const clave = (t: string) => t.replace(/\D/g, "").slice(-10);
+    const porTelefono = new Map<string, string>();
+    for (const c of (comercios.data ?? []) as any[]) {
+      const t = clave(String(c.config?.telefono ?? ""));
+      if (t.length >= 8) porTelefono.set(t, c.nombre);
+    }
+    return NextResponse.json({
+      visitas: (visitas.data ?? []).map((v: any) => ({ ...v, comercio: porTelefono.get(clave(v.telefono)) ?? null })),
+    });
+  }
+
   // Ficha completa para "Administrar": correos del dueño, cuanto paga por mes
   // (plan + cajas extra - descuento de grupo), debito automatico de Mercado
   // Pago y el historial de pagos.

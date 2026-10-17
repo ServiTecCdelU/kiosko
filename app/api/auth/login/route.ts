@@ -7,11 +7,10 @@
 // - 5 PIN equivocados bloquean ESA PC 15 minutos (guardado en la base: vale en
 //   todos los servidores).
 // - PIN de 6. El viejo de 4 entra una ultima vez y obliga a elegir uno de 6.
-// - El PIN publico de la demo siempre entra a la demo (lib/server/demo.ts).
+// - El PIN publico de la demo no entra por aca: la demo pide nombre y WhatsApp (/api/auth/demo).
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ipDe, limpiarIntentos, registrarFallo, segundosBloqueado } from "@/lib/server/limite-intentos";
-import { loginDemo, respuestaLoginPin, type UsuarioPin } from "@/lib/server/demo";
+import { respuestaLoginPin, type UsuarioPin } from "@/lib/server/demo";
 import { dispositivoDe } from "@/lib/server/dispositivo";
 import { esPinParaEntrar } from "@/lib/pin";
 import { DEMO_PIN } from "@/lib/demo";
@@ -31,15 +30,10 @@ export async function POST(req: Request) {
   const pin = String(body?.pin ?? "").trim();
   if (!pin) return NextResponse.json({ error: "Ingresá el PIN" }, { status: 400 });
 
-  // Demo: PIN publico, sin PC registrada. Limite por IP (en memoria) como antes.
+  // Demo: se entra por "Acceso a demo" (pide nombre y WhatsApp, /api/auth/demo).
+  // Ningun comercio real puede tener este PIN (errorPinReservado).
   if (pin === DEMO_PIN) {
-    const ip = ipDe(req);
-    const espera = segundosBloqueado(ip);
-    if (espera > 0) return NextResponse.json({ error: `Demasiados intentos. Esperá ${espera} segundos.` }, { status: 429 });
-    const demo = await loginDemo(pin);
-    if (!demo.ok) return NextResponse.json({ error: demo.error }, { status: demo.status });
-    limpiarIntentos(ip);
-    return respuestaLoginPin(demo.usuario);
+    return NextResponse.json({ error: "Para ver la demo volvé y tocá «Acceso a demo»." }, { status: 400 });
   }
 
   const pc = await dispositivoDe(req);

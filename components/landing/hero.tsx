@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, PlayCircle } from 'lucide-react'
 import { ROUTES, TRIAL_DAYS } from '@/lib/marketing/contact'
 import { WhatsAppLink } from '@/components/analytics/whatsapp-link'
 import { PosMock } from './pos-mock'
@@ -46,6 +46,10 @@ export function Hero() {
           <Link href={ROUTES.signup} prefetch={false} className={btnPrimary}>
             Probar gratis {TRIAL_DAYS} días
             <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link href={ROUTES.demo} prefetch={false} className={btnGhost}>
+            <PlayCircle className="h-4 w-4" />
+            Mirá el sistema ya
           </Link>
           <WhatsAppLink ubicacion="hero" className={btnGhost}>
             <WhatsAppIcon />

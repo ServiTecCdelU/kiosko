@@ -89,8 +89,14 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   columnas, nunca `*`: el PIN y el token de MP no salen). Lo arma `lib/server/backup.ts`
   paginando de a 1000 filas. Es una lectura (GET), así que anda en modo consulta. No hay
   restauración: para desastres están los backups diarios de Supabase.
-- **Demo pública**: comercio con slug `demo`, PIN `1234` (publicado a propósito
-  en el login, `lib/demo.ts`). Datos de 15 días regenerables con
+- **Demo pública**: comercio con slug `demo` (`lib/demo.ts`). Se entra con
+  "Mirá el sistema ya" (landing, `/login?demo=landing`) o "Acceso a demo" (login):
+  pide **nombre y WhatsApp** y entra directo, sin tipear el PIN (`1234`, interno).
+  Cada entrada queda en `demo_visitas` (migración 60) y se ve en el superadmin,
+  pestaña **Demo**, con botón de WhatsApp y marca "Creó X" si después se registró
+  con el mismo número. Adentro de la demo hay una franja fija con "Crear mi
+  comercio gratis" (`components/layout/aviso-demo.tsx`). El PIN 1234 ya no entra
+  por el teclado de empleados. Datos de 15 días regenerables con
   `supabase/38_demo_datos.sql` (solo toca filas `demo_*`).
 
 ## 3. Arquitectura (lo que hay que saber antes de tocar código)
