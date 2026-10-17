@@ -37,6 +37,14 @@ function readStored(): Usuario | null {
 }
 
 export function setCurrentUser(u: Usuario | null): void {
+  // Cambio de usuario (login, registro, salir de la demo): una validacion que
+  // arranco con el usuario anterior ya no sirve y no puede pisar al nuevo.
+  generacion++;
+  validacion = null;
+  guardarUsuario(u);
+}
+
+function guardarUsuario(u: Usuario | null): void {
   cached = u;
   if (typeof window === "undefined") return;
   if (u) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(u));
@@ -52,15 +60,26 @@ export function getCurrentUser(): Usuario | null {
 
 // Una sola validacion por carga de pagina aunque varios componentes usen el hook.
 let validacion: Promise<void> | null = null;
+// Sube con cada setCurrentUser: la respuesta de una validacion que arranco con
+// otro usuario (ej. la demo antes de registrarse) se descarta.
+let generacion = 0;
 
 function validarSesion(stored: Usuario): Promise<void> {
+  const gen = generacion;
   validacion ??= fetch(apiUrl("/api/auth/session"))
     .then(async (res) => {
+      if (gen !== generacion) return;
       if (res.status === 401) {
-        setCurrentUser(null);
+        guardarUsuario(null);
         return;
       }
-      if (res.ok) setCurrentUser({ ...stored, ...((await res.json()) as Usuario) });
+      if (res.ok) {
+        const datos = (await res.json()) as Usuario;
+        if (gen !== generacion) return;
+        // Si cambio el usuario (otra cuenta en la misma pestaña), no se mezclan
+        // los datos guardados del anterior: manda lo que dice el servidor.
+        guardarUsuario(datos.id === stored.id ? { ...stored, ...datos } : datos);
+      }
     })
     // Sin red (modo offline del POS) se sigue con el usuario guardado.
     .catch(() => {});

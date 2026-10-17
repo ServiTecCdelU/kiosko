@@ -17,6 +17,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { apiUrl } from "@/lib/utils/api-url";
+import { getCurrentUser, setCurrentUser } from "@/hooks/use-auth";
+import { DEMO_SLUG } from "@/lib/demo";
 import { trackRegistroCompletado } from "@/lib/analytics";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { MAX_CAJAS_REGISTRO, PLANES_REGISTRO, RUBROS, validarRegistro } from "@/lib/registro";
@@ -89,6 +91,12 @@ export default function RegistroPage() {
   );
 
   useEffect(() => {
+    // Viene de mirar la demo ("Crear mi comercio gratis"): se cierra esa sesion
+    // para que al terminar el alta no quede guardado el usuario de la demo.
+    if (getCurrentUser()?.comercioSlug === DEMO_SLUG) {
+      setCurrentUser(null);
+      fetch(apiUrl("/api/auth/logout"), { method: "POST" }).catch(() => {});
+    }
     fetch(apiUrl("/api/registro"))
       // Sin registro el servidor responde { registro: false }: todavia no paso por Google.
       .then(async (r) => {
@@ -224,6 +232,8 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el comercio");
       toast.success("¡Listo! Tu comercio está creado", avisoOscuro("exito"));
+      // Fuera cualquier usuario viejo de esta pestaña: /auth/completando carga el nuevo.
+      setCurrentUser(null);
       trackRegistroCompletado({ plan: validado.datos.plan, rubro: validado.datos.rubro });
       router.replace(data.redirectTo);
     } catch (err) {

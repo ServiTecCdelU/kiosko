@@ -122,7 +122,7 @@ function HomeContent() {
         <div className="overflow-hidden rounded-2xl empty:hidden">
           <AvisoAccesoBanner rol={rol} />
         </div>
-        <BrandHeader nombre={user?.nombre} />
+        <BrandHeader comercio={user?.comercioNombre} />
 
         {rol === "admin" && <PrimerosPasosCard />}
 
@@ -192,7 +192,8 @@ function HomeContent() {
   );
 }
 
-function BrandHeader({ nombre }: { nombre?: string }) {
+// Arriba la marca; abajo el saludo con el nombre del comercio ("Buenas noches, Kiosko Kroll").
+function BrandHeader({ comercio }: { comercio?: string }) {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -222,11 +223,11 @@ function BrandHeader({ nombre }: { nombre?: string }) {
         </span>
         <div>
           <h1 className="text-xl font-bold leading-none text-foreground sm:text-2xl">
-            Demo
+            ServiTec-Comercio
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {saludo}
-            {nombre ? `, ${nombre}` : ""}
+            {comercio ? `, ${comercio}` : ""}
           </p>
         </div>
       </div>
