@@ -45,6 +45,21 @@ const CAMPO_SELECT = "rounded-xl data-[size=default]:h-11 sm:data-[size=default]
 // contraste 4,5:1 (mismo criterio que btnPrimary en components/landing/shared.tsx).
 const BOTON = "bg-blue-600 text-white shadow-[0_8px_32px_-8px_rgba(59,139,255,0.65)] hover:bg-blue-500";
 
+/**
+ * Avisos (sonner) con los colores de la landing. El Toaster es uno solo para
+ * toda la app (app/layout.tsx) y en el panel sigue claro: aca se pisa el
+ * estilo de cada aviso, no el del Toaster.
+ */
+function avisoOscuro(tipo: "exito" | "error"): { style: React.CSSProperties } {
+  return {
+    style: {
+      background: "#0b1529",
+      color: tipo === "exito" ? "#bbf7d0" : "#fecaca",
+      border: `1px solid ${tipo === "exito" ? "rgb(74 222 128 / 0.35)" : "rgb(248 113 113 / 0.4)"}`,
+    },
+  };
+}
+
 /** Logo de Google (la "G" de cuatro colores) para el boton de entrar. */
 function LogoGoogle() {
   return (
@@ -120,7 +135,7 @@ function PasoGoogle() {
     try {
       await iniciarLoginGoogle();
     } catch {
-      toast.error("No se pudo iniciar sesión con Google");
+      toast.error("No se pudo iniciar sesión con Google", avisoOscuro("error"));
       setEntrando(false);
     }
   };
@@ -198,7 +213,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "No se pudo crear el comercio");
-      toast.success("¡Listo! Tu comercio está creado");
+      toast.success("¡Listo! Tu comercio está creado", avisoOscuro("exito"));
       trackRegistroCompletado({ plan: validado.datos.plan, rubro: validado.datos.rubro });
       router.replace(data.redirectTo);
     } catch (err) {
