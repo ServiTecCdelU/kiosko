@@ -23,10 +23,14 @@ export const dynamic = "force-dynamic";
 // molestar a nadie real.
 const altasPorIp = crearLimitador(3, 60 * 60 * 1000);
 
-/** Datos de Google para precargar el formulario, y los planes con su precio. */
+/**
+ * Datos de Google para precargar el formulario, y los planes con su precio.
+ * Sin registro responde 200 con `registro: false` (no 401): es el caso normal
+ * del paso 1 y un 401 ensuciaba la consola del navegador como si fuera un error.
+ */
 export async function GET(req: Request) {
   const registro = getRegistro(req);
-  if (!registro) return NextResponse.json({ error: "Sin registro" }, { status: 401 });
+  if (!registro) return NextResponse.json({ registro: false });
   const planes = await listarPlanes().catch(() => []);
   return NextResponse.json({
     email: registro.email,
@@ -83,6 +87,9 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+    // Queda en los logs de Vercel: sin esto no habia forma de saber por que
+    // fallo el alta de alguien (sin correo: el motivo alcanza).
+    console.error("[registro] fallo el alta:", (error as { code?: string }).code ?? "-", error.message);
     // Dos altas simultaneas con el mismo nombre pueden chocar en el slug.
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json({ error: "No se pudo crear el comercio. Probá de nuevo." }, { status: 409 });
@@ -91,7 +98,10 @@ export async function POST(req: Request) {
   }
 
   const creado = (Array.isArray(data) ? data[0] : data) as { nuevo_id: string; nuevo_slug: string } | undefined;
-  if (!creado?.nuevo_id) return NextResponse.json({ error: "No se pudo crear el comercio" }, { status: 500 });
+  if (!creado?.nuevo_id) {
+    console.error("[registro] la RPC no devolvio el comercio creado");
+    return NextResponse.json({ error: "No se pudo crear el comercio" }, { status: 500 });
+  }
 
   // Plan elegido y cajas: la RPC crea "Caja 1" con plan free; aca se completa.
   // La prueba de TRIAL_DAYS corre igual; el plan define que va a pagar despues.

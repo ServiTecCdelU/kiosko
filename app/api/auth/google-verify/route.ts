@@ -86,7 +86,8 @@ export async function POST(req: Request) {
   if (!usuario) {
     const meta = data.user?.user_metadata ?? {};
     const nombre = String(meta.full_name ?? meta.name ?? "").trim().slice(0, 80);
-    const res = NextResponse.json({ redirectTo: "/registro" });
+    // ?paso=datos: la pagina espera la consulta en vez de mostrar el boton de Google.
+    const res = NextResponse.json({ redirectTo: "/registro?paso=datos" });
     res.headers.append("Set-Cookie", crearCookieRegistro({ email, nombre }));
     return res;
   }

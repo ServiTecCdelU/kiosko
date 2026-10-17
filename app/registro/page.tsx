@@ -79,12 +79,22 @@ const BENEFICIOS = [
 ];
 
 export default function RegistroPage() {
-  // undefined = cargando; null = todavia no paso por Google
-  const [google, setGoogle] = useState<DatosGoogle | null | undefined>(undefined);
+  // undefined = cargando; null = todavia no paso por Google.
+  // Arranca mostrando el boton de Google (es lo que ve casi todo el que llega,
+  // y asi sale en el HTML sin esperar a nadie). Solo quien vuelve de Google
+  // (google-verify manda a /registro?paso=datos) espera la consulta con el
+  // circulo de carga, para no ver un instante el boton que ya toco.
+  const [google, setGoogle] = useState<DatosGoogle | null | undefined>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("paso") === "datos" ? undefined : null,
+  );
 
   useEffect(() => {
     fetch(apiUrl("/api/registro"))
-      .then(async (r) => (r.ok ? ((await r.json()) as DatosGoogle) : null))
+      // Sin registro el servidor responde { registro: false }: todavia no paso por Google.
+      .then(async (r) => {
+        const data = r.ok ? ((await r.json()) as Partial<DatosGoogle>) : null;
+        return data?.email ? (data as DatosGoogle) : null;
+      })
       .then(setGoogle)
       .catch(() => setGoogle(null));
   }, []);
