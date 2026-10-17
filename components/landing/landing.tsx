@@ -3,6 +3,7 @@ import { SiteHeader } from "./site-header";
 import { SiteFooter } from "./site-footer";
 import { Hero } from "./hero";
 import { Rubros } from "./rubros";
+import { Diferencias } from "./diferencias";
 import { Flow, Problem } from "./flow-problem";
 import { Benefits, Modules } from "./benefits-modules";
 import { CtaFinal, Faq, Security, Steps } from "./closing-sections";
@@ -16,6 +17,7 @@ export function Landing() {
       <SiteHeader />
       <main>
         <Hero />
+        <Diferencias />
         <Rubros />
         <Flow />
         <Problem />

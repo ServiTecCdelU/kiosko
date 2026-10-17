@@ -9,6 +9,7 @@ export interface PreguntaFrecuente {
 }
 
 export const FAQS: PreguntaFrecuente[] = [
+  { q: "¿En qué se diferencia de otros sistemas de punto de venta?", a: "Además de registrar las ventas, te dice qué hacer: qué ofertar porque vence o está quieto, qué reponer y cuánto pedir, qué carteles de góndola reimprimir porque cambió el precio, y te arma los carteles y la imagen de la oferta para WhatsApp o Instagram. Si se corta internet, sigue cobrando, y la compra al proveedor se carga sola desde su factura." },
   { q: "¿Necesito instalar algo?", a: "No. Es 100% web: funciona desde cualquier computadora, tablet o celular con navegador. Si se corta internet, el punto de venta sigue cobrando y sincroniza cuando vuelve." },
   { q: "¿Funciona con lector de código de barras?", a: "Sí. Cualquier lector USB o Bluetooth funciona: conectás y escaneás directo en el punto de venta. También lee las etiquetas con peso de las balanzas (EAN-13)." },
   { q: "¿Puedo tener varias cajas abiertas?", a: "Sí. Cada caja tiene su apertura, cierre y arqueo, con el detalle de qué cajero la operó, y un consolidado del día con todas las cajas." },

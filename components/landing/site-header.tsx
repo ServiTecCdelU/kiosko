@@ -3,6 +3,7 @@ import { ROUTES } from '@/lib/marketing/contact'
 import { Brand } from './shared'
 
 const NAV = [
+  { href: '#diferencias', label: 'Diferencias' },
   { href: '#rubros', label: 'Rubros' },
   { href: '#plataforma', label: 'Plataforma' },
   { href: '#modulos', label: 'Módulos' },
