@@ -3,6 +3,7 @@ import {
   Lightbulb,
   Megaphone,
   PackagePlus,
+  Smartphone,
   Tag,
   WifiOff,
   type LucideIcon,
@@ -61,8 +62,34 @@ export function Diferencias() {
           id="diferencias-heading"
           kicker="Lo que nos diferencia"
           title="No solo guarda tus ventas: te dice qué hacer."
-          text="La mayoría de los sistemas registran lo que pasó. Este además te avisa qué ofertar, qué reponer y qué cartel cambiar, y sigue cobrando aunque se corte internet."
+          text="La mayoría de los sistemas registran lo que pasó. Este además te avisa qué ofertar, qué reponer y qué cartel cambiar, sigue cobrando aunque se corte internet y lo controlás desde el celular."
         />
+        {/* Destacada, a lo ancho: el dueño entra con Google desde cualquier
+            celular y ve el inicio del panel (ventas de hoy, cajas abiertas y
+            quien atiende, stock bajo) y el stock de cualquier producto. */}
+        <div
+          data-animate
+          className="relative mb-4 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-card to-[#08111f] p-6 md:p-8"
+        >
+          <div aria-hidden="true" className="absolute -right-16 -top-16 size-48 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-primary text-white shadow-[0_8px_24px_-8px_rgba(59,139,255,0.8)]">
+              <Smartphone className="size-6" aria-hidden="true" />
+            </span>
+            <div className="flex-1">
+              <h3 className="mb-2 text-xl font-semibold text-white md:text-2xl">Tu negocio en el celular, aunque no estés en el local</h3>
+              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                Desde tu casa o de viaje, entrás con tu cuenta de Google y ves cuánto se vendió hoy y a qué hora, qué cajas
+                están abiertas y quién atiende, y si te queda stock de un producto. Todo al momento, sin llamar al local.
+              </p>
+            </div>
+            <ul className="flex shrink-0 flex-col gap-2 font-mono text-xs text-sky-200">
+              {['Ventas de hoy · $284.650', 'Caja 1 abierta · atiende Ana', 'Leche 1 L · quedan 4'].map((e) => (
+                <li key={e} className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">{e}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
         <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DIFERENCIAS.map((d) => (
             <div
