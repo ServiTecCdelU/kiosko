@@ -7,7 +7,7 @@ import { WhatsAppIcon, btnGhost, btnPrimary } from './shared'
 
 export function Hero() {
   return (
-    <section aria-labelledby="hero-heading" className="relative overflow-hidden pb-20 pt-16 md:pb-28 md:pt-24">
+    <section aria-labelledby="hero-heading" className="relative overflow-hidden pb-14 pt-10 sm:pb-20 sm:pt-16 md:pb-28 md:pt-24">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[720px] bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,rgba(59,139,255,0.28),transparent_70%)]"
@@ -18,7 +18,7 @@ export function Hero() {
       />
 
       <div className="relative mx-auto max-w-6xl px-5 text-center md:px-7">
-        <div className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 font-mono text-xs text-sky-200">
+        <div className="mb-5 inline-flex items-center gap-2.5 sm:mb-7 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 font-mono text-xs text-sky-200">
           <span className="relative flex size-2" aria-hidden="true">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" />
             <span className="relative inline-flex size-2 rounded-full bg-accent" />
@@ -37,12 +37,12 @@ export function Hero() {
           </span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl">
+        <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:mt-6 sm:text-lg md:text-xl">
           Caja, ventas con escáner, stock, fiado y vencimientos en un solo lugar. Para kioscos,
           supermercados, panaderías, verdulerías y almacenes de barrio.
         </p>
 
-        <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mx-auto mt-7 flex max-w-sm flex-col items-stretch justify-center gap-3 sm:mt-9 sm:max-w-none sm:flex-row sm:items-center">
           <Link href={ROUTES.signup} prefetch={false} className={btnPrimary}>
             Probar gratis {TRIAL_DAYS} días
             <ArrowRight className="h-4 w-4" />
@@ -60,7 +60,7 @@ export function Hero() {
           Sin tarjeta · Sin instalación · Funciona en PC, tablet y celular
         </p>
 
-        <div className="relative mx-auto mt-16 max-w-5xl">
+        <div className="relative mx-auto mt-10 max-w-5xl sm:mt-16">
           <div
             aria-hidden="true"
             className="absolute -inset-x-16 -top-16 -bottom-8 bg-[radial-gradient(ellipse_at_center,rgba(59,139,255,0.32),transparent_68%)]"

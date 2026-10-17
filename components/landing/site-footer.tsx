@@ -19,6 +19,7 @@ export function SiteFooter() {
           <div>
             <h3 className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-slate-400">Producto</h3>
             <ul className="flex flex-col gap-2.5">
+              <li><a className={linkCls} href="#diferencias">Diferencias</a></li>
               <li><a className={linkCls} href="#rubros">Rubros</a></li>
               <li><a className={linkCls} href="#plataforma">Plataforma</a></li>
               <li><a className={linkCls} href="#modulos">Módulos</a></li>

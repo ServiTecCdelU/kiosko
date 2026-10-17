@@ -48,7 +48,7 @@ export function SectionHead({
   className?: string
 }) {
   return (
-    <div data-animate className={cn('mb-12 max-w-2xl', className)}>
+    <div data-animate className={cn('mb-8 max-w-2xl sm:mb-12', className)}>
       <Kicker>{kicker}</Kicker>
       <h2
         id={id}
@@ -56,7 +56,7 @@ export function SectionHead({
       >
         {title}
       </h2>
-      {text ? <p className="text-pretty text-lg text-muted-foreground">{text}</p> : null}
+      {text ? <p className="text-pretty text-base text-muted-foreground sm:text-lg">{text}</p> : null}
     </div>
   )
 }

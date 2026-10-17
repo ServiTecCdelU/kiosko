@@ -26,7 +26,20 @@ export function LandingEffects() {
     }
 
     const nav = document.getElementById('navbar')
-    const onScroll = () => nav?.classList.toggle('scrolled', window.scrollY > 8)
+    // Barra de botones del celular (cta-movil.tsx): despues de la portada y
+    // mientras no se vea el cierre, que ya tiene los mismos botones.
+    const ctaMovil = document.getElementById('cta-movil')
+    const hero = document.querySelector<HTMLElement>('[aria-labelledby="hero-heading"]')
+    const cierre = document.getElementById('cta-final')
+    const onScroll = () => {
+      nav?.classList.toggle('scrolled', window.scrollY > 8)
+      if (!ctaMovil) return
+      const pasoPortada = hero ? hero.getBoundingClientRect().bottom < 120 : window.scrollY > 600
+      const r = cierre?.getBoundingClientRect()
+      const veCierre = !!r && r.top < window.innerHeight && r.bottom > 0
+      ctaMovil.dataset.visible = String(pasoPortada && !veCierre)
+    }
+    onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
 
     return () => {

@@ -53,7 +53,7 @@ const BENEFITS: { icon: LucideIcon; title: string; text: string }[] = [
 
 export function Benefits() {
   return (
-    <section aria-labelledby="beneficios-heading" className="py-20 md:py-28">
+    <section aria-labelledby="beneficios-heading" className="py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-7">
         <SectionHead
           id="beneficios-heading"
@@ -66,13 +66,16 @@ export function Benefits() {
             <div
               key={b.title}
               data-animate
-              className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card to-[#08111f] p-6"
+              className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card to-[#08111f] p-5 sm:p-6"
             >
               <div aria-hidden="true" className="absolute -right-12 -top-12 size-32 rounded-full bg-primary/15 blur-2xl" />
-              <span className="relative mb-5 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-primary text-white shadow-[0_8px_24px_-8px_rgba(59,139,255,0.8)]">
-                <b.icon className="size-5" aria-hidden="true" />
-              </span>
-              <h3 className="relative mb-2 text-lg font-semibold text-white">{b.title}</h3>
+              {/* En el celular el icono va al lado del titulo: la tarjeta queda mas baja. */}
+              <div className="relative mb-2 flex items-center gap-3 sm:block">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-primary text-white shadow-[0_8px_24px_-8px_rgba(59,139,255,0.8)] sm:mb-5 sm:size-12">
+                  <b.icon className="size-5" aria-hidden="true" />
+                </span>
+                <h3 className="text-base font-semibold text-white sm:text-lg">{b.title}</h3>
+              </div>
               <p className="relative text-sm leading-relaxed text-muted-foreground">{b.text}</p>
             </div>
           ))}
@@ -111,7 +114,7 @@ const MODULES: { icon: LucideIcon; title: string; text: string; soon?: boolean; 
 
 export function Modules() {
   return (
-    <section id="modulos" aria-labelledby="modulos-heading" className="bg-[#081021] py-20 md:py-28">
+    <section id="modulos" aria-labelledby="modulos-heading" className="bg-[#081021] py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-7">
         <SectionHead
           id="modulos-heading"
@@ -119,27 +122,28 @@ export function Modules() {
           title="Todo lo que tu comercio necesita"
           text="Sin plugins ni sistemas paralelos: los módulos que se usan de verdad en el mostrador."
         />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* En el celular van de a dos, con el icono arriba: 24 modulos en una columna eran 4 metros de scroll. */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {MODULES.map((m) => (
             <div
               key={m.title}
-              className="relative flex items-start gap-4 rounded-2xl border border-border bg-card/80 p-5 transition hover:border-primary/40"
+              className="relative flex flex-col gap-3 rounded-2xl border border-border bg-card/80 p-4 transition hover:border-primary/40 sm:flex-row sm:items-start sm:gap-4 sm:p-5"
             >
               {m.soon ? (
-                <span className="absolute right-4 top-4 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
+                <span className="absolute right-3 top-3 rounded-full border border-accent/30 sm:right-4 sm:top-4 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
                   Próximamente
                 </span>
               ) : m.pro ? (
-                <span className="absolute right-4 top-4 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-sky-300">
+                <span className="absolute right-3 top-3 rounded-full border border-primary/40 sm:right-4 sm:top-4 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-sky-300">
                   Plan Pro
                 </span>
               ) : null}
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-sky-300 ring-1 ring-primary/20">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-sky-300 ring-1 ring-primary/20 sm:size-11">
                 <m.icon className="size-5" aria-hidden="true" />
               </span>
-              <div className="pr-16">
-                <h3 className="font-semibold text-white">{m.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{m.text}</p>
+              <div className="min-w-0 sm:pr-16">
+                <h3 className="text-sm font-semibold leading-snug text-white sm:text-base">{m.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">{m.text}</p>
               </div>
             </div>
           ))}

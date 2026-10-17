@@ -5,7 +5,7 @@ const FLOW_STEPS = ['Escaneo', 'Cobro', 'Stock', 'Caja', 'Reportes']
 
 export function Flow() {
   return (
-    <section id="plataforma" aria-labelledby="flow-heading" className="py-20 md:py-28">
+    <section id="plataforma" aria-labelledby="flow-heading" className="py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-7">
         <SectionHead
           id="flow-heading"
@@ -13,16 +13,17 @@ export function Flow() {
           title="Vendés una vez, todo se actualiza solo."
           text="Cada ticket descuenta stock, suma a la caja y alimenta tus reportes. Sin cargar nada dos veces."
         />
-        <div data-animate className="flex flex-col items-stretch gap-2 md:flex-row md:items-center">
+        {/* En el celular, grilla de 2 sin conectores (apilados ocupaban una pantalla entera). */}
+        <div data-animate className="grid grid-cols-2 gap-2 md:flex md:flex-row md:items-center">
           {FLOW_STEPS.map((step, i) => (
             <Fragment key={step}>
-              <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3.5 font-mono text-sm text-slate-200">
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3.5 font-mono text-sm text-slate-200 md:px-5">
                 <span className="text-xs text-primary">{String(i + 1).padStart(2, '0')}</span>
                 {step}
               </div>
               <div
                 aria-hidden="true"
-                className="mx-auto h-5 w-px bg-gradient-to-b from-primary/60 to-accent/60 md:h-px md:w-auto md:flex-1 md:bg-gradient-to-r"
+                className="hidden md:block md:h-px md:w-auto md:flex-1 md:bg-gradient-to-r md:from-primary/60 md:to-accent/60"
               />
             </Fragment>
           ))}
@@ -55,7 +56,7 @@ const PROBLEMS = [
 
 export function Problem() {
   return (
-    <section aria-labelledby="problema-heading" className="bg-[#081021] py-20 md:py-28">
+    <section aria-labelledby="problema-heading" className="bg-[#081021] py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-7">
         <SectionHead id="problema-heading" kicker="El problema" title="¿Te suena?" />
         <div className="stagger grid gap-4 md:grid-cols-3">

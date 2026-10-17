@@ -14,16 +14,19 @@ const STEPS = [
 
 export function Steps() {
   return (
-    <section id="como-funciona" aria-labelledby="pasos-heading" className="py-20 md:py-28">
+    <section id="como-funciona" aria-labelledby="pasos-heading" className="py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-7">
         <SectionHead id="pasos-heading" kicker="Cómo funciona" title="Arrancás en tres pasos" />
         <div className="stagger grid gap-4 md:grid-cols-3">
           {STEPS.map((s) => (
-            <div key={s.n} data-animate className="rounded-2xl border border-border bg-card p-7">
-              <div className="mb-5 bg-gradient-to-br from-sky-300 to-primary bg-clip-text font-mono text-4xl font-semibold text-transparent">
-                {s.n}
+            <div key={s.n} data-animate className="rounded-2xl border border-border bg-card p-5 sm:p-7">
+              {/* En el celular el numero va al lado del titulo. */}
+              <div className="mb-2 flex items-baseline gap-3 sm:block">
+                <div className="bg-gradient-to-br from-sky-300 to-primary bg-clip-text font-mono text-3xl font-semibold text-transparent sm:mb-5 sm:text-4xl">
+                  {s.n}
+                </div>
+                <h3 className="text-lg font-semibold text-white sm:mb-2">{s.title}</h3>
               </div>
-              <h3 className="mb-2 text-lg font-semibold text-white">{s.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{s.text}</p>
             </div>
           ))}
@@ -42,7 +45,7 @@ const SECURITY = [
 
 export function Security() {
   return (
-    <section id="seguridad" aria-labelledby="seguridad-heading" className="bg-[#081021] py-20 md:py-28">
+    <section id="seguridad" aria-labelledby="seguridad-heading" className="bg-[#081021] py-14 sm:py-20 md:py-28">
       <div className="mx-auto grid max-w-6xl items-start gap-12 px-5 md:px-7 lg:grid-cols-2">
         <div data-animate>
           <Kicker>Seguridad</Kicker>
@@ -73,7 +76,7 @@ export function Security() {
 
 export function Faq() {
   return (
-    <section id="faq" aria-labelledby="faq-heading" className="py-20 md:py-28">
+    <section id="faq" aria-labelledby="faq-heading" className="py-14 sm:py-20 md:py-28">
       <div className="mx-auto max-w-3xl px-5 md:px-7">
         <SectionHead id="faq-heading" kicker="Preguntas frecuentes" title="Lo que siempre nos preguntan" className="mx-auto text-center" />
         <div data-animate className="flex flex-col gap-3">
@@ -108,7 +111,7 @@ export function CtaFinal() {
           <p className="mx-auto mt-4 max-w-xl text-pretty text-lg text-blue-50/85">
             Creá tu cuenta, cargá tus productos y hacé tu primera venta hoy mismo.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mx-auto mt-8 flex max-w-sm flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:items-center">
             <Link
               href={ROUTES.signup}
               prefetch={false}
