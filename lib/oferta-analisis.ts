@@ -115,6 +115,18 @@ export function empujeCombo(p: ConOferta, cantidad: number): EmpujeCombo | null 
 }
 
 /** Texto corto de la oferta para badges, etiquetas y carteles: "-20%", "-$200", "3x2"... */
+/**
+ * Como etiquetaOferta, pero un combo de un producto por kg/m/l se lee "2 kg x $3.000"
+ * en vez de "2x$3.000" (etiqueta de gondola y tienda online).
+ */
+export function etiquetaOfertaConUnidad(producto: ConOferta & { unidad?: string | null }): string | null {
+  const base = etiquetaOferta(producto);
+  const u = producto.unidad;
+  if (!base || producto.ofertaTipo !== "combo" || !(u === "kg" || u === "m" || u === "l")) return base;
+  const cant = String(Number(producto.ofertaCantidad) || 0).replace(".", ",");
+  return `${cant} ${u} x ${pesos(Number(producto.ofertaValor) || 0)}`;
+}
+
 export function etiquetaOferta(producto: ConOferta): string | null {
   const p = sinFechas(producto);
   if (!tieneOferta(p)) return null;

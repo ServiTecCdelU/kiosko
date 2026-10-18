@@ -3,11 +3,11 @@
 // actual si la suscripcion esta vencida o no existe, el siguiente si esta al dia.
 // "Hasta" es fin de ese mes en hora argentina (UTC-3 todo el año).
 
-export type Plan = "free" | "basico" | "pro";
+export type Plan = "free" | "basico" | "pro" | "tienda";
 
-export const PLANES: Plan[] = ["free", "basico", "pro"];
+export const PLANES: Plan[] = ["free", "basico", "pro", "tienda"];
 
-export const PLAN_LABEL: Record<Plan, string> = { free: "Free", basico: "Básico", pro: "Pro" };
+export const PLAN_LABEL: Record<Plan, string> = { free: "Free", basico: "Básico", pro: "Pro", tienda: "Tienda" };
 
 export const METODO_PAGO_LABEL = { mercadopago: "Mercado Pago", manual: "Manual" } as const;
 
@@ -134,13 +134,23 @@ export function planIncluyeMercadoPago(plan: unknown): boolean {
   return plan !== "basico";
 }
 
+/**
+ * Catalogo online con pedido por WhatsApp (72_plan_tienda.sql): plan Tienda. "free"
+ * (cortesia del superadmin) tampoco se limita.
+ */
+export function planIncluyeTienda(plan: unknown): boolean {
+  return plan === "tienda" || plan === "free";
+}
+
+export const MENSAJE_TIENDA = "La tienda online es del plan Tienda. Pasá a Tienda desde Suscripción para tener tu catálogo con pedidos por WhatsApp.";
+
 export const MENSAJE_FACTURACION_PRO = "La facturación electrónica es del plan Pro. Pasá a Pro desde Suscripción para usarla.";
 export const MENSAJE_MP_PRO = "Los cobros con Mercado Pago (QR y lector Point) son del plan Pro. Pasá a Pro desde Suscripción para usarlos.";
 
 // ---- Cambio de plan por el propio comercio (decidido 2026-10-10) ----
 
 /** Planes que el comercio puede elegir solo. "free" lo asigna el superadmin. */
-export const PLANES_CONTRATABLES: Plan[] = ["basico", "pro"];
+export const PLANES_CONTRATABLES: Plan[] = ["basico", "pro", "tienda"];
 
 export interface CambioDePlan {
   actual: Plan;

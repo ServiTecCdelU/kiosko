@@ -17,7 +17,7 @@ export interface Comercio {
   nombre: string;
   slug: string;
   estado: "activo" | "prueba" | "suspendido" | "baja";
-  plan: "free" | "basico" | "pro";
+  plan: "free" | "basico" | "pro" | "tienda";
   trial_hasta: string | null;
   suscripcion_hasta: string | null;
   created_at: string;
@@ -119,10 +119,11 @@ export const ESTADO_PUNTO: Record<Comercio["estado"], string> = {
 
 export const ESTADOS: Comercio["estado"][] = ["activo", "prueba", "suspendido", "baja"];
 
-export const PLAN_LABEL: Record<Comercio["plan"], string> = { free: "Free", basico: "Básico", pro: "Pro" };
+export const PLAN_LABEL: Record<Comercio["plan"], string> = { free: "Free", basico: "Básico", pro: "Pro", tienda: "Tienda" };
 
 /** Badge del plan: Pro resaltado, Básico neutro, Free apagado. */
 export const PLAN_CLASE: Record<Comercio["plan"], string> = {
+  tienda: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
   pro: "border-primary/40 bg-primary/10 text-primary",
   basico: "border-border bg-muted/60 text-foreground",
   free: "border-border text-muted-foreground",

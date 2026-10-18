@@ -355,6 +355,7 @@ function Distribucion({ m }: { m: Metricas }) {
       <div>
         <p className="font-semibold">Por plan</p>
         <ul className="mt-2 space-y-2">
+          <Barra nombre="Tienda" valor={m.porPlan.tienda ?? 0} color="var(--viz-3)" />
           <Barra nombre="Pro" valor={m.porPlan.pro} color="var(--viz-1)" />
           <Barra nombre="Básico" valor={m.porPlan.basico} color="var(--viz-2)" />
           <Barra nombre="Free" valor={m.porPlan.free} color="var(--muted-foreground)" />

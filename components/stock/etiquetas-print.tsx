@@ -6,7 +6,7 @@
 // app/globals.css).
 import { BarcodeEAN13 } from "@/components/stock/barcode-svg";
 import { precioFinal, tieneOferta } from "@/lib/pricing";
-import { etiquetaOferta } from "@/lib/oferta-analisis";
+import { etiquetaOfertaConUnidad } from "@/lib/oferta-analisis";
 import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import type { Product } from "@/lib/types";
 import { esFraccionable } from "@/lib/unidades";
@@ -37,14 +37,6 @@ function fechaCorta(iso: string): string {
   return `${d}/${m}/${a.slice(2)}`;
 }
 
-/** Texto de la franja de oferta: un combo por kg se lee "2 kg x $3.000", no "2x$3.000". */
-function textoOferta(p: Product): string | null {
-  const base = etiquetaOferta(p);
-  if (!base || p.ofertaTipo !== "combo" || !esFraccionable(p.unidad)) return base;
-  const cant = String(Number(p.ofertaCantidad) || 0).replace(".", ",");
-  return `${cant} ${p.unidad} x $${miles.format(Number(p.ofertaValor) || 0)}`;
-}
-
 export function EtiquetasPrint({ productos: todos }: { productos: Product[] }) {
   // Precio libre (recargas, "Varios"): no tiene precio que poner en la gondola.
   const productos = todos.filter((p) => !p.precioLibre);
@@ -55,7 +47,7 @@ export function EtiquetasPrint({ productos: todos }: { productos: Product[] }) {
     <div id="etiquetas-print">
       <div className="etiquetas-grid">
         {productos.map((p) => {
-          const oferta = textoOferta(p);
+          const oferta = etiquetaOfertaConUnidad(p);
           const esCombo = p.ofertaTipo === "combo";
           const rebajado = tieneOferta(p) && !esCombo;
           const unidad = esFraccionable(p.unidad) ? `por ${p.unidad}` : esCombo ? "c/u" : null;

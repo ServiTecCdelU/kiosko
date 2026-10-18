@@ -4,7 +4,7 @@
 // Puro (sin imports con alias) para poder testearlo con node:test.
 
 export type Estado = "activo" | "prueba" | "suspendido" | "baja";
-export type Plan = "free" | "basico" | "pro";
+export type Plan = "free" | "basico" | "pro" | "tienda";
 
 export interface ComercioM {
   id: string;
@@ -356,7 +356,7 @@ export function calcularMetricas(e: EntradaMetricas): Metricas {
 
   // ---- Distribuciones ----------------------------------------------------
   const porEstado: Record<Estado, number> = { activo: 0, prueba: 0, suspendido: 0, baja: 0 };
-  const porPlan: Record<Plan, number> = { free: 0, basico: 0, pro: 0 };
+  const porPlan: Record<Plan, number> = { free: 0, basico: 0, pro: 0, tienda: 0 };
   for (const c of e.comercios) {
     porEstado[c.estado]++;
     porPlan[c.plan]++;

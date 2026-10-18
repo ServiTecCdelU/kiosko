@@ -13,6 +13,7 @@ import { useAuth, setCurrentUser, getCurrentUser } from "@/hooks/use-auth";
 import { RUBROS } from "@/lib/registro";
 import { MODULOS, moduloActivo, moduloPorRubro, type ModuloId, type ModulosElegidos } from "@/lib/modulos";
 import { apiUrl } from "@/lib/utils/api-url";
+import { TiendaConfig } from "@/components/tienda/tienda-config";
 
 export default function MiComercioPage() {
   const { user, rol } = useAuth();
@@ -62,6 +63,8 @@ export default function MiComercioPage() {
   return (
     <AppShell title="Mi comercio">
       <div className="max-w-2xl space-y-6">
+        <TiendaConfig />
+
         <section className="space-y-2 rounded-2xl border bg-card p-5">
           <h2 className="font-semibold">Rubro</h2>
           <p className="text-sm text-muted-foreground">

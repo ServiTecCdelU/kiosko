@@ -510,6 +510,7 @@ function Contenido({ comercio, grupos, precios = {}, onOpenChange, onCambio, onE
                 <option value="free">Free</option>
                 <option value="basico">Básico</option>
                 <option value="pro">Pro</option>
+                <option value="tienda">Tienda</option>
               </select>
             </div>
             <div className="col-span-2 grid grid-cols-3 gap-2 border-t pt-3 text-center">

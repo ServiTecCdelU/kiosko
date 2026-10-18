@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const ESTADOS = ["activo", "prueba", "suspendido", "baja"];
 const COLUMNAS_PANEL = "id, nombre, slug, estado, plan, trial_hasta, suscripcion_hasta, created_at, config, grupo_id";
-const PLANES = ["free", "basico", "pro"];
+const PLANES = ["free", "basico", "pro", "tienda"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Admins (acceso con Google) activos de un comercio. */

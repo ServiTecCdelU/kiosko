@@ -1,6 +1,23 @@
 # Plan Tienda ($80.000): catálogo y pedidos online — diseño (borrador 2026-10-18)
 
-Estado: **borrador para decidir**. Nada implementado. Las decisiones abiertas están al final.
+Estado: **etapa 1 hecha (2026-10-18)**: catálogo público + pedido por WhatsApp, plan Tienda
+(migración 72), configuración en Mi comercio. Etapas 2 y 3 pendientes.
+
+## Etapa 1 implementada
+
+- Página pública `/tienda/<slug>` (`app/tienda/[slug]`, `components/tienda/catalogo-tienda.tsx`):
+  buscador, rubros, "Ofertas de hoy", precio con oferta (`lib/pricing.ts`), carrito en el
+  navegador del cliente, por kg de a 250 g (arranca en 500 g). El pedido abre WhatsApp
+  con el mensaje armado (`lib/tienda.ts`, testeado).
+- API pública `GET /api/publico/tienda?slug=` (regla "publica" en `lib/permisos-api.ts`):
+  solo nombre, precio, oferta, rubro, foto, unidad y si hay stock. Abre si el plan la
+  incluye (`planIncluyeTienda`: tienda o free), el dueño la activó, hay WhatsApp válido y
+  el comercio tiene acceso completo. Caché de 60 s en el CDN.
+- Mi comercio → Tienda online (`components/tienda/tienda-config.tsx`, `/api/comercio`):
+  abrir/pausar, WhatsApp (normalizado a `549…`), bienvenida, retiro/envío, mostrar sin
+  stock, link, QR para imprimir. Se guarda en `comercios.config.tienda`.
+- Sin el plan: la sección explica la tienda y manda a Suscripción. El alta (`/registro`)
+  todavía ofrece solo Básico y Pro; a Tienda se pasa desde Suscripción.
 
 ## Problema
 
