@@ -34,7 +34,8 @@ import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
 import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
 import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
-import { getCurrentUser } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth } from "@/hooks/use-auth";
+import { moduloActivo } from "@/lib/modulos";
 import { formatCurrency } from "@/lib/utils/format";
 import { cantidadTexto } from "@/lib/cantidad";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
@@ -53,6 +54,8 @@ const FILTROS: QuickFilter[] = ["todos", "stockBajo", "agotados", "revisar", "ve
 const DIAS_VENCEN = 7;
 
 export default function StockPage() {
+  const { user: sesion } = useAuth();
+  const conBalanza = moduloActivo("balanza", sesion?.rubro, sesion?.modulos);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
@@ -444,9 +447,11 @@ export default function StockPage() {
         <Button variant="outline" className="rounded-2xl" onClick={() => setAumentoOpen(true)}>
           <TrendingUp className="mr-2 h-4 w-4" /> Aumentar precios
         </Button>
-        <Button variant="outline" className="rounded-2xl" onClick={() => setQendraOpen(true)} title="Pasar productos y precios a las balanzas Systel por Qendra">
-          <Scale className="mr-2 h-4 w-4" /> Balanza
-        </Button>
+        {conBalanza && (
+          <Button variant="outline" className="rounded-2xl" onClick={() => setQendraOpen(true)} title="Pasar productos y precios a las balanzas Systel por Qendra">
+            <Scale className="mr-2 h-4 w-4" /> Balanza
+          </Button>
+        )}
         <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
           <PackagePlus className="mr-2 h-4 w-4" /> Nuevo producto
         </Button>

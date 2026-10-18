@@ -31,7 +31,8 @@ import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } f
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
 import { VentasOfflineDialog } from "@/components/pos/ventas-offline-dialog";
-import { getCurrentUser } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth } from "@/hooks/use-auth";
+import { moduloActivo } from "@/lib/modulos";
 import { MENSAJE_MP_PRO, planIncluyeMercadoPago } from "@/lib/suscripcion";
 import { panelHref } from "@/lib/panel";
 import { CartPanel, type ConfirmData, type CartPanelHandle } from "@/components/pos/cart-panel";
@@ -75,6 +76,10 @@ export default function PosPage() {
 }
 
 function PosScreen() {
+  // Modulos del comercio (lib/modulos.ts): presupuestos y balanza segun rubro y "Mi comercio".
+  const { user: sesion } = useAuth();
+  const conPresupuestos = moduloActivo("presupuestos", sesion?.rubro, sesion?.modulos);
+  const conBalanza = moduloActivo("balanza", sesion?.rubro, sesion?.modulos);
   const cart = useCart();
   const anunciarVenta = usePantallaCliente(cart.items);
   const ofertasVigentes = useOfertasVigentes();
@@ -852,10 +857,10 @@ function PosScreen() {
           </button>
           <button
             onClick={() => setImpresoraOpen(true)}
-            title="Configurar la impresora de tickets y la balanza de esta PC"
+            title={conBalanza ? "Configurar la impresora de tickets y la balanza de esta PC" : "Configurar la impresora de tickets de esta PC"}
             className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <Settings2 className="h-3.5 w-3.5" /> Impresora y balanza
+            <Settings2 className="h-3.5 w-3.5" /> {conBalanza ? "Impresora y balanza" : "Impresora"}
           </button>
           {lastTicket && (
             <button
@@ -1058,7 +1063,7 @@ function PosScreen() {
             onClear={cart.clear}
             onConfirm={handleConfirm}
             onSuspend={handleSuspender}
-            onPresupuesto={() => setPresupuestoOpen(true)}
+            onPresupuesto={conPresupuestos ? () => setPresupuestoOpen(true) : undefined}
             processing={processing}
             isOnline={isOnline}
             avisoBloqueo={avisoCaja}
@@ -1089,6 +1094,7 @@ function PosScreen() {
         nombreComercio={nombreComercio.trim() || undefined}
         onChanged={setConfigImpresora}
         onPruebaNavegador={handlePruebaNavegador}
+        conBalanza={conBalanza}
       />
       <VentasOfflineDialog
         open={offlineOpen}

@@ -22,6 +22,7 @@ const RUTAS_SUPERADMIN = ["/api/superadmin"];
 
 /** Pantallas que el menu solo le muestra al admin (lib/nav.ts). */
 const RUTAS_ADMIN = [
+  "/api/comercio",
   "/api/usuarios",
   "/api/consultas/usuarios",
   "/api/compras",

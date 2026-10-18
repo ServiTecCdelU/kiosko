@@ -150,7 +150,9 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 ## Auth y roles
 - Admin del comercio: Google o código por correo (`lib/auth-correo.ts`, SMTP Resend) · Cajero/encargado: PIN · Superadmin del SaaS: Google +
   tabla `superadmins` (panel `/superadmin`, puede entrar a un comercio en modo soporte).
-- Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`.
+- Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`. Módulos por rubro
+  (Producción, Presupuestos, Balanza) en `lib/modulos.ts`: el dueño los prende o apaga en
+  `/mi-comercio` (`comercios.config.modulos`, le gana al rubro).
 - Sesión: cookie `kiosko_sesion` firmada con HMAC (12 h). Demo pública: slug `demo`; se entra dejando nombre y WhatsApp (`demo_visitas`).
 - Facturación AFIP/ARCA (Factura C para monotributo; A y B con IVA por alícuota para
   responsable inscripto, más sus notas de crédito) en `lib/afip/` (puro, testeado) y

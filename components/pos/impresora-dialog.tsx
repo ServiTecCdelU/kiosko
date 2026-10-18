@@ -30,6 +30,8 @@ interface ImpresoraDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nombreComercio?: string;
+  /** Modulo Balanza del comercio (lib/modulos.ts): sin el, solo la impresora. */
+  conBalanza?: boolean;
   /** Se avisa cada vez que se guarda, para que el POS relea la configuracion. */
   onChanged?: (config: ConfigImpresora) => void;
   /** En modo navegador el ticket de prueba lo imprime el POS con window.print(). */
@@ -44,7 +46,7 @@ const MODOS: { valor: ModoImpresora; ayuda: string }[] = [
   { valor: "zebra", ayuda: "Ticket ZPL a una Zebra ZD220 compartida en la PC donde corre la app. Solo para instalaciones locales." },
 ];
 
-export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged, onPruebaNavegador }: ImpresoraDialogProps) {
+export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged, onPruebaNavegador, conBalanza = true }: ImpresoraDialogProps) {
   const [config, setConfig] = useState<ConfigImpresora>(leerConfigImpresora);
   const [usbNombre, setUsbNombre] = useState<string | null>(null);
   const [agenteEstado, setAgenteEstado] = useState<{ ok: boolean; impresoras: string[]; error?: string } | null>(null);
@@ -128,7 +130,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Printer className="h-4 w-4 text-primary" /> Impresora y balanza</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Printer className="h-4 w-4 text-primary" /> {conBalanza ? "Impresora y balanza" : "Impresora"}</DialogTitle>
           <DialogDescription>
             Cómo imprime esta PC y qué traen las etiquetas de su balanza. Se guarda acá, en esta computadora: cada caja puede tener las suyas.
           </DialogDescription>
@@ -266,6 +268,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
           )}
         </div>
 
+        {conBalanza && (<>
         <section className="space-y-2 border-t pt-4">
           <p className="text-sm font-semibold">Etiquetas de la balanza</p>
           <p className="text-xs text-muted-foreground">
@@ -323,6 +326,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
         </section>
 
         <BalanzaSerieSection />
+        </>)}
       </DialogContent>
     </Dialog>
   );

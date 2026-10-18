@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { crearCookieSesion } from "@/lib/server/sesion";
 import { DEMO_PIN, DEMO_SLUG } from "@/lib/demo";
+import { modulosValidos, type ModulosElegidos } from "@/lib/modulos";
 
 export interface UsuarioPin {
   id: string;
@@ -70,12 +71,14 @@ export async function errorPinRepetido(comercioId: string, pin: string | null | 
 }
 
 /** Slug (el panel vive en /<slug>) y nombre del comercio (menu y panel). */
-export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string; rubro?: string }> {
+export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string; rubro?: string; modulos?: ModulosElegidos }> {
   const { data } = await supabaseAdmin.from("comercios").select("slug, nombre, plan, config").eq("id", comercioId).maybeSingle();
   // El plan viaja al navegador para mostrar los avisos de "plan Pro" (el servidor igual lo valida).
   // El rubro del alta, para sugerir productos tipicos y la unidad (lib/rubros-perfil.ts).
   const rubro = typeof data?.config?.rubro === "string" ? data.config.rubro : undefined;
-  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined, rubro };
+  // Modulos prendidos o apagados por el dueño (lib/modulos.ts): ordenan el menu.
+  const modulos = modulosValidos(data?.config?.modulos);
+  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined, rubro, modulos };
 }
 
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */

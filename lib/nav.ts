@@ -1,7 +1,8 @@
 // lib/nav.ts — items de navegacion del kiosko
 import type { LucideIcon } from "lucide-react";
-import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign, ClipboardList, ChefHat } from "lucide-react";
+import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign, ClipboardList, ChefHat, Store } from "lucide-react";
 import type { UserRol } from "@/lib/types";
+import { moduloActivo, type ModuloId, type ModulosElegidos } from "@/lib/modulos";
 import { panelHref } from "@/lib/panel";
 
 export interface NavItem {
@@ -11,10 +12,10 @@ export interface NavItem {
   /** Roles no-admin que tambien ven el item. Sin definir = solo admin. */
   roles?: UserRol[];
   /**
-   * Rubros del alta (lib/registro.ts) que ven el item en el menu. Sin definir = todos.
-   * Solo ordena el menu: la pantalla se puede abrir igual (la guardia es por rol).
+   * Modulo del que depende (lib/modulos.ts): sale segun el rubro y lo que elija el
+   * dueño en "Mi comercio". Solo ordena el menu: la pantalla se abre igual por URL.
    */
-  rubros?: string[];
+  modulo?: ModuloId;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -24,20 +25,19 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Caja", href: "/caja", icon: Wallet, roles: ["encargado", "cajero"] },
   { label: "Ventas", href: "/ventas", icon: Receipt, roles: ["encargado"] },
   // Presupuestos del mostrador: los arma y los pasa a venta cualquiera que atienda.
-  { label: "Presupuestos", href: "/presupuestos", icon: ClipboardList, roles: ["encargado", "cajero"] },
+  { label: "Presupuestos", href: "/presupuestos", icon: ClipboardList, roles: ["encargado", "cajero"], modulo: "presupuestos" },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Stock", href: "/stock", icon: Package },
   // Produccion del dia: para quien elabora (pan, facturas, milanesas...).
-  {
-    label: "Producción", href: "/produccion", icon: ChefHat, roles: ["encargado"],
-    rubros: ["panaderia", "carniceria", "almacen", "supermercado", "dietetica", "otro"],
-  },
+  { label: "Producción", href: "/produccion", icon: ChefHat, roles: ["encargado"], modulo: "produccion" },
   { label: "Promociones", href: "/promociones", icon: Megaphone, roles: ["encargado"] },
   { label: "Compras", href: "/compras", icon: Truck },
   { label: "Empleados", href: "/usuarios", icon: UserCog },
   { label: "Reportes", href: "/reportes", icon: BarChart3 },
   { label: "Facturación", href: "/facturacion", icon: FileText },
   { label: "Catálogo y copia de datos", href: "/sincronizacion", icon: RefreshCw },
+  // Solo el dueño: rubro y pantallas del menu (lib/modulos.ts).
+  { label: "Mi comercio", href: "/mi-comercio", icon: Store },
   { label: "Ayuda", href: "/ayuda", icon: CircleHelp, roles: ["encargado", "cajero"] },
   // Solo el dueño: plan, pagos y debito automatico (app/suscripcion).
   { label: "Suscripción", href: "/suscripcion", icon: CircleDollarSign },
@@ -48,10 +48,10 @@ export function hrefDe(item: NavItem, comercioSlug: string | undefined): string 
   return item.href === "/" ? panelHref(comercioSlug) : item.href;
 }
 
-/** Items visibles segun rol: admin ve todo; encargado y cajero, lo declarado en roles. */
-export function visibleNavItems(rol: UserRol | null, rubro?: string): NavItem[] {
-  // Comercios sin rubro (anteriores al alta self-service) ven todo.
-  const porRubro = NAV_ITEMS.filter((i) => !i.rubros || !rubro || i.rubros.includes(rubro));
+/** Items visibles segun rol y modulos: admin ve todo; encargado y cajero, lo declarado en roles. */
+export function visibleNavItems(rol: UserRol | null, rubro?: string, modulos?: ModulosElegidos): NavItem[] {
+  // Comercios sin rubro (anteriores al alta self-service) ven todo, salvo lo que apague el dueño.
+  const porRubro = NAV_ITEMS.filter((i) => !i.modulo || moduloActivo(i.modulo, rubro, modulos));
   // Sin sesion (rol null) se muestran todos los items.
   if (!rol || rol === "admin") return porRubro;
   return porRubro.filter((i) => i.roles?.includes(rol));

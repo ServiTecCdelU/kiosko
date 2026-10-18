@@ -44,11 +44,15 @@ export function setCurrentUser(u: Usuario | null): void {
   guardarUsuario(u);
 }
 
+/** Avisa a los useAuth montados (ej. el menu) que cambio el usuario guardado. */
+const EVENTO_USUARIO = "kiosko:usuario";
+
 function guardarUsuario(u: Usuario | null): void {
   cached = u;
   if (typeof window === "undefined") return;
   if (u) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(u));
   else sessionStorage.removeItem(STORAGE_KEY);
+  window.dispatchEvent(new Event(EVENTO_USUARIO));
 }
 
 export function getCurrentUser(): Usuario | null {
@@ -95,6 +99,14 @@ export function sesionVencida(): void {
 export function useAuth() {
   const [user, setUser] = useState<Usuario | null>(() => readStored());
   const [ready, setReady] = useState(false);
+
+  // Cambios del usuario guardado en otra parte de la pantalla (ej. "Mi comercio" prende un
+  // modulo y el menu tiene que mostrarlo ya).
+  useEffect(() => {
+    const alCambiar = () => setUser(readStored());
+    window.addEventListener(EVENTO_USUARIO, alCambiar);
+    return () => window.removeEventListener(EVENTO_USUARIO, alCambiar);
+  }, []);
 
   useEffect(() => {
     const stored = readStored();
