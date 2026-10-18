@@ -80,7 +80,9 @@ export function EntrarDemoForm({ origen }: { origen: OrigenDemo }) {
 
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={enviando} className="h-12 rounded-2xl text-sm">
+      {/* Azul 600 y no --primary: va sobre el tema oscuro del login y ahi el
+          primary no llega al contraste 4,5:1 con texto blanco (igual que el registro). */}
+      <Button type="submit" disabled={enviando} className="h-12 rounded-2xl bg-blue-600 text-sm text-white hover:bg-blue-500">
         {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
         Entrar a la demo
       </Button>

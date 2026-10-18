@@ -133,20 +133,26 @@ function LoginContent() {
   });
 
   return (
-    <main className="bg-mesh flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/30 p-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        {/* El logo es blanco: va sobre el fondo de marca para verse en el tema claro. */}
+    // Mismo tema oscuro que la landing y el registro (.landing-theme en globals.css):
+    // quien viene de "Mirá el sistema ya" o "Ingresar" no salta a una pantalla clara.
+    <main className="landing-theme relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-background p-6 text-foreground">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,rgba(59,139,255,0.28),transparent_70%)]"
+      />
+      <div className="relative flex flex-col items-center gap-3 text-center">
+        {/* El logo es blanco: va sobre el fondo de marca. */}
         <div className="grad-brand shadow-brand flex h-16 w-16 items-center justify-center rounded-3xl">
           <Image src={logoServitec} alt="" aria-hidden="true" width={48} height={48} priority className="h-12 w-12" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">ServiTec</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white">ServiTec</h1>
         <p className="text-sm text-muted-foreground">
           {modo === "inicio" ? "Punto de venta para tu comercio" : modo === "demo" ? "Acceso a la demo" : "Ingresá tu PIN de empleado"}
         </p>
       </div>
 
       {modo === "inicio" ? (
-        <div className="flex w-full max-w-[300px] animate-in fade-in flex-col gap-3 duration-300">
+        <div className="relative flex w-full max-w-[300px] animate-in fade-in flex-col gap-3 duration-300">
           {pc?.registrada && (
             <p className="rounded-2xl border bg-card px-4 py-2 text-center text-xs text-muted-foreground">
               Esta PC es <b className="text-foreground">{pc.comercio} · {pc.caja}</b>
@@ -188,7 +194,7 @@ function LoginContent() {
           </button>
         </div>
       ) : (
-        <div className={cn("flex w-full animate-in fade-in flex-col items-center gap-6 duration-300", modo === "demo" ? "max-w-sm" : "max-w-[260px]")}>
+        <div className={cn("relative flex w-full animate-in fade-in flex-col items-center gap-6 duration-300", modo === "demo" ? "max-w-sm" : "max-w-[260px]")}>
           {modo === "demo" && <EntrarDemoForm origen={origenDemo} />}
 
           {modo === "pin" && pc === undefined && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}

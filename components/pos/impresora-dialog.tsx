@@ -32,6 +32,7 @@ interface ImpresoraDialogProps {
 }
 
 const MODOS: { valor: ModoImpresora; ayuda: string }[] = [
+  { valor: "ninguno", ayuda: "Para cuando no tenés ticketera: cobrás y listo. Si un cliente pide el ticket, tocá “Reimprimir” en el punto de venta." },
   { valor: "navegador", ayuda: "Se abre la ventana de imprimir en cada venta. Sirve con cualquier impresora instalada en Windows, pero no abre el cajón." },
   { valor: "webusb", ayuda: "Chrome o Edge le mandan el ticket directo a la impresora térmica (Epson, Xprinter, 3nStar…). Silencioso, con corte y cajón." },
   { valor: "agente", ayuda: "Un programita en esta PC recibe el ticket y lo manda a la impresora de Windows o de red. Sirve cuando el USB directo no funciona." },
@@ -91,6 +92,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
     try {
       const r = await imprimirTicketDePrueba(nombreComercio, config);
       if (r === "navegador") onPruebaNavegador?.(ticketDePrueba(nombreComercio));
+      else if (r === "omitido") toast.info("Con “No imprimir ticket” no sale nada. Elegí una impresora para probar.");
       else toast.success("Ticket de prueba enviado a la impresora");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo imprimir");

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { planIncluyeMercadoPago } from "@/lib/suscripcion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   try {
     const { data: comercio, error } = await supabaseAdmin
       .from("comercios")
-      .select("config, mp_token_cifrado")
+      .select("config, mp_token_cifrado, plan")
       .eq("id", comercioId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       mostrar: comercio?.config?.origen === "autoregistro",
       pasos: { productos, venta, cajeros, mercadoPago: !!comercio?.mp_token_cifrado },
+      // El plan Basico no trae Mercado Pago: ese paso no se muestra.
+      incluyeMercadoPago: planIncluyeMercadoPago(comercio?.plan ?? null),
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 400 });

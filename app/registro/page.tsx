@@ -21,6 +21,7 @@ import { getCurrentUser, setCurrentUser } from "@/hooks/use-auth";
 import { DEMO_SLUG } from "@/lib/demo";
 import { trackRegistroCompletado } from "@/lib/analytics";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
+import { WhatsAppLink } from "@/components/analytics/whatsapp-link";
 import { MAX_CAJAS_REGISTRO, PLANES_REGISTRO, RUBROS, validarRegistro } from "@/lib/registro";
 import { slugDeNombre } from "@/lib/slug";
 import { ROUTES, TRIAL_DAYS } from "@/lib/marketing/contact";
@@ -174,6 +175,17 @@ function PasoGoogle() {
       <p className="text-center text-xs text-muted-foreground">
         Con tu cuenta de Google entrás siempre a tu comercio, sin contraseñas.
       </p>
+      {/* El alta es solo con Google: el que no tiene Gmail no queda afuera. */}
+      <p className="-mt-2 text-center text-xs text-muted-foreground">
+        ¿No tenés cuenta de Google?{" "}
+        <WhatsAppLink
+          ubicacion="registro-sin-google"
+          mensaje="Hola, quiero probar el sistema pero no tengo cuenta de Google."
+          className="font-semibold text-primary hover:underline"
+        >
+          Escribinos y te ayudamos
+        </WhatsAppLink>
+      </p>
       {/* Para quien todavia no se decide: ver el sistema sin registrarse. */}
       <Link
         href={ROUTES.demo}
@@ -193,6 +205,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
   const [rubro, setRubro] = useState("");
   const [plan, setPlan] = useState<"basico" | "pro">("basico");
   const [cajas, setCajas] = useState(1);
+  const [verPlanes, setVerPlanes] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -207,7 +220,10 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
   // Un supermercado suele tener varias cajas: se sugiere Pro al elegir ese rubro.
   const elegirRubro = (r: string) => {
     setRubro(r);
-    if (r === "supermercado" && plan === "basico") setPlan("pro");
+    if (r === "supermercado" && plan === "basico") {
+      setPlan("pro");
+      setVerPlanes(true);
+    }
   };
   const elegirPlan = (p: "basico" | "pro") => {
     setPlan(p);
@@ -285,6 +301,21 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
         </Select>
       </div>
 
+      {/* El plan no frena el alta: arranca en Basico (la prueba es gratis igual)
+          y se despliega solo si quiere cambiarlo o eligio supermercado. */}
+      {!verPlanes ? (
+        <button
+          type="button"
+          onClick={() => setVerPlanes(true)}
+          className="flex items-center justify-between gap-2 rounded-2xl border border-border px-3 py-2.5 text-left text-sm transition-colors hover:border-primary/50"
+        >
+          <span>
+            Plan <span className="font-semibold">{PLANES_REGISTRO.find((p) => p.id === plan)?.nombre}</span>
+            <span className="block text-xs text-muted-foreground">Gratis los {TRIAL_DAYS} días de prueba. ¿Varias cajas o facturación? Elegí Pro.</span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-primary">Cambiar</span>
+        </button>
+      ) : (
       <div className="space-y-1.5">
         <Label>Plan</Label>
         <div className="grid grid-cols-2 gap-2">
@@ -310,6 +341,7 @@ function FormularioComercio({ google }: { google: DatosGoogle }) {
         </div>
         <p className="text-xs text-muted-foreground">Los {TRIAL_DAYS} días de prueba son gratis con cualquier plan. Lo podés cambiar después.</p>
       </div>
+      )}
 
       {plan === "pro" && (
         <div className="space-y-1.5">

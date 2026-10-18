@@ -68,11 +68,13 @@ export function precioLinea(p: ConOferta, cantidad: number): number {
   return round2(precioFinal(p) * cantidad);
 }
 
-const numeroAR = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+const numeroAR = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const numeroARCentavos = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "$1.500" — formato corto (sin espacio) para etiquetas y carteles. */
+/** "$1.500" — formato corto (sin espacio) para etiquetas y carteles. Con centavos, "$1.450,50". */
 export function pesos(n: number): string {
-  return `$${numeroAR.format(Math.round(n * 100) / 100)}`;
+  const r = Math.round(n * 100) / 100;
+  return `$${(Number.isInteger(r) ? numeroAR : numeroARCentavos).format(r)}`;
 }
 
 /**

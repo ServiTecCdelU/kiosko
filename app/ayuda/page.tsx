@@ -151,7 +151,7 @@ const TEMAS: Tema[] = [
     pasos: [
       "Reportes muestra ventas por día y por hora, margen bruto, gastos por categoría, pérdidas y ganancia neta. Se exporta a Excel y PDF.",
       "Más vendidos, rentabilidad por rubro y mayores aumentos de precio ayudan a decidir qué subir y qué promocionar.",
-      "En Sincronización y reportes descargás un Excel con todos tus datos, una hoja por tema. Tus datos son tuyos.",
+      "En Catálogo y copia de datos descargás un Excel con todos tus datos, una hoja por tema. Tus datos son tuyos.",
     ],
     href: "/reportes",
   },

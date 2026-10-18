@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
-import { createProduct, type CreateProductInput } from "@/services/products-service";
+import { lookupNombrePorCodigoBarras } from "@/lib/barcode-lookup";
+import { createProduct, findProductByCode, type CreateProductInput } from "@/services/products-service";
 
 interface NuevoProductoDialogProps {
   open: boolean;
@@ -36,9 +37,20 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const [stockControlado, setStockControlado] = useState(true);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
+  // El aviso del nombre recien despues de tocarlo: no se reta antes de escribir.
+  const [nombreTocado, setNombreTocado] = useState(false);
+  // Al escanear o escribir el codigo de barra: si ya existe se avisa; si no, se
+  // busca el nombre en las bases publicas (igual que el alta rapida del POS).
+  const [yaExiste, setYaExiste] = useState<string | null>(null);
+  const [buscandoNombre, setBuscandoNombre] = useState(false);
+  const [codigoBuscado, setCodigoBuscado] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    setNombreTocado(false);
+    setYaExiste(null);
+    setBuscandoNombre(false);
+    setCodigoBuscado("");
     setCodigo("");
     setCodigoBarras("");
     setName("");
@@ -60,6 +72,23 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const margenPct = costoNum && priceNum > 0 ? ((priceNum - costoNum) / priceNum) * 100 : undefined;
   const nombreInvalido = !name.trim();
 
+  const buscarCodigo = async () => {
+    const c = codigoBarras.trim();
+    if (!c || c === codigoBuscado) return;
+    setCodigoBuscado(c);
+    setYaExiste(null);
+    const existente = await findProductByCode(c).catch(() => null);
+    if (existente) {
+      setYaExiste(existente.name);
+      return;
+    }
+    if (name.trim()) return;
+    setBuscandoNombre(true);
+    const sugerido = await lookupNombrePorCodigoBarras(c).finally(() => setBuscandoNombre(false));
+    // Si mientras tanto escribio un nombre, no se le pisa.
+    if (sugerido) setName((n) => n.trim() ? n : sugerido);
+  };
+
   const handleGuardar = async () => {
     if (nombreInvalido) return;
     setSaving(true);
@@ -79,8 +108,11 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
         favorito,
         stockControlado,
         iva,
+        // Cargado a mano con todos sus datos no hay nada que revisar; sin precio, si.
+        revisar: priceNum <= 0,
       };
       await createProduct(input);
+      toast.success(`${input.name} guardado`);
       onOpenChange(false);
       onCreated();
     } catch (e) {
@@ -105,7 +137,21 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Código de barra</Label>
-              <Input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} className="rounded-xl" />
+              <Input
+                value={codigoBarras}
+                onChange={(e) => setCodigoBarras(e.target.value)}
+                onBlur={buscarCodigo}
+                // El lector manda Enter al final del codigo.
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    buscarCodigo();
+                  }
+                }}
+                placeholder="Escaneá o escribí"
+                className="rounded-xl"
+                autoFocus
+              />
             </div>
             <div>
               <Label className="mb-1 block text-xs">Código interno</Label>
@@ -118,11 +164,15 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={() => setNombreTocado(true)}
               placeholder="Nombre del producto"
               className="rounded-xl"
-              autoFocus
             />
-            {nombreInvalido && <p className="mt-1 text-xs text-destructive">El nombre es obligatorio</p>}
+            {yaExiste && (
+              <p className="mt-1 text-xs text-warning">Ya tenés un producto con ese código: “{yaExiste}”. Buscalo en la lista para editarlo.</p>
+            )}
+            {buscandoNombre && <p className="mt-1 text-xs text-muted-foreground">Buscando el nombre por el código…</p>}
+            {nombreInvalido && nombreTocado && <p className="mt-1 text-xs text-destructive">El nombre es obligatorio</p>}
           </div>
 
           <div>
@@ -149,6 +199,10 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
               </select>
             </div>
           </div>
+
+          {!price && nombreTocado && (
+            <p className="-mt-2 text-xs text-muted-foreground">Sin precio queda marcado “A revisar” hasta que se lo pongas.</p>
+          )}
 
           {margenPct !== undefined && (
             <div className={cn(

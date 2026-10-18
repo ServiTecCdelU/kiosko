@@ -27,10 +27,10 @@ const COLUMNAS_AYUDA = [
   { nombre: "Rubro", ejemplo: "Bebidas" },
   { nombre: "Subrubro", ejemplo: "Gaseosas" },
   { nombre: "Stock", ejemplo: "24" },
-  { nombre: "Lote (unidades por paquete)", ejemplo: "6" },
+  { nombre: "Unidades por bulto", ejemplo: "6" },
 ];
 
-const PLANTILLA_ENCABEZADOS = ["Código de barra", "Código", "Descripción", "Precio", "Costo", "Rubro", "Subrubro", "Stock", "Lote"];
+const PLANTILLA_ENCABEZADOS = ["Código de barra", "Código", "Descripción", "Precio", "Costo", "Rubro", "Subrubro", "Stock", "Unidades por bulto"];
 const PLANTILLA_EJEMPLO = ["7790895000997", "CC15", "Coca Cola 1.5 L", 1850, 1200, "Bebidas", "Gaseosas", 24, 6];
 
 interface ImportDialogProps {
@@ -44,7 +44,7 @@ type Step = "archivo" | "preview" | "progreso" | "resultado";
 const FIELDS: ImportField[] = ["barra", "codigo", "descripcion", "precio", "costo", "rubro", "subrubro", "stock", "lote"];
 
 const STRATEGIES: { value: StockStrategy; label: string; hint: string }[] = [
-  { value: "no_tocar", label: "No tocar stock", hint: "Solo actualiza precio, nombre y rubro" },
+  { value: "mantener", label: "No tocar stock", hint: "Solo actualiza precio, nombre y rubro" },
   { value: "reemplazar", label: "Reemplazar stock", hint: "El stock pasa a ser el del Excel" },
   { value: "sumar", label: "Sumar al stock", hint: "El valor del Excel se suma al actual" },
   { value: "solo_nuevos", label: "Solo agregar nuevos", hint: "No modifica productos existentes" },
@@ -58,7 +58,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [startRow, setStartRow] = useState(2);
   const [rows, setRows] = useState<ParsedRow[]>([]);
-  const [stockStrategy, setStockStrategy] = useState<StockStrategy>("no_tocar");
+  const [stockStrategy, setStockStrategy] = useState<StockStrategy>("mantener");
   const [incluirConAdvertencias, setIncluirConAdvertencias] = useState(true);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -73,7 +73,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
     setMapping({});
     setStartRow(2);
     setRows([]);
-    setStockStrategy("no_tocar");
+    setStockStrategy("mantener");
     setIncluirConAdvertencias(true);
     setProgress({ done: 0, total: 0 });
     setSummary(null);
@@ -129,6 +129,8 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
     const conAdvertencias = rows.filter((r) => r.warnings.length > 0).length;
     return { total: rows.length, conAdvertencias, ok: rows.length - conAdvertencias };
   }, [rows]);
+  const filasConAdvertencias = useMemo(() => rows.filter((r) => r.warnings.length > 0), [rows]);
+  const MAX_ADVERTENCIAS_VISIBLES = 50;
 
   const handleImport = async () => {
     setStep("progreso");
@@ -159,7 +161,9 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
 
         {step === "archivo" && (
           <div className="space-y-4">
+            {/* key: al cargar el archivo se vuelve a montar plegada y deja ver las columnas. */}
             <AyudaArchivo
+              key={workbook ? "con-archivo" : "sin-archivo"}
               que="productos"
               columnas={COLUMNAS_AYUDA}
               ubicacion="importar-productos"
@@ -250,6 +254,28 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                 </span>
                 <Switch checked={incluirConAdvertencias} onCheckedChange={setIncluirConAdvertencias} />
               </label>
+            )}
+
+            {filasConAdvertencias.length > 0 && (
+              <div className="rounded-xl border">
+                <p className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Qué tiene cada fila con advertencia</p>
+                <ul className="max-h-40 divide-y overflow-y-auto text-xs">
+                  {filasConAdvertencias.slice(0, MAX_ADVERTENCIAS_VISIBLES).map((r) => (
+                    <li key={r.rowNumber} className="flex gap-2 px-3 py-1.5">
+                      <span className="shrink-0 text-muted-foreground">Fila {r.rowNumber}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium">{r.descripcion || r.barra || r.codigo}</span>
+                        <span className="text-warning"> — {r.warnings.join(", ")}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {filasConAdvertencias.length > MAX_ADVERTENCIAS_VISIBLES && (
+                  <p className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                    Y {filasConAdvertencias.length - MAX_ADVERTENCIAS_VISIBLES} más.
+                  </p>
+                )}
+              </div>
             )}
 
             <div>

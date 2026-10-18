@@ -25,7 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Empleados", href: "/usuarios", icon: UserCog },
   { label: "Reportes", href: "/reportes", icon: BarChart3 },
   { label: "Facturación", href: "/facturacion", icon: FileText },
-  { label: "Sincronización y reportes", href: "/sincronizacion", icon: RefreshCw },
+  { label: "Catálogo y copia de datos", href: "/sincronizacion", icon: RefreshCw },
   { label: "Ayuda", href: "/ayuda", icon: CircleHelp, roles: ["encargado", "cajero"] },
   // Solo el dueño: plan, pagos y debito automatico (app/suscripcion).
   { label: "Suscripción", href: "/suscripcion", icon: CircleDollarSign },

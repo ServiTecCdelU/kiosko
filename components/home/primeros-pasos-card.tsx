@@ -37,19 +37,25 @@ function leerOculta(): boolean {
 
 export function PrimerosPasosCard() {
   const [pasos, setPasos] = useState<Pasos | null>(null);
+  const [conMercadoPago, setConMercadoPago] = useState(true);
   const [oculta, setOculta] = useState(true);
 
   useEffect(() => {
     if (leerOculta()) return;
     setOculta(false);
-    consultar<{ mostrar: boolean; pasos: Pasos }>("/api/consultas/primeros-pasos", "estado")
-      .then((r) => setPasos(r.mostrar ? r.pasos : null))
+    consultar<{ mostrar: boolean; pasos: Pasos; incluyeMercadoPago?: boolean }>("/api/consultas/primeros-pasos", "estado")
+      .then((r) => {
+        setPasos(r.mostrar ? r.pasos : null);
+        setConMercadoPago(r.incluyeMercadoPago !== false);
+      })
       .catch(() => setPasos(null)); // es una ayuda: si falla, no se muestra
   }, []);
 
   if (oculta || !pasos) return null;
-  const hechos = PASOS.filter((p) => pasos[p.id]).length;
-  if (hechos === PASOS.length) return null;
+  // Plan Basico: sin Mercado Pago, ese paso no se puede completar.
+  const visibles = PASOS.filter((p) => p.id !== "mercadoPago" || conMercadoPago);
+  const hechos = visibles.filter((p) => pasos[p.id]).length;
+  if (hechos === visibles.length) return null;
 
   const ocultar = () => {
     setOculta(true);
@@ -70,7 +76,7 @@ export function PrimerosPasosCard() {
           </span>
           <div>
             <h3 id="primeros-pasos-titulo" className="font-semibold text-foreground">Primeros pasos</h3>
-            <p className="text-xs text-muted-foreground">{hechos} de {PASOS.length} listos</p>
+            <p className="text-xs text-muted-foreground">{hechos} de {visibles.length} listos</p>
           </div>
         </div>
         <button onClick={ocultar} className="text-muted-foreground/70 hover:text-foreground" aria-label="Ocultar primeros pasos">
@@ -79,11 +85,11 @@ export function PrimerosPasosCard() {
       </div>
 
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-        <div className="grad-brand h-full rounded-full transition-[width] duration-500" style={{ width: `${(hechos / PASOS.length) * 100}%` }} />
+        <div className="grad-brand h-full rounded-full transition-[width] duration-500" style={{ width: `${(hechos / visibles.length) * 100}%` }} />
       </div>
 
       <ol className="mt-4 divide-y">
-        {PASOS.map((p) => {
+        {visibles.map((p) => {
           const hecho = pasos[p.id];
           return (
             <li key={p.id} className="flex items-center gap-3 py-2.5">

@@ -1,6 +1,7 @@
 // lib/impresora/imprimir.ts — punto unico de impresion del ticket desde el navegador.
 //
 // Elige el transporte segun la configuracion de esta PC (lib/impresora/config.ts):
+//   ninguno   → no sale nada (kiosco sin ticketera)
 //   navegador → el llamador abre window.print() (el ticket HTML ya esta en pantalla)
 //   webusb    → bytes ESC/POS directo a la impresora USB
 //   agente    → bytes ESC/POS al agente local, que escribe en la impresora de Windows o de red
@@ -16,8 +17,11 @@ import { enviarPorUsb } from "@/lib/impresora/webusb";
 import { enviarAlAgente } from "@/lib/impresora/agente";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
 
-/** "impreso": ya salio. "navegador": el llamador tiene que abrir window.print(). */
-export type ResultadoImpresion = "impreso" | "navegador";
+/**
+ * "impreso": ya salio. "navegador": el llamador tiene que abrir window.print().
+ * "omitido": esta PC no imprime tickets (modo "ninguno").
+ */
+export type ResultadoImpresion = "impreso" | "navegador" | "omitido";
 
 /** Metodos con los que el cajon se abre solo (hay efectivo de por medio). */
 export function cobroConEfectivo(metodo: PaymentMethod): boolean {
@@ -51,6 +55,7 @@ async function imprimirZebra(ticket: TicketData): Promise<void> {
  * impresora no respondio (el llamador decide si cae al navegador).
  */
 export async function imprimirTicket(ticket: TicketData, config: ConfigImpresora = leerConfigImpresora()): Promise<ResultadoImpresion> {
+  if (config.modo === "ninguno") return "omitido";
   if (config.modo === "navegador") return "navegador";
   if (config.modo === "zebra") {
     await imprimirZebra(ticket);

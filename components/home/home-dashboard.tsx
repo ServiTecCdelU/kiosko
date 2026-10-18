@@ -205,13 +205,16 @@ function BrandHeader({ comercio }: { comercio?: string }) {
   const hora = now
     ? now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
     : "--:--";
-  const fecha = now
+  // Solo la primera letra en mayuscula ("Domingo, 18 de octubre"): con la clase
+  // capitalize salia "18 De Octubre".
+  const fechaLarga = now
     ? now.toLocaleDateString("es-AR", {
         weekday: "long",
         day: "numeric",
         month: "long",
       })
     : "";
+  const fecha = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
   const saludo = getSaludo(now);
 
   return (
@@ -236,7 +239,7 @@ function BrandHeader({ comercio }: { comercio?: string }) {
         <p className="font-mono text-2xl font-semibold leading-none tracking-tight text-foreground tabular-nums">
           {hora}
         </p>
-        <p className="mt-1 text-xs capitalize text-muted-foreground">{fecha}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{fecha}</p>
       </div>
     </header>
   );

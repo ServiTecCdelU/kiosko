@@ -35,9 +35,10 @@ const timeFormatter = new Intl.DateTimeFormat("es-AR", {
   hour12: false,
 });
 
+/** "$ 1.500" si es entero y "$ 1.450,50" si tiene centavos (nunca "$ 1.450,5"). */
 export const formatCurrency = (amount: number): string => {
-  const safe = typeof amount === "number" && !isNaN(amount) ? amount : 0;
-  return currencyFormatter.format(safe);
+  const safe = typeof amount === "number" && !isNaN(amount) ? Math.round(amount * 100) / 100 : 0;
+  return (Number.isInteger(safe) ? currencyFormatter : currencyFormatterDecimals).format(safe);
 };
 
 export const formatCurrencyDecimals = (amount: number): string => {

@@ -493,7 +493,7 @@ export default function StockPage() {
                   <TableHead className="text-right">Margen</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-right">Mín.</TableHead>
-                  <TableHead className="text-right">Lote</TableHead>
+                  <TableHead className="text-right" title="Unidades por bulto">Bulto</TableHead>
                   <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>

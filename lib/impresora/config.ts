@@ -5,7 +5,8 @@
 import { claveDelComercioActual } from "@/lib/clave-comercio";
 import type { AnchoPapel } from "@/lib/escpos";
 
-export type ModoImpresora = "navegador" | "webusb" | "agente" | "zebra";
+/** "ninguno": kiosco sin ticketera; el ticket solo sale si se toca "Reimprimir". */
+export type ModoImpresora = "ninguno" | "navegador" | "webusb" | "agente" | "zebra";
 
 export interface ConfigImpresora {
   modo: ModoImpresora;
@@ -32,6 +33,7 @@ export const CONFIG_IMPRESORA_DEFAULT: ConfigImpresora = {
 const CLAVE = "kiosko:impresora";
 
 export const MODO_LABEL: Record<ModoImpresora, string> = {
+  ninguno: "No imprimir ticket",
   navegador: "Diálogo de impresión del navegador",
   webusb: "Impresora térmica por USB (sin instalar nada)",
   agente: "Impresora térmica por el agente local",
@@ -54,6 +56,20 @@ export function leerConfigImpresora(): ConfigImpresora {
     };
   } catch {
     return CONFIG_IMPRESORA_DEFAULT;
+  }
+}
+
+/**
+ * false si en esta PC nunca se eligio como imprimir. El POS entonces no abre la
+ * ventana de imprimir por su cuenta: pregunta una vez (muchos kioscos no tienen ticketera).
+ */
+export function impresoraConfigurada(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const clave = claveDelComercioActual(CLAVE);
+    return !!clave && window.localStorage.getItem(clave) !== null;
+  } catch {
+    return true;
   }
 }
 

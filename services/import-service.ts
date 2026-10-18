@@ -1,7 +1,7 @@
 import { apiUrl } from "@/lib/utils/api-url"
 // services/import-service.ts — importación masiva de productos desde lista de precios (Excel o CSV)
 import * as XLSX from "xlsx-js-style";
-import { indexToLetter, letterToIndex, parsearNumero } from "@/lib/importar-filas";
+import { claveProducto, indexToLetter, letterToIndex, parsearNumero, separarCodigos } from "@/lib/importar-filas";
 
 export { indexToLetter, letterToIndex };
 
@@ -20,12 +20,12 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   barra: "Código de barra",
   codigo: "Código",
   descripcion: "Descripción",
-  precio: "Precio (Cons. Final)",
+  precio: "Precio de venta",
   costo: "Costo (opcional, para margen)",
   rubro: "Rubro",
   subrubro: "Subrubro",
   stock: "Stock",
-  lote: "Lote (unidades por paquete)",
+  lote: "Unidades por bulto",
 };
 
 // El mapeo usa la letra de columna de Excel (A, B, C...), no el texto del encabezado
@@ -164,6 +164,8 @@ export interface ParsedRow {
   stock: number;
   lote: number | undefined;
   warnings: string[];
+  /** Mismo codigo que una fila anterior del archivo: no se importa. */
+  repetida?: boolean;
 }
 
 export function parseRows(
@@ -187,13 +189,14 @@ export function parseRows(
 
   const dataRows = rows.slice(startRow - 1);
   const parsed: ParsedRow[] = [];
+  // Primera fila de cada codigo, para marcar las repetidas.
+  const vistas = new Map<string, number>();
 
   dataRows.forEach((r, i) => {
     if (r.every((c) => String(c ?? "").trim() === "")) return;
 
     const get = (i2: number) => (i2 >= 0 ? String(r[i2] ?? "").trim() : "");
-    const barra = get(idx.barra);
-    const codigo = get(idx.codigo);
+    const { barra, codigo } = separarCodigos(get(idx.barra), get(idx.codigo));
     const descripcion = get(idx.descripcion);
     // Numeros como vienen en las listas argentinas: "1.500,50", "$ 1.500", "12,5".
     const precio = parsearNumero(get(idx.precio)) ?? 0;
@@ -211,6 +214,10 @@ export function parseRows(
     if (!barra && !codigo) warnings.push("sin código");
     if (!rubro) warnings.push("sin rubro");
     if (!descripcion) warnings.push("sin descripción");
+    const clave = claveProducto(barra, codigo);
+    const primera = clave ? vistas.get(clave) : undefined;
+    if (primera !== undefined) warnings.push(`repetido (igual que la fila ${primera}): no se importa`);
+    else if (clave) vistas.set(clave, startRow + i);
 
     parsed.push({
       rowNumber: startRow + i,
@@ -224,13 +231,15 @@ export function parseRows(
       stock,
       lote,
       warnings,
+      repetida: primera !== undefined,
     });
   });
 
   return parsed;
 }
 
-export type StockStrategy = "no_tocar" | "reemplazar" | "sumar" | "solo_nuevos";
+// Mismos valores que EstrategiaStock (lib/server/importar-productos.ts).
+export type StockStrategy = "mantener" | "reemplazar" | "sumar" | "solo_nuevos";
 
 export interface ImportOptions {
   stockStrategy: StockStrategy;
@@ -252,6 +261,10 @@ export async function importProducts(
   const summary: ImportSummary = { creados: 0, actualizados: 0, omitidos: 0, conAdvertencias: 0 };
 
   const usable = rows.filter((r) => {
+    if (r.repetida) {
+      summary.omitidos++;
+      return false;
+    }
     if (r.warnings.length > 0 && !options.incluirConAdvertencias) {
       summary.omitidos++;
       return false;
@@ -277,6 +290,7 @@ export async function importProducts(
 
     summary.creados += data.creados ?? 0;
     summary.actualizados += data.actualizados ?? 0;
+    summary.omitidos += data.omitidos ?? 0;
     summary.conAdvertencias += data.conAdvertencias ?? 0;
 
     onProgress?.(Math.min(i + TAMANIO_LOTE, usable.length), usable.length);

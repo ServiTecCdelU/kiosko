@@ -36,7 +36,7 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
     chocar con rutas fijas: ver `RUTAS_RESERVADAS` en `lib/panel.ts`.
   - `/login`, `/pos`, `/caja`, `/stock` (+ `/stock/inventario`), `/ventas`, `/clientes`, `/compras`,
     `/promociones`, `/reportes`, `/usuarios`, `/facturacion` (incluye Cobros con Mercado Pago),
-    `/sincronizacion` (Sincronización y reportes: catálogo + copia de datos en Excel),
+    `/sincronizacion` (Catálogo y copia de datos: catálogo + copia de datos en Excel),
     `/suscripcion`, `/ayuda` (tutorial por pantalla, todos los roles).
   - Inicio del admin: Primeros pasos, tarjetas de hoy, accesos (incluye la tarjeta "Suscripción",
     al lado de Ayuda, que lleva a `/suscripcion`) y "Cuenta"

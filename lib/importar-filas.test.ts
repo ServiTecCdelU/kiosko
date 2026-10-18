@@ -1,7 +1,7 @@
 // lib/importar-filas.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { adivinarMapeo, CLIENTE_AUTO_MATCH, indexToLetter, letterToIndex, parsearClientes, parsearNumero } from "./importar-filas.ts";
+import { adivinarMapeo, claveProducto, CLIENTE_AUTO_MATCH, esCodigoDeBarras, indexToLetter, letterToIndex, parsearClientes, parsearNumero, separarCodigos } from "./importar-filas.ts";
 
 describe("letras de columna", () => {
   test("ida y vuelta", () => {
@@ -75,5 +75,29 @@ describe("parsearClientes", () => {
     const r = parsearClientes(rows, { telefono: "B" }, 2);
     assert.equal(r.filas.length, 0);
     assert.equal(r.sinNombre, 4);
+  });
+});
+
+describe("códigos de productos", () => {
+  test("reconoce códigos de barra con dígito verificador", () => {
+    assert.equal(esCodigoDeBarras("4006381333931"), true); // EAN-13
+    assert.equal(esCodigoDeBarras("96385074"), true); // EAN-8
+    assert.equal(esCodigoDeBarras("036000291452"), true); // UPC-A
+    assert.equal(esCodigoDeBarras("4006381333932"), false); // verificador mal
+    assert.equal(esCodigoDeBarras("CC15"), false);
+    assert.equal(esCodigoDeBarras("12345"), false);
+  });
+
+  test("un EAN en la columna Código pasa a ser código de barra", () => {
+    assert.deepEqual(separarCodigos("", "4006381333931"), { barra: "4006381333931", codigo: "" });
+    assert.deepEqual(separarCodigos("", "D020"), { barra: "", codigo: "D020" });
+    // Si ya hay columna de barra, no se toca nada.
+    assert.deepEqual(separarCodigos("96385074", "4006381333931"), { barra: "96385074", codigo: "4006381333931" });
+  });
+
+  test("clave para repetidos: barra primero, código sin mayúsculas", () => {
+    assert.equal(claveProducto("779", "X"), "b:779");
+    assert.equal(claveProducto("", "Ab1"), "c:ab1");
+    assert.equal(claveProducto("", ""), "");
   });
 });

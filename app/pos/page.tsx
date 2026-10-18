@@ -48,7 +48,7 @@ import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
 import { QuickCreateProductDialog } from "@/components/pos/quick-create-product-dialog";
 import { ImpresoraDialog } from "@/components/pos/impresora-dialog";
 import { abrirCajon, imprimirTicket as imprimirTicketConfigurado } from "@/lib/impresora/imprimir";
-import { leerConfigImpresora, modoPuedeAbrirCajon, type ConfigImpresora } from "@/lib/impresora/config";
+import { guardarConfigImpresora, impresoraConfigurada, leerConfigImpresora, modoPuedeAbrirCajon, type ConfigImpresora } from "@/lib/impresora/config";
 import type { Caja, Product } from "@/lib/types";
 
 /** Ofertas que se imprimen al pie de cada ticket. */
@@ -73,6 +73,8 @@ function PosScreen() {
   const [processing, setProcessing] = useState(false);
   const [cajaId, setCajaId] = useState<string | undefined>(undefined);
   const [cajasAbiertas, setCajasAbiertas] = useState<Caja[]>([]);
+  // Hasta saber que cajas hay abiertas no se avisa "caja cerrada".
+  const [cajasCargadas, setCajasCargadas] = useState(false);
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
@@ -101,6 +103,7 @@ function PosScreen() {
     // sin caja propia: si hay una sola abierta se usa esa; con varias, elige.
     const elegirCaja = (cs: Caja[]) => {
       setCajasAbiertas(cs);
+      setCajasCargadas(true);
       const u = getCurrentUser();
       const propia = u ? cs.find((c) => c.abiertaPor === u.id) : undefined;
       if (propia) setCajaId(propia.id);
@@ -324,12 +327,35 @@ function PosScreen() {
     [addToCart, focusInput],
   );
 
-  const imprimirTicket = useCallback((ticket: TicketData) => {
+  const imprimirTicket = useCallback((ticket: TicketData, manual = false) => {
     // Segun la configuracion de esta PC: termica ESC/POS (USB o agente), Zebra o
     // navegador. Si la impresora no responde, se cae al ticket HTML del navegador
     // para que el cliente igual se lleve su ticket.
     const porNavegador = () => setTimeout(() => window.print(), 150);
-    imprimirTicketConfigurado(ticket, configImpresora ?? leerConfigImpresora())
+    const config = configImpresora ?? leerConfigImpresora();
+    const guardar = (modo: ConfigImpresora["modo"]) => {
+      const nueva = { ...config, modo };
+      guardarConfigImpresora(nueva);
+      setConfigImpresora(nueva);
+    };
+    // "Reimprimir" sin ticketera: el cliente lo pidio, sale por el navegador.
+    if (manual && config.modo === "ninguno") {
+      porNavegador();
+      return;
+    }
+    // PC sin configurar: en vez de abrir la ventana de imprimir en cada venta
+    // (muchos kioscos no tienen ticketera), se pregunta una vez.
+    if (!manual && !impresoraConfigurada()) {
+      toast("¿Imprimís tickets en esta caja?", {
+        id: "preguntar-impresora",
+        duration: 20000,
+        description: "Si no tenés ticketera, elegí No: se cobra sin imprimir. Se cambia en “Impresora”.",
+        action: { label: "Sí, imprimir", onClick: () => { guardar("navegador"); porNavegador(); } },
+        cancel: { label: "No", onClick: () => guardar("ninguno") },
+      });
+      return;
+    }
+    imprimirTicketConfigurado(ticket, config)
       .then((r) => {
         if (r === "navegador") porNavegador();
       })
@@ -569,6 +595,20 @@ function PosScreen() {
     [cart, cajaId, finalizarTicket, resolverDispositivoPoint],
   );
 
+  // Sin caja la venta queda con caja_id null y no entra en ningun cierre
+  // (lib/server/caja.ts filtra por caja): el arqueo daria faltante.
+  const eligeCaja = cajasAbiertas.length > 1 && getCurrentUser()?.rol !== "cajero";
+  const avisoCaja = cajasCargadas && !cajaId ? (
+    eligeCaja ? (
+      <p>Elegí arriba en qué caja va esta venta.</p>
+    ) : (
+      <p>
+        La caja está cerrada. Abrila para cobrar: así la venta entra en el cierre del día.{" "}
+        <Link href="/caja" className="font-semibold text-primary underline-offset-2 hover:underline">Abrir caja</Link>
+      </p>
+    )
+  ) : undefined;
+
   return (
     <main className="bg-mesh flex h-screen flex-col bg-muted/30">
       <AvisoSoporte />
@@ -637,7 +677,7 @@ function PosScreen() {
           </button>
           {lastTicket && (
             <button
-              onClick={() => lastTicket && imprimirTicket(lastTicket)}
+              onClick={() => lastTicket && imprimirTicket(lastTicket, true)}
               className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <Printer className="h-3.5 w-3.5" /> Reimprimir
@@ -817,6 +857,7 @@ function PosScreen() {
             onSuspend={handleSuspender}
             processing={processing}
             isOnline={isOnline}
+            avisoBloqueo={avisoCaja}
           />
         </div>
       </div>

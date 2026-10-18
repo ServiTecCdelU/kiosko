@@ -55,6 +55,34 @@ export function adivinarMapeo<C extends string>(encabezados: string[], patrones:
   return mapeo;
 }
 
+// ---- Productos --------------------------------------------------------------
+
+/** Codigo de barras real (EAN-8, UPC-A, EAN-13 o GTIN-14) con su digito verificador. */
+export function esCodigoDeBarras(codigo: string): boolean {
+  const s = codigo.trim();
+  if (!/^(\d{8}|\d{12,14})$/.test(s)) return false;
+  const digitos = s.split("").map(Number);
+  const verificador = digitos.pop()!;
+  const suma = digitos.reverse().reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (suma % 10)) % 10 === verificador;
+}
+
+/**
+ * Muchas listas traen el codigo de barras en una columna "Código". Si no hay
+ * columna de barra y el codigo es un EAN valido, va como codigo de barras.
+ */
+export function separarCodigos(barra: string, codigo: string): { barra: string; codigo: string } {
+  if (!barra && esCodigoDeBarras(codigo)) return { barra: codigo, codigo: "" };
+  return { barra, codigo };
+}
+
+/** Clave para detectar el mismo producto repetido dentro de un archivo. */
+export function claveProducto(barra: string, codigo: string): string {
+  if (barra) return `b:${barra}`;
+  if (codigo) return `c:${codigo.toLowerCase()}`;
+  return "";
+}
+
 // ---- Clientes ---------------------------------------------------------------
 
 export type ClienteCampo = "nombre" | "telefono" | "documento" | "limite" | "saldo" | "notas";

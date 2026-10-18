@@ -95,7 +95,7 @@ function SincronizacionContent() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-bold sm:text-2xl">Sincronización y reportes</h1>
+          <h1 className="text-xl font-bold sm:text-2xl">Catálogo y copia de datos</h1>
           <p className="text-sm text-muted-foreground">Catálogo desde la distribuidora y copia completa de tus datos</p>
         </div>
         <Button onClick={handleSync} disabled={syncing} className="rounded-2xl">

@@ -1,7 +1,7 @@
 // lib/pricing.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { tieneOferta, precioFinal, ahorroOferta, precioLinea, comboLabel } from "./pricing.ts";
+import { tieneOferta, precioFinal, ahorroOferta, precioLinea, comboLabel, pesos } from "./pricing.ts";
 
 const base = { price: 1000 };
 
@@ -129,5 +129,14 @@ describe("comboLabel", () => {
   test("el resto se muestra como NxPRECIO", () => {
     const p = { ...base, ofertaActiva: true, ofertaTipo: "combo" as const, ofertaValor: 2500, ofertaCantidad: 3 };
     assert.equal(comboLabel(p), "3x$2.500");
+  });
+});
+
+describe("pesos", () => {
+  test("entero sin decimales y con centavos siempre dos", () => {
+    assert.equal(pesos(1500), "$1.500");
+    assert.equal(pesos(1450.5), "$1.450,50");
+    assert.equal(pesos(0.1 + 0.2), "$0,30");
+    assert.equal(pesos(99.999), "$100");
   });
 });

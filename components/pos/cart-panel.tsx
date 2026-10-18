@@ -59,6 +59,8 @@ interface CartPanelProps {
   processing: boolean;
   /** Los metodos de Mercado Pago necesitan conexion: se deshabilitan sin ella. */
   isOnline?: boolean;
+  /** Si viene, no se puede cobrar y se muestra arriba del boton (ej: caja cerrada). */
+  avisoBloqueo?: React.ReactNode;
 }
 
 /** "¡Llevá 1 más gratis!": el cliente quedo a medio combo; un toque suma lo que falta. */
@@ -81,7 +83,7 @@ function EmpujeComboAviso({ item, onSumar }: { item: CartItem; onSumar: (faltan:
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
-  { items, total: totalBruto, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true },
+  { items, total: totalBruto, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true, avisoBloqueo },
   ref,
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
@@ -127,7 +129,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const total = Math.max(0, Math.round((totalBruto - descuentoMonto) * 100) / 100);
   const ahorroOfertas = items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0);
 
-  const pagaConNum = Number(pagaCon) || 0;
+  // "Paga con" vacio = paga justo: en el kiosco casi siempre es asi y obligar a
+  // tocar "Justo" dejaba el boton Cobrar apagado sin que se entienda por que.
+  const pagaJusto = pagaCon.trim() === "";
+  const pagaConNum = pagaJusto ? total : Number(pagaCon) || 0;
   const vuelto = method === "efectivo" ? Math.max(0, pagaConNum - total) : 0;
   const faltaEfectivo = method === "efectivo" && pagaConNum < total;
 
@@ -167,7 +172,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const deudaProyectada = credito?.deudaProyectada ?? 0;
   const excedeCredito = method === "fiado" && !!credito && credito.supera;
 
-  const disabled = items.length === 0 || processing || faltaEfectivo || faltaCliente || excedeCredito || faltaPagador;
+  const disabled = items.length === 0 || processing || !!avisoBloqueo || faltaEfectivo || faltaCliente || excedeCredito || faltaPagador;
 
   const handleConfirm = () => {
     if (disabled) return;
@@ -444,7 +449,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           <div className="mb-3 space-y-2">
             <div className="flex items-center gap-2">
               <Input
-                type="number" inputMode="decimal" placeholder="Paga con"
+                type="number" inputMode="decimal" placeholder="Paga con (vacío = justo)"
                 value={pagaCon} onChange={(e) => setPagaCon(e.target.value)}
                 className="rounded-xl"
               />
@@ -455,7 +460,9 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Vuelto</span>
               <span className={cn("font-semibold", faltaEfectivo ? "text-destructive" : "text-foreground")}>
-                {faltaEfectivo ? "Falta " + formatCurrency(total - pagaConNum) : formatCurrency(vuelto)}
+                {faltaEfectivo
+                  ? "Falta " + formatCurrency(total - pagaConNum)
+                  : pagaJusto && total > 0 ? "Paga justo" : formatCurrency(vuelto)}
               </span>
             </div>
           </div>
@@ -537,6 +544,12 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
               </span>
               <span className="cifra font-semibold">{formatCurrency(parte2Final)}</span>
             </div>
+          </div>
+        )}
+
+        {avisoBloqueo && (
+          <div role="alert" className="mb-3 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            {avisoBloqueo}
           </div>
         )}
 

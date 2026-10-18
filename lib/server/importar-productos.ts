@@ -2,6 +2,7 @@
 // (server-only, service role). El parseo del archivo sigue en el navegador;
 // lo que se movio aca son las escrituras, que antes iban con el anon key.
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { claveProducto } from "@/lib/importar-filas";
 
 export interface FilaImportacion {
   barra: string;
@@ -58,12 +59,14 @@ async function buscarExistente(
       .maybeSingle();
     if (data) return data as ProductoExistente;
   }
-  if (fila.codigo) {
+  // Un EAN que una importacion vieja guardo como codigo interno tambien cuenta.
+  const codigo = fila.codigo || fila.barra;
+  if (codigo) {
     const { data } = await supabaseAdmin
       .from("productos")
       .select(COLUMNAS)
       .eq("comercio_id", comercioId)
-      .eq("codigo", fila.codigo)
+      .eq("codigo", codigo)
       .limit(1)
       .maybeSingle();
     if (data) return data as ProductoExistente;
@@ -161,6 +164,20 @@ export async function importarLote(
     omitidos: 0,
     conAdvertencias: 0,
   };
+
+  // El mismo producto dos veces en el lote crearia dos filas (van en paralelo):
+  // queda la primera. El navegador ya las saca; esto es la segunda barrera.
+  const vistas = new Set<string>();
+  filas = filas.filter((f) => {
+    const clave = claveProducto(f.barra ?? "", f.codigo ?? "");
+    if (!clave) return true;
+    if (vistas.has(clave)) {
+      resumen.omitidos++;
+      return false;
+    }
+    vistas.add(clave);
+    return true;
+  });
 
   // De a 25 en paralelo, igual que la version que corria en el navegador.
   const CONCURRENCIA = 25;

@@ -1,6 +1,7 @@
 // lib/registro.ts — datos del alta self-service de un comercio (app/registro).
 // Lo comparten el formulario y app/api/registro: mismas reglas en los dos lados.
 import { z } from "zod";
+import { telefonoInventado } from "./demo.ts";
 
 export const RUBROS = [
   { id: "kiosco", nombre: "Kiosco" },
@@ -32,7 +33,12 @@ const esquema = z
     telefono: z
       .string()
       .transform((t) => t.replace(/[^\d+]/g, ""))
-      .pipe(z.string().min(8, "Poné un WhatsApp válido, con característica").max(20, "Poné un WhatsApp válido")),
+      .pipe(
+        z.string()
+          .min(8, "Poné un WhatsApp válido, con característica")
+          .max(20, "Poné un WhatsApp válido")
+          .refine((t) => !telefonoInventado(t), "Poné un WhatsApp válido, con característica"),
+      ),
     rubro: z.enum(IDS_RUBRO, { errorMap: () => ({ message: "Elegí el rubro" }) }),
     plan: z.enum(["basico", "pro"], { errorMap: () => ({ message: "Elegí un plan" }) }).default("basico"),
     cajas: z.coerce.number().int("Las cajas son un número entero").min(1, "Al menos 1 caja").max(MAX_CAJAS_REGISTRO, `Hasta ${MAX_CAJAS_REGISTRO} cajas; para más, escribinos`).default(1),
