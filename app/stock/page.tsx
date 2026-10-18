@@ -708,7 +708,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <AumentoPreciosDialog open={aumentoOpen} onOpenChange={setAumentoOpen} onAplicado={() => refreshAll()} />
-      <QendraDialog open={qendraOpen} onOpenChange={setQendraOpen} products={products} />
+      <QendraDialog open={qendraOpen} onOpenChange={setQendraOpen} onCambio={() => refreshAll()} />
       <ProductosTipicosDialog open={tipicosOpen} onOpenChange={setTipicosOpen} onCreados={() => refreshAll()} />
       <EtiquetasPrint productos={productosEtiqueta} />
       {impresion}

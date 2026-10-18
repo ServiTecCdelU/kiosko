@@ -23,7 +23,7 @@ import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
+import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte, unidadesDesdeImporte } from "@/lib/barcode-balanza";
 import { leerDigitosPlu, leerFormatoBalanza, leerPrefijoTicket } from "@/lib/balanza-config";
 import { ajustarCantidad, cantidadTexto, separarMultiplicador } from "@/lib/cantidad";
 import { esFraccionable, porUnidad } from "@/lib/unidades";
@@ -391,7 +391,17 @@ function PosScreen() {
         const p = await buscarPorCodigo(c);
         if (!p) continue;
         if (p.unidad !== "kg") {
-          // PLU apunta a un producto por unidad: se agrega normal y se avisa.
+          // Producto por unidad (un pack de oferta, 71_productos_pack.sql): la etiqueta
+          // trae el importe de las unidades que marco la balanza.
+          if (balanza.importe !== null) {
+            const n = unidadesDesdeImporte(balanza.importe, precioFinal(p));
+            if (n === null) {
+              toast.error(`${p.name}: la etiqueta dice ${formatCurrency(balanza.importe)} y el precio es ${formatCurrency(precioFinal(p))}. Volvé a enviar los precios a la balanza.`);
+              return true;
+            }
+            addToCart(p, n);
+            return true;
+          }
           toast.warning(`${p.name} no está marcado como pesable`);
           addToCart(p);
           return true;

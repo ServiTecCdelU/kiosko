@@ -23,6 +23,9 @@ export interface Product {
   stockControlado: boolean;
   /** Se cobra el importe que se tipea en el POS (recargas, "varios"): 64_precio_libre.sql. */
   precioLibre?: boolean;
+  /** Pack de otro producto (71_productos_pack.sql): cada unidad son packCantidad del producto packDe. */
+  packDe?: string | null;
+  packCantidad?: number | null;
   /** Se elabora en el local: aparece en Produccion (68_produccion.sql). */
   elaboracionPropia?: boolean;
   /** Alicuota de IVA (0, 2.5, 5, 10.5, 21, 27). La usa la Factura A/B. */

@@ -2,7 +2,7 @@
 // El formato sale del instructivo de Systel para importar en Qendra.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { bytesQendra, generarQendra, pluDe, precioQendra, textoCuora } from "./qendra.ts";
+import { bytesQendra, codigoLibre, generarQendra, nombrePack, pluDe, precioQendra, textoCuora } from "./qendra.ts";
 
 describe("formato Qendra", () => {
   test("la linea del ejemplo del instructivo", () => {
@@ -71,7 +71,28 @@ describe("ofertas", () => {
     ]);
     assert.deepEqual(r.lineas.map((l) => l.split(";")[4]), ["2000,00", "800,00", "1800,00", "1100,00"]);
     assert.equal(r.conOferta, 2);
-    assert.deepEqual(r.combos, ["Banana"]);
+    assert.deepEqual(r.combos.map((c) => c.name), ["Banana"]);
+  });
+});
+
+describe("combo como pack", () => {
+  const banana = { id: "b", name: "Banana", codigo: "7008", price: 1800, unidad: "kg", ofertaActiva: true, ofertaTipo: "combo" as const, ofertaValor: 3000, ofertaCantidad: 2 };
+  const pack = { id: "p", name: "Banana 2 kg oferta", codigo: "7009", price: 3000, unidad: "un", packDe: "b" };
+  test("con el pack creado, el combo va a la balanza como producto por unidad y no se avisa", () => {
+    const r = generarQendra([banana, pack]);
+    assert.deepEqual(r.combos, []);
+    assert.deepEqual(r.lineas, ["General;7008;Banana;4;1800,00;0,00;P;0;;", "General;7009;Banana 2 kg oferta;5;3000,00;0,00;U;0;;"].map((l) => l.replace(";4;", ";1;").replace(";5;", ";2;")));
+  });
+  test("sin pack se ofrece crearlo; con la oferta terminada el pack no va", () => {
+    assert.deepEqual(generarQendra([banana]).combos.map((c) => [c.cantidad, c.valor]), [[2, 3000]]);
+    const r = generarQendra([{ ...banana, ofertaActiva: false }, pack]);
+    assert.equal(r.incluidos, 1);
+    assert.match(r.omitidos[0].motivo, /no está vigente/);
+  });
+  test("nombre y codigo del pack", () => {
+    assert.equal(nombrePack({ name: "Banana", cantidad: 2, unidad: "kg" }), "Banana 2 kg oferta");
+    assert.equal(nombrePack({ name: "Palta", cantidad: 1.5, unidad: "kg" }), "Palta 1,5 kg oferta");
+    assert.equal(codigoLibre(["7008", "7790001234567", null, "12"]), "7009");
   });
 });
 

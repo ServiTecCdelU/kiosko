@@ -20,6 +20,9 @@ const LARGO_TEXTO = 18;
 
 /** Con los campos de oferta: la balanza recibe el precio CON la oferta de hoy (lib/pricing.ts). */
 export interface ProductoQendra extends ConOferta {
+  id?: string;
+  /** Pack de oferta (71_productos_pack.sql): va a la balanza mientras dure el combo del base. */
+  packDe?: string | null;
   name: string;
   codigo?: string | null;
   price: number;
@@ -36,8 +39,12 @@ export interface ResultadoQendra {
   omitidos: { name: string; motivo: string }[];
   /** Cuantos van con el precio de oferta. */
   conOferta: number;
-  /** Ofertas combo ("2 kg x $3.000"): la balanza no las puede aplicar, van a precio de lista. */
-  combos: string[];
+  /**
+   * Ofertas combo ("2 kg x $3.000") sin su producto pack: la balanza no las puede
+   * aplicar, van a precio de lista. Con el pack creado, el combo se vende en la balanza
+   * como un producto por unidad.
+   */
+  combos: { id?: string; name: string; category?: string | null; cantidad: number; valor: number; unidad: string }[];
 }
 
 // La Cuora solo muestra ASCII imprimible mas ñ, Ñ y º (instructivo, nota 1).
@@ -76,11 +83,21 @@ export function generarQendra(productos: ProductoQendra[], seccion: string | nul
   const omitidos: { name: string; motivo: string }[] = [];
   const usados = new Set<number>();
   let conOferta = 0;
-  const combos: string[] = [];
+  const combos: ResultadoQendra["combos"] = [];
   const elegidos: { p: ProductoQendra; plu: number; descripcion: string }[] = [];
+
+  const porId = new Map(productos.filter((p) => p.id).map((p) => [p.id!, p]));
+  const conPack = new Set(productos.filter((p) => p.packDe && !p.disabled).map((p) => p.packDe!));
 
   for (const p of productos) {
     if (p.disabled) continue;
+    if (p.packDe) {
+      const base = porId.get(p.packDe);
+      if (!base || !(tieneOferta(base) && base.ofertaTipo === "combo")) {
+        omitidos.push({ name: p.name, motivo: `la oferta de ${base?.name ?? "su producto"} no está vigente` });
+        continue;
+      }
+    }
     const plu = pluDe(p.codigo);
     if (plu === null) {
       if (p.unidad === "kg") omitidos.push({ name: p.name, motivo: "sin código de balanza (número de 1 a 99997)" });
@@ -124,7 +141,12 @@ export function generarQendra(productos: ProductoQendra[], seccion: string | nul
     // Precio por kg/unidad con la oferta vigente: la etiqueta coincide con lo que cobra la caja.
     const precio = precioFinal(p);
     if (precio < p.price) conOferta++;
-    else if (tieneOferta(p) && p.ofertaTipo === "combo") combos.push(p.name);
+    else if (tieneOferta(p) && p.ofertaTipo === "combo" && !(p.id && conPack.has(p.id))) {
+      combos.push({
+        id: p.id, name: p.name, category: p.category, unidad: p.unidad,
+        cantidad: Number(p.ofertaCantidad) || 0, valor: Number(p.ofertaValor) || 0,
+      });
+    }
     const sec = textoCuora(seccion ?? (p.category ?? "").split(" / ")[0]) || "General";
     lineas.push([
       sec, plu, descripcion, numero, precioQendra(precio), "0,00",
@@ -147,4 +169,17 @@ export function bytesQendra(lineas: string[]): Uint8Array<ArrayBuffer> {
     out[i] = especiales[c] ?? (c.charCodeAt(0) < 0x80 ? c.charCodeAt(0) : 0x3f); // "?" si algo se escapo
   }
   return out;
+}
+
+/** "Banana 2 kg oferta". La balanza muestra los primeros 18 caracteres. */
+export function nombrePack(combo: { name: string; cantidad: number; unidad: string }): string {
+  const cant = combo.unidad === "un" ? `x${combo.cantidad}` : `${String(combo.cantidad).replace(".", ",")} ${combo.unidad}`;
+  return `${combo.name} ${cant} oferta`;
+}
+
+/** Primer codigo libre para un pack: el siguiente al mayor codigo numerico de balanza. */
+export function codigoLibre(codigos: (string | null | undefined)[]): string | null {
+  const usados = codigos.map(pluDe).filter((n): n is number => n !== null);
+  const siguiente = (usados.length ? Math.max(...usados) : 0) + 1;
+  return siguiente <= PLU_MAX ? String(siguiente) : null;
 }

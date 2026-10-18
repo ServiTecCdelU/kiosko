@@ -19,6 +19,30 @@ export const dynamic = "force-dynamic";
 const TIPOS_OFERTA = ["monto", "porcentaje", "combo"];
 
 // Debe coincidir con el CHECK de productos.iva (47_iva_producto.sql) y ALICUOTAS_IVA en lib/iva.ts.
+/**
+ * Pack de otro producto (71_productos_pack.sql). El base tiene que ser de este
+ * comercio y no ser un pack; la cantidad, positiva (entera si el base va por unidad).
+ */
+async function validarPack(
+  comercioId: string, packDe: unknown, packCantidad: unknown,
+): Promise<{ error: string } | { pack_de: string; pack_cantidad: number }> {
+  const cantidad = Number(packCantidad);
+  if (typeof packDe !== "string" || !packDe) return { error: "Falta el producto del pack" };
+  const { data: base, error } = await supabaseAdmin
+    .from("productos")
+    .select("id, unidad, pack_de")
+    .eq("comercio_id", comercioId)
+    .eq("id", packDe)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!base) return { error: "El producto del pack no existe" };
+  if (base.pack_de) return { error: "Un pack no puede armarse con otro pack" };
+  if (!(cantidad > 0) || (base.unidad === "un" && !Number.isInteger(cantidad))) {
+    return { error: "Cantidad del pack invalida" };
+  }
+  return { pack_de: base.id, pack_cantidad: Math.round(cantidad * 1000) / 1000 };
+}
+
 function esAlicuotaIva(valor: unknown): boolean {
   return [0, 2.5, 5, 10.5, 21, 27].includes(Number(valor));
 }
@@ -65,7 +89,7 @@ export async function PATCH(req: Request) {
   // asi un cambio de precio no puede quedar sin rastro.
   const { data: anterior, error: errorAnterior } = await supabaseAdmin
     .from("productos")
-    .select("price")
+    .select("price, pack_de")
     .eq("comercio_id", comercioId)
     .eq("id", productId)
     .maybeSingle();
@@ -88,8 +112,9 @@ export async function PATCH(req: Request) {
       revisar: input.revisar,
       favorito: input.favorito,
       fecha_vencimiento: input.fechaVencimiento || null,
-      unidad: input.unidad,
-      stock_controlado: input.stockControlado,
+      // Un pack (71_productos_pack.sql) sigue por unidad y sin stock propio.
+      unidad: anterior.pack_de ? "un" : input.unidad,
+      stock_controlado: anterior.pack_de ? false : input.stockControlado,
       ...(input.precioLibre !== undefined ? { precio_libre: !!input.precioLibre } : {}),
       ...(input.elaboracionPropia !== undefined ? { elaboracion_propia: !!input.elaboracionPropia } : {}),
     })
@@ -139,6 +164,13 @@ export async function POST(req: Request) {
   if (input.iva !== undefined && !esAlicuotaIva(input.iva)) {
     return NextResponse.json({ error: "Alicuota de IVA invalida" }, { status: 400 });
   }
+  // Pack: se vende por unidad y no tiene stock propio (mueve el del producto base).
+  let pack: { pack_de: string; pack_cantidad: number } | null = null;
+  if (input.packDe) {
+    const r = await validarPack(comercioId, input.packDe, input.packCantidad);
+    if ("error" in r) return NextResponse.json({ error: r.error }, { status: 400 });
+    pack = r;
+  }
 
   const { data, error } = await supabaseAdmin
     .from("productos")
@@ -152,11 +184,12 @@ export async function POST(req: Request) {
       category: input.category || "",
       price,
       precio_base: input.costo ?? null,
-      stock,
+      stock: pack ? 0 : stock,
       stock_minimo: Number(input.stockMinimo) || 0,
       lote: input.lote ?? null,
-      unidad: unidadValida(input.unidad),
-      stock_controlado: input.stockControlado ?? true,
+      unidad: pack ? "un" : unidadValida(input.unidad),
+      stock_controlado: pack ? false : input.stockControlado ?? true,
+      ...(pack ?? {}),
       precio_libre: !!input.precioLibre,
       elaboracion_propia: !!input.elaboracionPropia,
       fecha_vencimiento: input.fechaVencimiento || null,

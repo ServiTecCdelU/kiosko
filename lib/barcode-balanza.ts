@@ -96,3 +96,14 @@ export function pesoDesdeImporte(importe: number, precioKg: number): number | nu
   const kg = Math.round((importe / precioKg) * 1000) / 1000;
   return kg > 0 ? kg : null;
 }
+
+/**
+ * Unidades de una etiqueta de producto por unidad (la balanza multiplica: 2 packs de
+ * $3.000 = $6.000). null si el importe no es un multiplo del precio: la etiqueta se
+ * hizo con otro precio y no se puede saber cuantas son.
+ */
+export function unidadesDesdeImporte(importe: number, precio: number): number | null {
+  if (!(precio > 0) || !(importe > 0)) return null;
+  const n = Math.round(importe / precio);
+  return n >= 1 && Math.abs(n * precio - importe) < 0.01 ? n : null;
+}

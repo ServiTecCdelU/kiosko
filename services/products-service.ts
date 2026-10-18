@@ -29,6 +29,8 @@ export function mapRow(d: Record<string, any>): Product {
     unidad: unidadValida(d.unidad),
     stockControlado: d.stock_controlado ?? true,
     precioLibre: d.precio_libre === true,
+    packDe: d.pack_de ?? null,
+    packCantidad: d.pack_cantidad != null ? Number(d.pack_cantidad) : null,
     elaboracionPropia: d.elaboracion_propia === true,
     iva: d.iva != null ? Number(d.iva) : 21,
     disabled: d.disabled ?? false,
@@ -371,6 +373,9 @@ export interface CreateProductInput {
   precioLibre?: boolean;
   elaboracionPropia?: boolean;
   iva?: number;
+  /** Pack de otro producto (oferta para la balanza): ver lib/types.ts. */
+  packDe?: string;
+  packCantidad?: number;
 }
 
 export async function createProduct(input: CreateProductInput): Promise<string> {

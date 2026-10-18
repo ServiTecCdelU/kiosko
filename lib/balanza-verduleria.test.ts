@@ -5,7 +5,7 @@
 // con lib/barcode-balanza.ts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte } from "./barcode-balanza.ts";
+import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte, unidadesDesdeImporte } from "./barcode-balanza.ts";
 import { generarQendra } from "./qendra.ts";
 import { precioFinal, precioLinea } from "./pricing.ts";
 
@@ -93,6 +93,16 @@ describe("verduleria con Systel Cuora", () => {
     const kg = pesoDesdeImporte(leida.importe!, precioFinal(tomate))!;
     assert.equal(kg, 0.735);
     assert.equal(precioLinea(tomate, kg), leida.importe);
+  });
+
+  test("combo como pack: la balanza vende 2 'Banana 2 kg oferta' ($6.000) y la caja cobra eso", () => {
+    // Etiqueta de producto por unidad (21): PLU 7009, importe $6.000,00 (la Cuora multiplica).
+    const etiqueta = ean(`217009${String(600000).padStart(6, "0")}`);
+    const leida = parseCodigoBalanza(etiqueta, "importe-centavos", 4)!;
+    assert.equal(leida.plu, "7009");
+    assert.equal(unidadesDesdeImporte(leida.importe!, 3000), 2);
+    // Etiqueta hecha con otro precio: no se adivina la cantidad.
+    assert.equal(unidadesDesdeImporte(6500, 3000), null);
   });
 
   test("un importe en centavos leido como pesos enteros cobraria 100 veces mas", () => {

@@ -78,3 +78,20 @@ guarda en la carpeta que vigila Qendra (Chrome/Edge) o lo descarga. `lib/qendra.
   de lista y se avisan; la caja aplica el combo igual. Hay que volver a enviar cuando
   empieza o termina una oferta (si la balanza queda desactualizada, la caja cobra igual
   el importe de la etiqueta y solo se corre el peso que se descuenta del stock).
+
+## Combos en la balanza: producto pack (migración 71)
+
+La Cuora no puede cobrar "2 kg x $3.000" (un precio por kg, y el CSV de Qendra no tiene
+campo para combos). Se carga como **producto aparte por unidad**, "Banana 2 kg oferta" a
+$3.000, que la balanza vende como cualquier unitario (etiqueta `21`).
+- `productos.pack_de` / `pack_cantidad`: cada unidad son 2 kg de Banana. Venta,
+  anulación y devolución (`process_sale_kiosko`, `anular_venta_kiosko`,
+  `registrar_devolucion_kiosko`) mueven el stock del base. El pack se fuerza a "por
+  unidad" y sin stock propio; no hay packs de packs; el base tiene que ser del comercio.
+- Stock → Balanza: cada combo sin pack tiene "Crear «Banana 2 kg oferta»" (código libre
+  siguiente, precio del combo). Con la oferta del base terminada, el pack deja de ir a
+  la balanza (el producto queda; se desactiva a mano si no se usa más).
+- POS: etiqueta de producto por unidad con importe → unidades = importe / precio
+  (`unidadesDesdeImporte`); si no es múltiplo exacto avisa que hay que reenviar precios.
+- La banana suelta sigue a precio de lista en la balanza; si alguien pesa 2,5 kg suelta,
+  la caja aplica el combo y cobra menos que la etiqueta (a favor del cliente).
