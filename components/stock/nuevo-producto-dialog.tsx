@@ -44,6 +44,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const simbolo = simboloUnidad(unidad);
   const [stockControlado, setStockControlado] = useState(perfil.controlaStock);
   const [precioLibre, setPrecioLibre] = useState(false);
+  const [elaboracionPropia, setElaboracionPropia] = useState(false);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
   // El aviso del nombre recien despues de tocarlo: no se reta antes de escribir.
@@ -74,6 +75,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setUnidad(perfil.unidad);
     setStockControlado(perfil.controlaStock);
     setPrecioLibre(false);
+    setElaboracionPropia(false);
     setIva(IVA_DEFAULT);
   }, [open]);
 
@@ -118,6 +120,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
         favorito,
         stockControlado,
         precioLibre,
+        elaboracionPropia,
         iva,
         // Cargado a mano con todos sus datos no hay nada que revisar; sin precio, si
         // (salvo precio libre: el importe se pone al vender).
@@ -281,7 +284,11 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
                   Se vende sin contar unidades. Ej: recargas, fotocopias, o el pan y la verdura si no los contás
                 </span>
               </span>
-              <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />
+              <Switch
+                checked={!stockControlado}
+                // Sin control de stock no hay produccion que medir.
+                onCheckedChange={(v) => { setStockControlado(!v); if (v) setElaboracionPropia(false); }}
+              />
             </label>
             <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">
@@ -291,6 +298,18 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
                 </span>
               </span>
               <Switch checked={precioLibre} onCheckedChange={setPrecioLibre} />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">
+                Lo elaboramos acá
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Aparece en Producción para cargar lo horneado cada día. Lleva control de stock
+                </span>
+              </span>
+              <Switch
+                checked={elaboracionPropia}
+                onCheckedChange={(v) => { setElaboracionPropia(v); if (v) setStockControlado(true); }}
+              />
             </label>
           </div>
         </div>

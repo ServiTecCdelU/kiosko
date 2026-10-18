@@ -58,6 +58,7 @@ export function EditarProductoDialog({
   const [unidad, setUnidad] = useState<Unidad>("un");
   const [stockControlado, setStockControlado] = useState(true);
   const [precioLibre, setPrecioLibre] = useState(false);
+  const [elaboracionPropia, setElaboracionPropia] = useState(false);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [historial, setHistorial] = useState<CambioPrecio[]>([]);
   const [saving, setSaving] = useState(false);
@@ -94,6 +95,7 @@ export function EditarProductoDialog({
       setUnidad(product.unidad);
       setStockControlado(product.stockControlado);
       setPrecioLibre(!!product.precioLibre);
+      setElaboracionPropia(!!product.elaboracionPropia);
       setIva(product.iva ?? IVA_DEFAULT);
       getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));
       setAjusteTipo("entrada");
@@ -138,6 +140,7 @@ export function EditarProductoDialog({
         unidad,
         stockControlado,
         precioLibre,
+        elaboracionPropia,
         iva,
       });
       onOpenChange(false);
@@ -336,7 +339,11 @@ export function EditarProductoDialog({
                   Se vende sin contar unidades. Ej: recargas, fotocopias, o el pan y la verdura si no los contás
                 </span>
               </span>
-              <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />
+              <Switch
+                checked={!stockControlado}
+                // Sin control de stock no hay produccion que medir.
+                onCheckedChange={(v) => { setStockControlado(!v); if (v) setElaboracionPropia(false); }}
+              />
             </label>
             <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">
@@ -346,6 +353,18 @@ export function EditarProductoDialog({
                 </span>
               </span>
               <Switch checked={precioLibre} onCheckedChange={setPrecioLibre} />
+            </label>
+            <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">
+                Lo elaboramos acá
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Aparece en Producción para cargar lo horneado cada día. Lleva control de stock
+                </span>
+              </span>
+              <Switch
+                checked={elaboracionPropia}
+                onCheckedChange={(v) => { setElaboracionPropia(v); if (v) setStockControlado(true); }}
+              />
             </label>
           </div>
 

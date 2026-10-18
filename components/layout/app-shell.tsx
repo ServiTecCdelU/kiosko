@@ -27,7 +27,7 @@ export function AppShell({ title, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, rol, logout } = useAuth();
-  const items = visibleNavItems(rol);
+  const items = visibleNavItems(rol, user?.rubro);
   const [colapsado, setColapsado] = useState(false);
 
   useEffect(() => {

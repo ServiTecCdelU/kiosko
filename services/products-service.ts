@@ -29,6 +29,7 @@ export function mapRow(d: Record<string, any>): Product {
     unidad: unidadValida(d.unidad),
     stockControlado: d.stock_controlado ?? true,
     precioLibre: d.precio_libre === true,
+    elaboracionPropia: d.elaboracion_propia === true,
     iva: d.iva != null ? Number(d.iva) : 21,
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
@@ -108,6 +109,7 @@ export interface UpdateProductInput {
   unidad: Unidad;
   stockControlado: boolean;
   precioLibre?: boolean;
+  elaboracionPropia?: boolean;
   /** Alicuota de IVA (lib/iva.ts). Si no se manda, no se toca. */
   iva?: number;
 }
@@ -367,6 +369,7 @@ export interface CreateProductInput {
   revisar?: boolean;
   stockControlado?: boolean;
   precioLibre?: boolean;
+  elaboracionPropia?: boolean;
   iva?: number;
 }
 

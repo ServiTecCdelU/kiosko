@@ -91,6 +91,7 @@ export async function PATCH(req: Request) {
       unidad: input.unidad,
       stock_controlado: input.stockControlado,
       ...(input.precioLibre !== undefined ? { precio_libre: !!input.precioLibre } : {}),
+      ...(input.elaboracionPropia !== undefined ? { elaboracion_propia: !!input.elaboracionPropia } : {}),
     })
     .eq("comercio_id", comercioId)
     .eq("id", productId);
@@ -157,6 +158,7 @@ export async function POST(req: Request) {
       unidad: unidadValida(input.unidad),
       stock_controlado: input.stockControlado ?? true,
       precio_libre: !!input.precioLibre,
+      elaboracion_propia: !!input.elaboracionPropia,
       fecha_vencimiento: input.fechaVencimiento || null,
       favorito: !!input.favorito,
       revisar: input.revisar ?? true,
