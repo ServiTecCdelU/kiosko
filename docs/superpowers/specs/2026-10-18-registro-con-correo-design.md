@@ -1,6 +1,6 @@
 # Registro y login con código por correo (sin Google)
 
-Fecha: 2026-10-18 · Estado: implementado (falta configurar el SMTP de Resend en Supabase)
+Fecha: 2026-10-18 · Estado: implementado y en producción (SMTP de Resend configurado y probado el 2026-10-18)
 
 ## Problema
 El alta self-service (`/registro`) y el login del dueño eran solo con Google. Quien no tiene
