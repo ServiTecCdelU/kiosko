@@ -12,8 +12,8 @@ No se probó: Mercado Pago, AFIP, impresión física, cola offline, importación
 
 Los comercios de prueba siguen en la base y se pueden borrar desde el superadmin.
 
-**Estado al cierre del día: todo lo encontrado quedó resuelto salvo la balanza conectada
-a la PC** (sección 2). Cada arreglo se probó contra el servidor local y, lo de pantalla,
+**Estado al cierre del día: todo lo encontrado quedó resuelto.** La balanza conectada a
+la PC falta probarla con una balanza real (sección 2). Cada arreglo se probó contra el servidor local y, lo de pantalla,
 también en el navegador.
 
 ---
@@ -82,7 +82,7 @@ también en el navegador.
 | Pago mixto con parte a fiado | Hecho, con límite de crédito, arqueo, reportes y anulación (`f17b239`, migración 67); su devolución baja primero la deuda (`97da629`, migración 69) |
 | El rubro del alta no cambiaba nada | Hecho: productos típicos del rubro, unidad y control de stock iniciales (`16ee63d`) |
 | Panadería: producción del día | Hecho: pantalla Producción con cierre y resumen semanal (`129296f`, migración 68) |
-| **Balanza conectada a la PC** (puerto serie) | **Pendiente:** hace falta saber qué marcas y modelos usan los clientes (Systel, Kretz, Moretti…); cada una manda el peso distinto |
+| Balanza conectada a la PC | Hecho, **sin probar con una balanza física**: Systel (los 4 protocolos del manual oficial), Kretz, Moretti, CAS, Dibal y Toledo, con detección automática (spec `2026-10-18-balanza-conectada-design.md`) |
 
 Especificaciones de lo grande en `docs/superpowers/specs/2026-10-18-*-design.md`.
 

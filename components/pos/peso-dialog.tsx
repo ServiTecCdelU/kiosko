@@ -4,7 +4,8 @@
 // (kg, m o l: lib/unidades.ts). Se tipea la cantidad ("0,350") o el importe
 // ("dame $2.000 de almendras"): con importe se calcula la cantidad al gramo
 // (o al milimetro / mililitro) y el servidor cobra precio x esa cantidad.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Scale } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -13,9 +14,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { precioFinal } from "@/lib/pricing";
-import { cantidadTexto, parseCantidad } from "@/lib/cantidad";
+import { cantidadTexto, numeroCantidad, parseCantidad } from "@/lib/cantidad";
 import { cantidadDesdeImporte } from "@/lib/importe";
 import { magnitud, simboloUnidad } from "@/lib/unidades";
+import { leerConfigBalanzaSerie } from "@/lib/balanza-config";
+import { leerPesoBalanza, soportaBalanzaSerie } from "@/lib/balanza-puerto";
 import type { Product } from "@/lib/types";
 
 interface PesoDialogProps {
@@ -26,16 +29,58 @@ interface PesoDialogProps {
 
 type Modo = "cantidad" | "importe";
 
+/** Reintentos mientras el peso esta inestable o el plato vacio (~5 s). */
+const INTENTOS_BALANZA = 10;
+
 export function PesoDialog({ product, onOpenChange, onConfirm }: PesoDialogProps) {
   const [texto, setTexto] = useState("");
   const [modo, setModo] = useState<Modo>("cantidad");
+  const [balanza, setBalanza] = useState<{ leyendo: boolean; mensaje: string | null }>({ leyendo: false, mensaje: null });
+  // Cambia al cerrar o abrir otro producto: una lectura vieja no pisa la nueva.
+  const turno = useRef(0);
+
+  const usaBalanza = !!product && product.unidad === "kg" && soportaBalanzaSerie() && leerConfigBalanzaSerie().activa;
+
+  const leerBalanza = useCallback(async () => {
+    const mio = ++turno.current;
+    setBalanza({ leyendo: true, mensaje: "Leyendo la balanza…" });
+    const cfg = leerConfigBalanzaSerie();
+    for (let i = 0; i < INTENTOS_BALANZA; i++) {
+      try {
+        const l = await leerPesoBalanza(cfg);
+        if (turno.current !== mio) return;
+        if (l.tipo === "peso" && l.kg > 0) {
+          setModo("cantidad");
+          setTexto(numeroCantidad(l.kg, "kg"));
+          setBalanza({ leyendo: false, mensaje: null });
+          return;
+        }
+        setBalanza({
+          leyendo: true,
+          mensaje: l.tipo === "inestable" ? "Peso inestable, esperá…"
+            : l.tipo === "peso" ? "Poné el producto en la balanza…"
+            : l.tipo === "error" ? l.motivo : "La balanza no responde…",
+        });
+      } catch (e) {
+        if (turno.current === mio) setBalanza({ leyendo: false, mensaje: e instanceof Error ? e.message : "No se pudo leer la balanza" });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 400));
+      if (turno.current !== mio) return;
+    }
+    setBalanza({ leyendo: false, mensaje: "No llegó un peso estable. Tipealo o probá de nuevo." });
+  }, []);
 
   useEffect(() => {
+    turno.current++;
     if (product) {
       setTexto("");
       setModo("cantidad");
+      setBalanza({ leyendo: false, mensaje: null });
+      // Balanza conectada: el peso se lee solo al abrir (se puede tipear igual).
+      if (product.unidad === "kg" && soportaBalanzaSerie() && leerConfigBalanzaSerie().activa) void leerBalanza();
     }
-  }, [product]);
+  }, [product, leerBalanza]);
 
   if (!product) return null;
 
@@ -91,6 +136,17 @@ export function PesoDialog({ product, onOpenChange, onConfirm }: PesoDialogProps
             onKeyDown={(e) => e.key === "Enter" && handle()}
             className="rounded-xl text-center text-lg"
           />
+          {usaBalanza && modo === "cantidad" && (
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                {balanza.leyendo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scale className="h-3.5 w-3.5" />}
+                {balanza.mensaje ?? (texto ? "Peso leído de la balanza" : "Balanza conectada")}
+              </span>
+              <button type="button" onClick={() => void leerBalanza()} disabled={balanza.leyendo} className="font-semibold text-primary disabled:opacity-50">
+                Leer de nuevo
+              </button>
+            </div>
+          )}
           {cantidad > 0 && (
             <p className="text-center text-sm text-muted-foreground">
               {modo === "importe" && <>{cantidadTexto(cantidad, product.unidad)} · </>}

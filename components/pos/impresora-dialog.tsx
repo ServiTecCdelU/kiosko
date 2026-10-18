@@ -20,6 +20,7 @@ import { estadoAgente } from "@/lib/impresora/agente";
 import { abrirCajon, imprimirTicketDePrueba } from "@/lib/impresora/imprimir";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
 import { guardarFormatoBalanza, leerFormatoBalanza } from "@/lib/balanza-config";
+import { BalanzaSerieSection } from "@/components/pos/balanza-serie-section";
 import type { FormatoBalanza } from "@/lib/barcode-balanza";
 import type { TicketData } from "@/components/pos/ticket-print";
 
@@ -291,6 +292,8 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
             ))}
           </div>
         </section>
+
+        <BalanzaSerieSection />
       </DialogContent>
     </Dialog>
   );
