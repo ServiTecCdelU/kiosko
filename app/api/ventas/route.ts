@@ -38,6 +38,7 @@ export async function POST(req: Request) {
       creditoMonto: body?.creditoMonto ?? null,
       tarjetaMonto: body?.tarjetaMonto ?? null,
       presupuestoId: body?.presupuestoId ?? null,
+      pedidoId: typeof body?.pedidoId === "string" ? body.pedidoId : null,
       fiadoMonto: body?.fiadoMonto ?? null,
     });
     // Facturacion automatica (si el comercio la activo): despues de responder,

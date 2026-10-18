@@ -1,8 +1,9 @@
 // lib/nav.ts — items de navegacion del kiosko
 import type { LucideIcon } from "lucide-react";
-import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign, ClipboardList, ChefHat, Store } from "lucide-react";
+import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign, ClipboardList, ChefHat, Store, ShoppingBag } from "lucide-react";
 import type { UserRol } from "@/lib/types";
 import { moduloActivo, type ModuloId, type ModulosElegidos } from "@/lib/modulos";
+import { planIncluyeTienda } from "@/lib/suscripcion";
 import { panelHref } from "@/lib/panel";
 
 export interface NavItem {
@@ -16,6 +17,8 @@ export interface NavItem {
    * dueño en "Mi comercio". Solo ordena el menu: la pantalla se abre igual por URL.
    */
   modulo?: ModuloId;
+  /** Solo con un plan que incluye la tienda online (lib/suscripcion.ts). */
+  requiereTienda?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -25,6 +28,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Caja", href: "/caja", icon: Wallet, roles: ["encargado", "cajero"] },
   { label: "Ventas", href: "/ventas", icon: Receipt, roles: ["encargado"] },
   // Presupuestos del mostrador: los arma y los pasa a venta cualquiera que atienda.
+  // Pedidos de la tienda online (plan Tienda): los atiende cualquiera que este en el mostrador.
+  { label: "Pedidos", href: "/pedidos", icon: ShoppingBag, roles: ["encargado", "cajero"], requiereTienda: true },
   { label: "Presupuestos", href: "/presupuestos", icon: ClipboardList, roles: ["encargado", "cajero"], modulo: "presupuestos" },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Stock", href: "/stock", icon: Package },
@@ -49,9 +54,11 @@ export function hrefDe(item: NavItem, comercioSlug: string | undefined): string 
 }
 
 /** Items visibles segun rol y modulos: admin ve todo; encargado y cajero, lo declarado en roles. */
-export function visibleNavItems(rol: UserRol | null, rubro?: string, modulos?: ModulosElegidos): NavItem[] {
+export function visibleNavItems(rol: UserRol | null, rubro?: string, modulos?: ModulosElegidos, plan?: string): NavItem[] {
   // Comercios sin rubro (anteriores al alta self-service) ven todo, salvo lo que apague el dueño.
-  const porRubro = NAV_ITEMS.filter((i) => !i.modulo || moduloActivo(i.modulo, rubro, modulos));
+  const porRubro = NAV_ITEMS.filter((i) =>
+    (!i.modulo || moduloActivo(i.modulo, rubro, modulos)) && (!i.requiereTienda || planIncluyeTienda(plan)),
+  );
   // Sin sesion (rol null) se muestran todos los items.
   if (!rol || rol === "admin") return porRubro;
   return porRubro.filter((i) => i.roles?.includes(rol));

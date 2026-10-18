@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `72`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `73`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -151,8 +151,10 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 - Admin del comercio: Google o código por correo (`lib/auth-correo.ts`, SMTP Resend) · Cajero/encargado: PIN · Superadmin del SaaS: Google +
   tabla `superadmins` (panel `/superadmin`, puede entrar a un comercio en modo soporte).
 - Plan Tienda ($80.000 = Pro + tienda online pública en `/tienda/<slug>` con pedido por WhatsApp):
-  `lib/tienda.ts`, `/api/publico/tienda` (única ruta pública de datos del comercio: nunca costo
-  ni stock exacto), spec `2026-10-18-plan-tienda-design.md`.
+  `lib/tienda.ts`, `/api/publico/tienda` y `/api/publico/tienda/pedido` (las únicas rutas públicas
+  de datos del comercio: nunca costo
+  ni stock exacto). Pedidos en `/pedidos` (tabla `pedidos`, migración 73) y se cobran con
+  `/pos?pedido=<id>`. Spec `2026-10-18-plan-tienda-design.md`.
 - Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`. Módulos por rubro
   (Producción, Presupuestos, Balanza) en `lib/modulos.ts`: el dueño los prende o apaga en
   `/mi-comercio` (`comercios.config.modulos`, le gana al rubro).

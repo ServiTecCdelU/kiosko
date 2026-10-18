@@ -30,6 +30,8 @@ export interface CreateSaleInput {
   tarjetaMonto?: number;
   /** Cobro de un presupuesto: el servidor respeta sus precios si sigue vigente. */
   presupuestoId?: string | null;
+  /** Cobro de un pedido de la tienda online: queda entregado (73_pedidos_tienda.sql). */
+  pedidoId?: string | null;
   /** Mixto: parte que queda en la cuenta corriente del cliente (67_mixto_con_fiado.sql). */
   fiadoMonto?: number;
 }

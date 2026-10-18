@@ -1,7 +1,11 @@
 // lib/tienda.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { configTiendaValida, mensajePedido, numeroWhatsapp, totalPedido, urlWhatsapp } from "./tienda.ts";
+import {
+  armarItemsPedido, configTiendaValida, datosClienteValidos, mensajeEstadoPedido, mensajePedido, numeroWhatsapp,
+  puedePasarA, totalPedido, urlWhatsapp,
+} from "./tienda.ts";
+import { precioLinea } from "./pricing.ts";
 
 describe("numeroWhatsapp", () => {
   test("celulares argentinos en cualquier formato", () => {
@@ -52,4 +56,50 @@ test("configTiendaValida limpia y exige una forma de entrega", () => {
   const c = configTiendaValida({ activa: true, whatsapp: "<b>343</b> 456", mensaje: "  Hola  ", retiro: false, envio: false, x: 1 });
   assert.deepEqual(c, { activa: true, whatsapp: "343 456", mensaje: "Hola", mostrarSinStock: false, retiro: true, envio: false });
   assert.equal(configTiendaValida(null).activa, false);
+});
+
+describe("pedidos (etapa 2)", () => {
+  const productos = [
+    { id: "t", name: "Tomate", unidad: "kg", price: 2500, hayStock: true, ofertaActiva: true, ofertaTipo: "porcentaje" as const, ofertaValor: 20 },
+    { id: "b", name: "Banana", unidad: "kg", price: 1800, hayStock: true, ofertaActiva: true, ofertaTipo: "combo" as const, ofertaValor: 3000, ofertaCantidad: 2 },
+    { id: "h", name: "Huevos", unidad: "un", price: 7500, hayStock: true },
+    { id: "x", name: "Palta", unidad: "kg", price: 5000, hayStock: false },
+  ];
+
+  test("precios del servidor, con oferta y combo", () => {
+    const r = armarItemsPedido(
+      [{ productId: "t", cantidad: 0.75 }, { productId: "b", cantidad: 2.5 }, { productId: "h", cantidad: 2 }],
+      productos, precioLinea,
+    );
+    assert.ok("items" in r);
+    assert.deepEqual(r.items.map((i) => i.subtotal), [1500, 3900, 15000]);
+    assert.equal(r.total, 20400);
+  });
+
+  test("rechaza lo que no se puede pedir", () => {
+    const err = (l: { productId: string; cantidad: number }[]) => "error" in armarItemsPedido(l, productos, precioLinea);
+    assert.ok(err([]));
+    assert.ok(err([{ productId: "no", cantidad: 1 }]));
+    assert.ok(err([{ productId: "x", cantidad: 1 }]), "sin stock");
+    assert.ok(err([{ productId: "h", cantidad: 1.5 }]), "unidades fraccionadas");
+    assert.ok(err([{ productId: "h", cantidad: 0 }]));
+    assert.ok(err([{ productId: "t", cantidad: 51 }]), "mas de 50 kg");
+    assert.ok(err([{ productId: "h", cantidad: 1 }, { productId: "h", cantidad: 1 }]), "repetido");
+  });
+
+  test("datos del cliente", () => {
+    const tienda = { retiro: true, envio: false };
+    const ok = datosClienteValidos({ nombre: " Juan  Pérez ", telefono: "343 15 456 7890", entrega: "retiro", pago: "efectivo", direccion: "x" }, tienda);
+    assert.deepEqual(ok, { nombre: "Juan Pérez", telefono: "5493434567890", entrega: "retiro", direccion: null, pago: "efectivo", nota: null });
+    assert.ok("error" in datosClienteValidos({ nombre: "Juan", telefono: "123", entrega: "retiro", pago: "efectivo" }, tienda));
+    assert.ok("error" in datosClienteValidos({ nombre: "Juan", telefono: "3434567890", entrega: "envio", pago: "efectivo", direccion: "Calle 1" }, tienda), "envio no ofrecido");
+    assert.ok("error" in datosClienteValidos({ nombre: "Juan", telefono: "3434567890", entrega: "envio", pago: "efectivo" }, { retiro: true, envio: true }), "sin direccion");
+  });
+
+  test("estados y avisos", () => {
+    assert.equal(puedePasarA("nuevo", "preparando"), true);
+    assert.equal(puedePasarA("entregado", "cancelado"), false);
+    assert.equal(puedePasarA("listo", "preparando"), false);
+    assert.equal(mensajeEstadoPedido("listo", 7, "Don Tito", "retiro", "Juan Pérez"), "Hola Juan! Te escribimos de Don Tito. Tu pedido N° 7 está listo para retirar.");
+  });
 });

@@ -101,11 +101,14 @@ export function totalPedido(items: ItemPedido[]): number {
   return Math.round(items.reduce((s, i) => s + i.cantidad * i.precio, 0) * 100) / 100;
 }
 
-/** El mensaje que le llega al comercio por WhatsApp. */
-export function mensajePedido(comercio: string, items: ItemPedido[], datos: DatosPedido): string {
+/**
+ * El mensaje que le llega al comercio por WhatsApp. Con `numero`, el pedido ya quedo
+ * guardado en el sistema (etapa 2) y el mensaje es solo un aviso.
+ */
+export function mensajePedido(comercio: string, items: ItemPedido[], datos: DatosPedido, numero?: number): string {
   const hayPesables = items.some((i) => i.unidad !== "un");
   const lineas = [
-    `Hola ${comercio}! Quiero hacer este pedido:`,
+    numero ? `Hola ${comercio}! Te hice el pedido N° ${numero} desde la tienda online:` : `Hola ${comercio}! Quiero hacer este pedido:`,
     "",
     ...items.map((i) => `• ${cantidadTexto(i.cantidad, i.unidad)} ${i.nombre} — ${pesos(i.cantidad * i.precio)}`),
     "",
@@ -127,4 +130,156 @@ export function urlWhatsapp(numero: string, texto: string): string {
 /** Paso de cantidad en el carrito: por unidad de a 1; por kg de a 250 g. */
 export function pasoCantidad(unidad: string): number {
   return unidad === "un" ? 1 : 0.25;
+}
+
+// ---- Etapa 2: pedidos guardados en el sistema (73_pedidos_tienda.sql) ----
+
+export const ESTADOS_PEDIDO = ["nuevo", "preparando", "listo", "entregado", "cancelado"] as const;
+export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number];
+
+export const ESTADO_PEDIDO_LABEL: Record<EstadoPedido, string> = {
+  nuevo: "Nuevo", preparando: "Preparando", listo: "Listo", entregado: "Entregado", cancelado: "Cancelado",
+};
+
+/** A que estados se puede pasar desde cada uno. Entregado y cancelado son finales. */
+const SIGUIENTES: Record<EstadoPedido, EstadoPedido[]> = {
+  nuevo: ["preparando", "listo", "entregado", "cancelado"],
+  preparando: ["listo", "entregado", "cancelado"],
+  listo: ["entregado", "cancelado"],
+  entregado: [],
+  cancelado: [],
+};
+
+export function puedePasarA(de: EstadoPedido, a: EstadoPedido): boolean {
+  return SIGUIENTES[de]?.includes(a) ?? false;
+}
+
+export function esEstadoPedido(v: unknown): v is EstadoPedido {
+  return (ESTADOS_PEDIDO as readonly string[]).includes(v as string);
+}
+
+/** Lo que pide el cliente desde la tienda (el precio NO viene del navegador). */
+export interface LineaPedida {
+  productId: string;
+  cantidad: number;
+}
+
+/** Subset de ConOferta (lib/pricing.ts), sin importar tipos de la app en este modulo puro. */
+interface ConOfertaMinima {
+  price: number;
+  ofertaActiva?: boolean;
+  ofertaTipo?: "monto" | "porcentaje" | "combo" | null;
+  ofertaValor?: number | null;
+  ofertaCantidad?: number | null;
+  ofertaDesde?: string | null;
+  ofertaHasta?: string | null;
+}
+
+/** Producto de la base, con lo necesario para cobrar. */
+export interface ProductoPedible extends ConOfertaMinima {
+  id: string;
+  name: string;
+  unidad: string;
+  hayStock: boolean;
+}
+
+export interface ItemGuardado {
+  productId: string;
+  name: string;
+  quantity: number;
+  unidad: string;
+  /** Precio por unidad/kg (con combo, el promedio de la linea). */
+  price: number;
+  subtotal: number;
+}
+
+export const MAX_LINEAS_PEDIDO = 60;
+const MAX_UNIDADES = 100;
+const MAX_KG = 50;
+
+/**
+ * Arma las lineas del pedido con los precios del servidor (`precioLinea` de
+ * lib/pricing.ts, que se pasa para mantener este modulo sin dependencias).
+ */
+export function armarItemsPedido(
+  lineas: LineaPedida[],
+  productos: ProductoPedible[],
+  precioLinea: (p: ProductoPedible, cantidad: number) => number,
+): { items: ItemGuardado[]; total: number } | { error: string } {
+  if (!Array.isArray(lineas) || lineas.length === 0) return { error: "El pedido está vacío" };
+  if (lineas.length > MAX_LINEAS_PEDIDO) return { error: `Un pedido puede tener hasta ${MAX_LINEAS_PEDIDO} productos` };
+  const porId = new Map(productos.map((p) => [p.id, p]));
+  const vistos = new Set<string>();
+  const items: ItemGuardado[] = [];
+  for (const l of lineas) {
+    const p = porId.get(String(l?.productId));
+    if (!p) return { error: "Un producto del pedido ya no está en la tienda. Actualizá la página." };
+    if (vistos.has(p.id)) return { error: `${p.name} está repetido en el pedido` };
+    vistos.add(p.id);
+    if (!p.hayStock) return { error: `${p.name} se quedó sin stock` };
+    const porUnidad = p.unidad === "un";
+    const cantidad = porUnidad ? Number(l.cantidad) : Math.round(Number(l.cantidad) * 1000) / 1000;
+    if (!Number.isFinite(cantidad) || cantidad <= 0 || (porUnidad && !Number.isInteger(cantidad))) {
+      return { error: `Cantidad inválida para ${p.name}` };
+    }
+    if (cantidad > (porUnidad ? MAX_UNIDADES : MAX_KG)) {
+      return { error: `Para pedir más de ${porUnidad ? MAX_UNIDADES : `${MAX_KG} ${p.unidad}`} de ${p.name}, escribile al comercio` };
+    }
+    const subtotal = Math.round(precioLinea(p, cantidad) * 100) / 100;
+    items.push({
+      productId: p.id, name: p.name, quantity: cantidad, unidad: p.unidad,
+      price: Math.round((subtotal / cantidad) * 100) / 100, subtotal,
+    });
+  }
+  return { items, total: Math.round(items.reduce((s, i) => s + i.subtotal, 0) * 100) / 100 };
+}
+
+export interface DatosCliente {
+  nombre: string;
+  telefono: string;
+  entrega: "retiro" | "envio";
+  direccion: string | null;
+  pago: DatosPedido["pago"];
+  nota: string | null;
+}
+
+/** Valida y limpia los datos del cliente con lo que ofrece la tienda. */
+export function datosClienteValidos(v: unknown, tienda: Pick<ConfigTienda, "retiro" | "envio">): DatosCliente | { error: string } {
+  const d = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const texto = (x: unknown, max: number) => (typeof x === "string" ? x.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  const nombre = texto(d.nombre, 60);
+  if (nombre.length < 2) return { error: "Poné tu nombre" };
+  const telefono = numeroWhatsapp(texto(d.telefono, 30));
+  if (!telefono) return { error: "Poné un celular válido con característica (ej. 343 456-7890)" };
+  const entrega = d.entrega === "envio" ? "envio" : d.entrega === "retiro" ? "retiro" : null;
+  if (!entrega || (entrega === "envio" && !tienda.envio) || (entrega === "retiro" && !tienda.retiro)) {
+    return { error: "Elegí cómo recibir el pedido" };
+  }
+  const direccion = texto(d.direccion, 150);
+  if (entrega === "envio" && direccion.length < 4) return { error: "Poné la dirección de entrega" };
+  const pago = d.pago === "transferencia" || d.pago === "mercadopago" || d.pago === "efectivo" ? d.pago : null;
+  if (!pago) return { error: "Elegí cómo vas a pagar" };
+  return {
+    nombre, telefono, entrega,
+    direccion: entrega === "envio" ? direccion : null,
+    pago,
+    nota: texto(d.nota, 200) || null,
+  };
+}
+
+/** Mensaje para avisarle al cliente por WhatsApp desde la pantalla Pedidos. */
+export function mensajeEstadoPedido(
+  estado: EstadoPedido, numero: number, comercio: string, entrega: "retiro" | "envio", nombre: string,
+): string | null {
+  const hola = `Hola ${nombre.split(" ")[0]}! Te escribimos de ${comercio}.`;
+  switch (estado) {
+    case "nuevo": return `${hola} Recibimos tu pedido N° ${numero}. Te avisamos cuando esté ${entrega === "envio" ? "en camino" : "listo para retirar"}.`;
+    case "preparando": return `${hola} Ya estamos preparando tu pedido N° ${numero}.`;
+    case "listo": return entrega === "envio"
+      ? `${hola} Tu pedido N° ${numero} está listo y sale para tu casa.`
+      : `${hola} Tu pedido N° ${numero} está listo para retirar.`;
+    case "entregado": return `${hola} ¡Gracias por tu compra! (pedido N° ${numero})`;
+    case "cancelado": return `${hola} No podemos preparar tu pedido N° ${numero}. Escribinos si querés cambiar algo.`;
+    default: return null;
+  }
 }

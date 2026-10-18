@@ -26,6 +26,8 @@ export interface ProcesarVentaInput {
   creditoMonto?: number | null;
   /** Venta que sale de un presupuesto: si sigue vigente se respetan sus precios. */
   presupuestoId?: string | null;
+  /** Venta que sale de un pedido de la tienda online: queda entregado (73_pedidos_tienda.sql). */
+  pedidoId?: string | null;
   /** Mixto: parte que queda en la cuenta corriente del cliente ("el resto anotamelo"). */
   fiadoMonto?: number | null;
   /** Mixto: monto (con recargo) que se paso por el posnet, debito y/o credito. Para separar tarjeta en el arqueo. */
@@ -88,6 +90,16 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
       .eq("id", input.presupuestoId)
       .eq("estado", "vigente");
     if (errorPresu) console.error("[ventas] presupuesto vendido:", errorPresu.message);
+  }
+  // El pedido de la tienda queda entregado con su venta (no revive uno cancelado).
+  if (input.pedidoId) {
+    const { error: errorPedido } = await supabaseAdmin
+      .from("pedidos")
+      .update({ estado: "entregado", venta_id: data.id, updated_at: new Date().toISOString() })
+      .eq("comercio_id", input.comercioId)
+      .eq("id", input.pedidoId)
+      .in("estado", ["nuevo", "preparando", "listo"]);
+    if (errorPedido) console.error("[ventas] pedido entregado:", errorPedido.message);
   }
   return { id: data.id, saleNumber: data.sale_number, total: data.total };
 }

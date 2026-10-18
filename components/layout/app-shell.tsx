@@ -15,6 +15,7 @@ import { AvisoPagoBanner } from "@/components/layout/aviso-pago-banner";
 import { AvisoAccesoBanner } from "@/components/layout/aviso-acceso-banner";
 import { AvisoSoporte } from "@/components/layout/aviso-soporte";
 import { AvisoDemo } from "@/components/layout/aviso-demo";
+import { contarPedidosNuevos } from "@/services/pedidos-service";
 
 interface AppShellProps {
   title?: string;
@@ -27,8 +28,18 @@ export function AppShell({ title, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, rol, logout } = useAuth();
-  const items = visibleNavItems(rol, user?.rubro, user?.modulos);
+  const items = visibleNavItems(rol, user?.rubro, user?.modulos, user?.plan);
   const [colapsado, setColapsado] = useState(false);
+  // Pedidos nuevos de la tienda online: numero en el menu, se consulta cada minuto.
+  const conPedidos = items.some((i) => i.href === "/pedidos");
+  const [pedidosNuevos, setPedidosNuevos] = useState(0);
+  useEffect(() => {
+    if (!conPedidos) return;
+    const leer = () => contarPedidosNuevos().then(setPedidosNuevos).catch(() => {});
+    void leer();
+    const t = setInterval(leer, 60_000);
+    return () => clearInterval(t);
+  }, [conPedidos]);
 
   useEffect(() => {
     setColapsado(localStorage.getItem(COLLAPSE_KEY) === "1");
@@ -82,6 +93,11 @@ export function AppShell({ title, children }: AppShellProps) {
               >
                 <item.icon className={cn("h-4 w-4 shrink-0 transition-transform", active && "scale-110")} />
                 {!colapsado && item.label}
+                {item.href === "/pedidos" && pedidosNuevos > 0 && (
+                  <span className={cn("rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-5 text-white", colapsado ? "absolute ml-5 -mt-5" : "ml-auto")}>
+                    {pedidosNuevos}
+                  </span>
+                )}
               </Link>
             );
           })}

@@ -17,6 +17,7 @@ import { searchProducts, findProductByCode, getFavoritos, createProduct } from "
 import { ImporteLibreDialog } from "@/components/pos/importe-libre-dialog";
 import { PresupuestoDialog } from "@/components/pos/presupuesto-dialog";
 import { carritoDePresupuesto, obtenerPresupuesto } from "@/services/presupuestos-service";
+import { carritoDePedido, obtenerPedido } from "@/services/pedidos-service";
 import { estaVigente } from "@/lib/presupuesto";
 import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 
@@ -98,6 +99,8 @@ function PosScreen() {
   const [presupuestoOpen, setPresupuestoOpen] = useState(false);
   /** Presupuesto que se esta cobrando (Presupuestos -> "Pasar a venta"). */
   const [presupuestoActivo, setPresupuestoActivo] = useState<{ id: string; numero: number; vence: string; vigente: boolean } | null>(null);
+  // Pedido de la tienda online que se esta cobrando (/pos?pedido=<id>, 73_pedidos_tienda.sql).
+  const [pedidoActivo, setPedidoActivo] = useState<{ id: string; numero: number; cliente: string } | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
   // Id de la ultima venta registrada (para facturarla). null si quedo offline.
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
@@ -279,6 +282,36 @@ function PosScreen() {
     },
     [agregarCantidad, pesoProduct],
   );
+
+  // Pedidos de la tienda -> "Pasar a venta" abre /pos?pedido=<id>: carrito con los
+  // productos y el precio de hoy (lo de por kg se pesa aca) y se cobra con pedidoId.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("pedido");
+    if (!id) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    (async () => {
+      try {
+        const { pedido, productos } = await obtenerPedido(id);
+        if (!pedido) {
+          toast.error("No se encontró el pedido");
+          return;
+        }
+        if (pedido.estado === "entregado" || pedido.estado === "cancelado") {
+          toast.error(`El pedido N° ${pedido.numero} ya está ${pedido.estado}`);
+          return;
+        }
+        const { items, faltantes } = carritoDePedido(pedido, productos);
+        cart.replaceAll(items);
+        setPresupuestoActivo(null);
+        setPedidoActivo({ id: pedido.id, numero: pedido.numero, cliente: pedido.clienteNombre });
+        if (faltantes.length > 0) toast.warning(`Ya no están en el catálogo: ${faltantes.join(", ")}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo abrir el pedido");
+      }
+    })();
+    // Solo al entrar al POS.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Presupuestos -> "Pasar a venta" abre /pos?presupuesto=<id>: se arma el carrito
   // con los productos de hoy y se cobra con presupuestoId (precios respetados).
@@ -588,6 +621,7 @@ function PosScreen() {
       setLastTicket(ticket);
       cart.clear();
       setPresupuestoActivo(null);
+      setPedidoActivo(null);
       setQuery("");
       setResults([]);
       focusInput();
@@ -662,6 +696,7 @@ function PosScreen() {
             transferAmount: cart.total,
             cajaId,
             presupuestoId: presupuestoActivo?.id ?? null,
+            pedidoId: pedidoActivo?.id ?? null,
             userId: user?.id,
             userName: user?.nombre,
           };
@@ -696,6 +731,7 @@ function PosScreen() {
             transferAmount: cart.total,
             cajaId,
             presupuestoId: presupuestoActivo?.id ?? null,
+            pedidoId: pedidoActivo?.id ?? null,
             userId: user?.id,
             userName: user?.nombre,
           };
@@ -724,6 +760,7 @@ function PosScreen() {
         transferAmount: data.transferAmount,
         cajaId,
         presupuestoId: presupuestoActivo?.id ?? null,
+        pedidoId: pedidoActivo?.id ?? null,
         clienteId: data.clienteId,
         userId: user?.id,
         userName: user?.nombre,
@@ -771,7 +808,7 @@ function PosScreen() {
         setProcessing(false);
       }
     },
-    [cart, cajaId, finalizarTicket, resolverDispositivoPoint, presupuestoActivo],
+    [cart, cajaId, finalizarTicket, resolverDispositivoPoint, presupuestoActivo, pedidoActivo],
   );
 
   // Sin caja la venta queda con caja_id null y no entra en ningun cierre
@@ -912,6 +949,19 @@ function PosScreen() {
       <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_380px]">
         {/* Busqueda + resultados */}
         <div className="flex min-h-0 flex-col gap-3">
+          {pedidoActivo && (
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+              <span>
+                Cobrando el <b>pedido N° {pedidoActivo.numero}</b> de {pedidoActivo.cliente} · ajustá lo que va por kg al pesarlo
+              </span>
+              <button
+                onClick={() => setPedidoActivo(null)}
+                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                Quitar
+              </button>
+            </div>
+          )}
           {presupuestoActivo && (
             <div className="flex items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
               <span>

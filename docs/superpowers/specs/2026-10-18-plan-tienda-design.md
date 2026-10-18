@@ -1,7 +1,7 @@
 # Plan Tienda ($80.000): catálogo y pedidos online — diseño (borrador 2026-10-18)
 
-Estado: **etapa 1 hecha (2026-10-18)**: catálogo público + pedido por WhatsApp, plan Tienda
-(migración 72), configuración en Mi comercio. Etapas 2 y 3 pendientes.
+Estado: **etapas 1 y 2 hechas (2026-10-18)**: catálogo público, pedidos en el sistema, plan Tienda
+(migraciones 72 y 73), configuración en Mi comercio. Etapa 3 (pago online) pendiente.
 
 ## Etapa 1 implementada
 
@@ -18,6 +18,23 @@ Estado: **etapa 1 hecha (2026-10-18)**: catálogo público + pedido por WhatsApp
   stock, link, QR para imprimir. Se guarda en `comercios.config.tienda`.
 - Sin el plan: la sección explica la tienda y manda a Suscripción. El alta (`/registro`)
   todavía ofrece solo Básico y Pro; a Tienda se pasa desde Suscripción.
+
+## Etapa 2 implementada (2026-10-18)
+
+- Tabla `pedidos` + RPC `crear_pedido_tienda` (migración 73): número por comercio
+  (`comercio_contadores`), estados nuevo → preparando → listo → entregado / cancelado.
+- `POST /api/publico/tienda/pedido`: misma regla de tienda abierta que el catálogo
+  (`lib/server/tienda.ts`); precios del servidor (`armarItemsPedido` + `precioLinea`);
+  datos del cliente validados (`datosClienteValidos`, celular obligatorio); topes de 10
+  por hora por IP y 3 por teléfono cada 15 min en el comercio.
+- La tienda confirma "Pedido N° X enviado" y deja un botón opcional para avisar por
+  WhatsApp con el número.
+- Pantalla **Pedidos** (`app/pedidos`, plan Tienda, admin/encargado/cajero): se actualiza
+  cada 20 s y suena al entrar uno; número de nuevos en el menú (cada 60 s); botones por
+  estado y "Avisar por WhatsApp" al cliente con el mensaje del estado.
+- **Pasar a venta**: `/pos?pedido=<id>` arma el carrito con los productos y el precio de
+  hoy (lo de por kg se pesa ahí); la venta lleva `pedidoId` y deja el pedido entregado
+  con su `venta_id` (`lib/server/procesar-venta.ts`). No reserva stock.
 
 ## Problema
 

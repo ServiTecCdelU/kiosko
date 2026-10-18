@@ -185,13 +185,14 @@ export function CatalogoTienda({ slug }: { slug: string }) {
 
       {verPedido && (
         <PanelPedido
+          slug={slug}
           datos={datos}
           items={items}
           total={total}
           porId={porId}
           onCambiar={cambiar}
           onCerrar={() => setVerPedido(false)}
-          onEnviado={() => { setCarrito({}); setVerPedido(false); }}
+          onEnviado={() => setCarrito({})}
         />
       )}
     </div>
@@ -280,7 +281,8 @@ function Tarjeta({ p, cantidad, onCambiar }: { p: ProductoTienda; cantidad: numb
   );
 }
 
-function PanelPedido({ datos, items, total, porId, onCambiar, onCerrar, onEnviado }: {
+function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, onEnviado }: {
+  slug: string;
   datos: DatosTienda;
   items: (ItemPedido & { id: string })[];
   total: number;
@@ -290,6 +292,10 @@ function PanelPedido({ datos, items, total, porId, onCambiar, onCerrar, onEnviad
   onEnviado: () => void;
 }) {
   const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [confirmado, setConfirmado] = useState<{ numero: number; texto: string } | null>(null);
   const [entrega, setEntrega] = useState<DatosPedido["entrega"]>(datos.retiro ? "retiro" : "envio");
   const [direccion, setDireccion] = useState("");
   const [pago, setPago] = useState<DatosPedido["pago"]>("efectivo");
@@ -297,15 +303,56 @@ function PanelPedido({ datos, items, total, porId, onCambiar, onCerrar, onEnviad
   const [faltan, setFaltan] = useState(false);
   const hayPesables = items.some((i) => i.unidad !== "un");
 
-  const enviar = () => {
-    if (!nombre.trim() || (entrega === "envio" && !direccion.trim())) {
+  // El pedido queda guardado en el sistema del comercio (le suena en Pedidos). El
+  // WhatsApp queda como aviso opcional, con el numero de pedido.
+  const enviar = async () => {
+    if (!nombre.trim() || !telefono.trim() || (entrega === "envio" && !direccion.trim())) {
       setFaltan(true);
       return;
     }
-    const texto = mensajePedido(datos.nombre, items, { nombre, entrega, direccion, pago, nota });
-    window.open(urlWhatsapp(datos.whatsapp!, texto), "_blank", "noopener");
-    onEnviado();
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const res = await fetch(apiUrl("/api/publico/tienda/pedido"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          items: items.map((i) => ({ productId: i.id, cantidad: i.cantidad })),
+          datos: { nombre, telefono, entrega, direccion, pago, nota },
+        }),
+      });
+      const r = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(r?.error ?? "No se pudo mandar el pedido");
+      const confirmados: ItemPedido[] = r.items.map((i: { name: string; quantity: number; unidad: string; price: number }) => (
+        { nombre: i.name, cantidad: i.quantity, unidad: i.unidad, precio: i.price }
+      ));
+      setConfirmado({ numero: r.numero, texto: mensajePedido(datos.nombre, confirmados, { nombre, entrega, direccion, pago, nota }, r.numero) });
+      onEnviado();
+    } catch (e) {
+      setErrorEnvio(e instanceof Error ? e.message : "No se pudo mandar el pedido");
+    } finally {
+      setEnviando(false);
+    }
   };
+
+  if (confirmado) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCerrar}>
+        <div className="w-full max-w-lg space-y-3 rounded-t-2xl bg-card p-6 text-center sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+          <p className="text-4xl">✅</p>
+          <h2 className="text-xl font-bold">¡Pedido N° {confirmado.numero} enviado!</h2>
+          <p className="text-sm text-muted-foreground">
+            {datos.nombre} ya lo recibió. Te van a escribir al {telefono} cuando esté {entrega === "envio" ? "en camino" : "listo para retirar"}.
+          </p>
+          <Button asChild variant="outline" className="h-11 w-full rounded-2xl">
+            <a href={urlWhatsapp(datos.whatsapp!, confirmado.texto)} target="_blank" rel="noopener noreferrer">Avisarles también por WhatsApp</a>
+          </Button>
+          <Button className="h-11 w-full rounded-2xl" onClick={onCerrar}>Listo</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCerrar}>
@@ -343,6 +390,9 @@ function PanelPedido({ datos, items, total, porId, onCambiar, onCerrar, onEnviad
           <Campo etiqueta="Tu nombre" falta={faltan && !nombre.trim()}>
             <Input value={nombre} onChange={(e) => setNombre(e.target.value)} className="h-11 rounded-xl" autoComplete="name" />
           </Campo>
+          <Campo etiqueta="Tu celular (para avisarte)" falta={faltan && !telefono.trim()}>
+            <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="343 456-7890" inputMode="tel" className="h-11 rounded-xl" autoComplete="tel" />
+          </Campo>
           {datos.retiro && datos.envio && (
             <div className="grid grid-cols-2 gap-2">
               <Opcion activa={entrega === "retiro"} onClick={() => setEntrega("retiro")}>Retiro en el local</Opcion>
@@ -366,10 +416,11 @@ function PanelPedido({ datos, items, total, porId, onCambiar, onCerrar, onEnviad
           </Campo>
         </div>
 
-        <Button className="mt-5 h-12 w-full rounded-2xl bg-[#25D366] text-base text-white hover:bg-[#1ebe5a]" onClick={enviar}>
-          Enviar pedido por WhatsApp
+        {errorEnvio && <p className="mt-4 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-700">{errorEnvio}</p>}
+        <Button className="mt-5 h-12 w-full rounded-2xl text-base" disabled={enviando} onClick={() => void enviar()}>
+          {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Enviar pedido
         </Button>
-        <p className="mt-2 text-center text-xs text-muted-foreground">Se abre WhatsApp con el pedido escrito. El comercio te confirma.</p>
+        <p className="mt-2 text-center text-xs text-muted-foreground">El comercio lo recibe al instante y te avisa por WhatsApp.</p>
       </div>
     </div>
   );
