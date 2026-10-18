@@ -143,6 +143,8 @@ export interface Caja {
   montoCierre?: number;
   totalEfectivo: number;
   totalTransferencia: number;
+  /** Debito y credito. 0 en cajas cerradas antes de 61_tarjeta_aparte.sql (iba en totalTransferencia). */
+  totalTarjeta: number;
   /** Cobros por Mercado Pago (QR y Point). 0 en cajas cerradas antes del desglose. */
   totalMercadoPago: number;
   totalVentas: number;

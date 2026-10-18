@@ -8,6 +8,7 @@ export interface CajaDelDia {
   cajeroNombre: string;
   totalEfectivo: number;
   totalTransferencia: number;
+  totalTarjeta: number;
   totalMercadoPago: number;
   totalVentas: number;
   cantidadVentas: number;
@@ -18,6 +19,7 @@ export interface CajaDelDia {
 export interface ConsolidadoTotales {
   totalEfectivo: number;
   totalTransferencia: number;
+  totalTarjeta: number;
   totalMercadoPago: number;
   totalVentas: number;
   cantidadVentas: number;
@@ -39,6 +41,7 @@ export function consolidarDia(cajas: CajaDelDia[]): {
   const totales: ConsolidadoTotales = {
     totalEfectivo: 0,
     totalTransferencia: 0,
+    totalTarjeta: 0,
     totalMercadoPago: 0,
     totalVentas: 0,
     cantidadVentas: 0,
@@ -50,6 +53,7 @@ export function consolidarDia(cajas: CajaDelDia[]): {
   for (const c of cajas) {
     totales.totalEfectivo += c.totalEfectivo;
     totales.totalTransferencia += c.totalTransferencia;
+    totales.totalTarjeta += c.totalTarjeta;
     totales.totalMercadoPago += c.totalMercadoPago;
     totales.totalVentas += c.totalVentas;
     totales.cantidadVentas += c.cantidadVentas;

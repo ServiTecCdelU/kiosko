@@ -26,6 +26,8 @@ export interface CreateSaleInput {
   recargoPct?: number;
   /** Mixto: monto (sin recargo) de la porcion que va por Credito. */
   creditoMonto?: number;
+  /** Mixto: monto (con recargo) que va por posnet, debito y/o credito. */
+  tarjetaMonto?: number;
 }
 
 export interface ProcessSaleResult {

@@ -134,6 +134,7 @@ export async function PATCH(req: Request) {
       monto_cierre: montoCierreContado,
       total_efectivo: resumen.totalEfectivo,
       total_transferencia: resumen.totalTransferencia,
+      total_tarjeta: resumen.totalTarjeta,
       total_mercadopago: resumen.totalMercadoPago,
       total_ventas: resumen.totalVentas,
       cantidad_ventas: resumen.cantidadVentas,

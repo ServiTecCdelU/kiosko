@@ -4,6 +4,8 @@
 export interface ResumenCajaServer {
   totalEfectivo: number;
   totalTransferencia: number;
+  /** Debito y credito (posnet). Antes iba sumado en totalTransferencia. */
+  totalTarjeta: number;
   totalMercadoPago: number;
   totalVentas: number;
   cantidadVentas: number;
@@ -16,6 +18,27 @@ export interface VentaParaArqueo {
   total: number | string;
   payment_method: string;
   transfer_amount?: number | string | null;
+  /** Parte cobrada con tarjeta en un mixto (61_tarjeta_aparte.sql). */
+  tarjeta_amount?: number | string | null;
+}
+
+const METODOS_TARJETA = ["tarjeta", "debito", "credito"];
+
+/**
+ * Cuanto de una venta (que no sea fiado ni Mercado Pago) fue efectivo,
+ * transferencia y tarjeta. En un mixto, transfer_amount es todo lo que no fue
+ * efectivo y tarjeta_amount la parte de eso que se paso por el posnet.
+ */
+export function partesDeVenta(v: VentaParaArqueo): { efectivo: number; transferencia: number; tarjeta: number } {
+  const t = Number(v.total) || 0;
+  if (METODOS_TARJETA.includes(v.payment_method)) return { efectivo: 0, transferencia: 0, tarjeta: t };
+  if (v.payment_method === "transferencia") return { efectivo: 0, transferencia: t, tarjeta: 0 };
+  if (v.payment_method === "mixto") {
+    const noEfectivo = Math.min(t, Number(v.transfer_amount) || 0);
+    const tarjeta = Math.min(noEfectivo, Math.max(0, Number(v.tarjeta_amount) || 0));
+    return { efectivo: t - noEfectivo, transferencia: noEfectivo - tarjeta, tarjeta };
+  }
+  return { efectivo: t, transferencia: 0, tarjeta: 0 };
 }
 
 export interface MovimientoParaArqueo {
@@ -36,6 +59,8 @@ export function agregarResumenCaja(
   let transferencia = 0;
   let mercadoPago = 0;
 
+  let tarjeta = 0;
+
   for (const v of ventas) {
     // El fiado no mueve la caja: no es efectivo ni transferencia al momento de la venta.
     if (v.payment_method === "fiado") continue;
@@ -47,14 +72,10 @@ export function agregarResumenCaja(
       continue;
     }
 
-    // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
-    const tr = ["transferencia", "tarjeta", "debito", "credito"].includes(v.payment_method)
-      ? t
-      : v.payment_method === "mixto"
-        ? Math.min(t, Number(v.transfer_amount) || 0)
-        : 0;
-    transferencia += tr;
-    efectivo += t - tr;
+    const partes = partesDeVenta(v);
+    transferencia += partes.transferencia;
+    tarjeta += partes.tarjeta;
+    efectivo += partes.efectivo;
   }
 
   let totalRetiros = 0;
@@ -70,8 +91,9 @@ export function agregarResumenCaja(
   return {
     totalEfectivo: efectivo,
     totalTransferencia: transferencia,
+    totalTarjeta: tarjeta,
     totalMercadoPago: mercadoPago,
-    totalVentas: efectivo + transferencia + mercadoPago,
+    totalVentas: efectivo + transferencia + tarjeta + mercadoPago,
     cantidadVentas: ventas.length,
     totalRetiros,
     totalAportes,

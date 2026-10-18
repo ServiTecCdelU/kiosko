@@ -11,6 +11,7 @@ describe("agregarResumenCaja — medios de pago", () => {
     assert.deepEqual(r, {
       totalEfectivo: 0,
       totalTransferencia: 0,
+      totalTarjeta: 0,
       totalMercadoPago: 0,
       totalVentas: 0,
       cantidadVentas: 0,
@@ -45,9 +46,38 @@ describe("agregarResumenCaja — medios de pago", () => {
     assert.equal(r.totalEfectivo, 0);
   });
 
-  test("'tarjeta' (historico) se sigue contando como transferencia", () => {
-    const r = agregarResumenCaja([{ total: 800, payment_method: "tarjeta" }], sinMovimientos);
-    assert.equal(r.totalTransferencia, 800);
+  test("debito, credito y 'tarjeta' (historico) van a tarjeta, no a transferencia", () => {
+    const r = agregarResumenCaja(
+      [
+        { total: 800, payment_method: "tarjeta" },
+        { total: 1000, payment_method: "debito" },
+        { total: 1200, payment_method: "credito" },
+      ],
+      sinMovimientos,
+    );
+    assert.equal(r.totalTarjeta, 3000);
+    assert.equal(r.totalTransferencia, 0);
+    assert.equal(r.totalVentas, 3000);
+  });
+
+  test("mixto efectivo + debito: la parte con tarjeta va a tarjeta", () => {
+    const r = agregarResumenCaja(
+      [{ total: 1000, payment_method: "mixto", transfer_amount: 600, tarjeta_amount: 600 }],
+      sinMovimientos,
+    );
+    assert.equal(r.totalEfectivo, 400);
+    assert.equal(r.totalTarjeta, 600);
+    assert.equal(r.totalTransferencia, 0);
+  });
+
+  test("mixto transferencia + credito se reparte entre los dos", () => {
+    const r = agregarResumenCaja(
+      [{ total: 1000, payment_method: "mixto", transfer_amount: 1000, tarjeta_amount: 700 }],
+      sinMovimientos,
+    );
+    assert.equal(r.totalEfectivo, 0);
+    assert.equal(r.totalTransferencia, 300);
+    assert.equal(r.totalTarjeta, 700);
   });
 
   test("EL FIADO NO MUEVE LA CAJA: no suma a ningun total de dinero", () => {

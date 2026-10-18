@@ -16,6 +16,7 @@ import { ahorroLinea, empujeCombo } from "@/lib/oferta-analisis";
 import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
+import { cantidadTexto } from "@/lib/cantidad";
 
 export interface ConfirmData {
   paymentMethod: PaymentMethod;
@@ -29,6 +30,8 @@ export interface ConfirmData {
   recargoPct?: number;
   /** Mixto: monto (sin recargo) de la porcion que va por Credito. */
   creditoMonto?: number;
+  /** Mixto: monto (con recargo) que va por posnet, debito y/o credito. */
+  tarjetaMonto?: number;
 }
 
 /** Metodos que no identifican por si solos a quien paga: hace falta pedir nombre y apellido. */
@@ -165,6 +168,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
     (mixtoParte1Metodo === "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo === "efectivo" ? parte2Final : 0);
   const transferPortion =
     (mixtoParte1Metodo !== "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo !== "efectivo" ? parte2Final : 0);
+  // Parte por posnet: el arqueo la muestra aparte de la transferencia.
+  const esTarjeta = (m: MixtoMetodo) => m === "debito" || m === "credito";
+  const tarjetaPortion =
+    (esTarjeta(mixtoParte1Metodo) ? parte1Final : 0) + (esTarjeta(mixtoParte2Metodo) ? parte2Final : 0);
 
   // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
   // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
@@ -192,7 +199,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
     } else if (method === "mixto") {
       onConfirm({
         paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion,
-        pagadorNombre, discount, clienteId: clienteIdFidelizacion,
+        tarjetaMonto: tarjetaPortion, pagadorNombre, discount, clienteId: clienteIdFidelizacion,
         ...(mixtoTieneCredito ? { cuotas: cuotasNum, recargoPct: recargoPctNum, creditoMonto: creditoBaseMixto } : {}),
       });
     } else if (method === "fiado") {
@@ -267,7 +274,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                             <Minus className="h-3 w-3" />
                           </Button>
                           <span className="w-12 text-center text-sm font-semibold">
-                            {i.product.unidad === "kg" ? `${i.quantity.toFixed(2)}kg` : i.quantity}
+                            {cantidadTexto(i.quantity, i.product.unidad)}
                           </span>
                           <Button
                             variant="outline" size="icon" className="h-7 w-7 rounded-lg"

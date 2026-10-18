@@ -133,6 +133,7 @@ export async function POST(req: Request) {
             ...c,
             total_efectivo: r.totalEfectivo,
             total_transferencia: r.totalTransferencia,
+            total_tarjeta: r.totalTarjeta,
             total_mercadopago: r.totalMercadoPago,
             total_ventas: r.totalVentas,
             cantidad_ventas: r.cantidadVentas,

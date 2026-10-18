@@ -5,6 +5,7 @@
 // un Uint8Array. Quien lo manda a la impresora esta en lib/impresora/. Sin
 // dependencias: todo el texto se translitera a ASCII para no depender de la
 // pagina de codigos que tenga cargada cada impresora.
+import { cantidadTexto as cantidadKg } from "./cantidad.ts";
 import type { TicketData } from "@/components/pos/ticket-print";
 import type { PaymentMethod } from "@/lib/types";
 
@@ -148,7 +149,7 @@ export function centrar(texto: string, columnas: number): string {
 }
 
 function cantidadTexto(item: TicketData["items"][number]): string {
-  return item.unidad === "kg" ? `${item.quantity.toFixed(2)}kg` : `${item.quantity}`;
+  return cantidadKg(item.quantity, item.unidad);
 }
 
 /** Lineas de texto del ticket, sin comandos. Util para tests y para previsualizar. */

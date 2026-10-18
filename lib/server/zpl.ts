@@ -1,5 +1,6 @@
 // lib/server/zpl.ts — genera el texto ZPL de un ticket con alto dinámico (^LL)
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
+import { cantidadTexto } from "@/lib/cantidad";
 import type { TicketData } from "@/components/pos/ticket-print";
 
 const METODO_LABEL: Record<TicketData["paymentMethod"], string> = {
@@ -94,7 +95,7 @@ export function generarZPL(ticket: TicketData): string {
 
   for (const item of ticket.items) {
     linea(item.name, { tamano: ALTO_POR_LINEA_NORMAL - 6 });
-    const cantidad = item.unidad === "kg" ? `${item.quantity.toFixed(2)}kg` : `${item.quantity}`;
+    const cantidad = cantidadTexto(item.quantity, item.unidad);
     linea(`${cantidad} x ${formatCurrency(item.price)}   ${formatCurrency(item.subtotal)}`);
   }
 

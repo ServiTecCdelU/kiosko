@@ -23,6 +23,21 @@ function acotar(valor: unknown, porDefecto: number, max = LIMITE_MAX): number {
 }
 
 /** Quita lo que rompe el filtro .or() de PostgREST. */
+/**
+ * Saca los productos sin control de stock (servicios, recargas, pan que no se cuenta):
+ * no se reponen, y como tienen stock 0 aparecian primeros "por agotarse".
+ */
+async function sinServicios<T extends { producto_id: string }>(comercioId: string, filas: T[]): Promise<T[]> {
+  if (filas.length === 0) return filas;
+  const { data } = await supabaseAdmin
+    .from("productos")
+    .select("id")
+    .eq("comercio_id", comercioId)
+    .eq("stock_controlado", false);
+  const servicios = new Set((data ?? []).map((p) => p.id));
+  return filas.filter((f) => !servicios.has(f.producto_id));
+}
+
 function sanitizar(q: string): string {
   return q.replace(/[,()%]/g, " ").trim();
 }
@@ -207,7 +222,7 @@ export async function POST(req: Request) {
         p_dias: dias,
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ productos: data ?? [] });
+      return NextResponse.json({ productos: await sinServicios(comercioId, data ?? []) });
     }
 
     // "Pedí más": ritmo de venta reciente vs anterior y ultima compra por producto
@@ -218,7 +233,7 @@ export async function POST(req: Request) {
         p_dias: dias,
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ productos: data ?? [], dias });
+      return NextResponse.json({ productos: await sinServicios(comercioId, data ?? []), dias });
     }
 
     case "porCodigo": {

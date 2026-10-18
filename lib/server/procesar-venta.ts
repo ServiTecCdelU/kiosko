@@ -2,6 +2,7 @@
 // La usan /api/ventas (cobro directo) y /api/mercadopago/webhook (cobro con QR confirmado).
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { precioLinea } from "@/lib/pricing";
+import { ERROR_SIN_CAJA, errorCantidad, errorDescuento } from "@/lib/venta-validacion";
 
 export interface ProcesarVentaInput {
   items: { productId: string; name?: string; quantity: number; price?: number }[];
@@ -21,6 +22,8 @@ export interface ProcesarVentaInput {
   recargoPct?: number | null;
   /** Mixto: monto (sin recargo) de la parte que va por Credito, para aplicarle el recargo solo a esa porcion. */
   creditoMonto?: number | null;
+  /** Mixto: monto (con recargo) que se paso por el posnet, debito y/o credito. Para separar tarjeta en el arqueo. */
+  tarjetaMonto?: number | null;
 }
 
 export interface ProcesarVentaResult {
@@ -31,8 +34,50 @@ export interface ProcesarVentaResult {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Lo que se valida ANTES de cobrar con Mercado Pago (QR o Point) y en el cobro
+ * directo: que haya caja abierta del comercio y que la venta sea valida. Asi
+ * nunca se cobra una venta que despues el servidor rechaza.
+ */
+export async function validarVenta(input: ProcesarVentaInput): Promise<void> {
+  await validarCaja(input.comercioId, input.cajaId);
+  await prepararVenta(input);
+}
+
+/** Toda venta va a una caja abierta del comercio: sin caja no entra en ningun cierre. */
+export async function validarCaja(comercioId: string, cajaId: string | null | undefined): Promise<void> {
+  if (!cajaId) throw new Error(ERROR_SIN_CAJA);
+  const { data, error } = await supabaseAdmin
+    .from("caja")
+    .select("id")
+    .eq("comercio_id", comercioId)
+    .eq("id", cajaId)
+    .eq("estado", "abierta")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(ERROR_SIN_CAJA);
+}
+
 /** Recalcula precios/subtotales autoritativos desde la BD e inserta la venta via RPC atomica. */
 export async function procesarVenta(input: ProcesarVentaInput): Promise<ProcesarVentaResult> {
+  const { tarjetaAmount, ...params } = await prepararVenta(input);
+  const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", params);
+  if (error) throw new Error(error.message);
+  // La RPC no conoce la columna (61_tarjeta_aparte.sql): se completa despues.
+  // Si falla la venta igual quedo bien; solo esa parte se veria como transferencia.
+  if (tarjetaAmount > 0) {
+    const { error: errorTarjeta } = await supabaseAdmin
+      .from("ventas")
+      .update({ tarjeta_amount: tarjetaAmount })
+      .eq("comercio_id", input.comercioId)
+      .eq("id", data.id);
+    if (errorTarjeta) console.error("[ventas] tarjeta_amount:", errorTarjeta.message);
+  }
+  return { id: data.id, saleNumber: data.sale_number, total: data.total };
+}
+
+/** Precios, totales y recargos autoritativos; tira error si la venta no es valida. */
+async function prepararVenta(input: ProcesarVentaInput) {
   const rawItems = input.items;
   if (rawItems.length === 0) {
     throw new Error("El carrito esta vacio");
@@ -53,9 +98,11 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
   const items = rawItems.map((i) => {
     const id = String(i.productId);
     const db = byId.get(id);
-    const quantity = Number(i.quantity) || 0;
-    const subtotal = db
-      ? precioLinea(
+    if (!db) throw new Error(`${String(i.name ?? "Un producto")} ya no existe en el catalogo`);
+    const quantity = Number(i.quantity);
+    const errorCant = errorCantidad(quantity, db.unidad, db.name);
+    if (errorCant) throw new Error(errorCant);
+    const subtotal = precioLinea(
           {
             price: Number(db.price),
             ofertaActiva: db.oferta_activa,
@@ -66,17 +113,19 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
             ofertaHasta: db.oferta_hasta ?? null,
           },
           quantity,
-        )
-      : round2((Number(i.price) || 0) * quantity);
-    const name = db ? db.name : String(i.name ?? "");
-    const price = quantity > 0 ? subtotal / quantity : 0;
+        );
+    const name = db.name;
+    const price = subtotal / quantity;
     return { productId: id, name, quantity, price, subtotal };
   });
 
   const discount = Number(input.discount) || 0;
+  const bruto = items.reduce((s, i) => s + i.subtotal, 0);
+  const errorDesc = errorDescuento(discount, bruto);
+  if (errorDesc) throw new Error(errorDesc);
   // Redondeo a centavos: sumar subtotales ya redondeados igual deja basura de coma
   // flotante (3 x 299.7 = 899.0999999999999), y AFIP exige 2 decimales.
-  const subtotal = round2(Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount));
+  const subtotal = round2(Math.max(0, bruto - discount));
 
   // El recargo por cuotas se calcula aca, nunca se confia en un total
   // mandado por el navegador. Solo existe para Credito (recargo sobre todo
@@ -86,12 +135,14 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
   let transferAmount = Number(input.transferAmount) || 0;
   let total = subtotal;
   let recargoPct = 0;
+  let tarjetaAmount = 0;
 
   if (input.paymentMethod === "credito") {
     recargoPct = Math.max(0, Number(input.recargoPct) || 0);
     cashAmount = 0;
     transferAmount = Math.round(subtotal * (1 + recargoPct / 100) * 100) / 100;
     total = transferAmount;
+    tarjetaAmount = total;
   } else if (input.paymentMethod === "mixto") {
     // Mixto reparte el total en dos partes con metodo propio cada una (ej:
     // transferencia + credito, o credito + debito). Solo la porcion que se
@@ -103,10 +154,15 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
     const recargoMonto = creditoBase * (recargoPct / 100);
     transferAmount = Math.round((restoSinRecargo + recargoMonto) * 100) / 100;
     total = Math.round((subtotal + recargoMonto) * 100) / 100;
+    // Lo que fue por posnet: al menos la parte a credito (con su recargo), que se
+    // conoce aca; la de debito la informa el POS. Nunca mas que lo no efectivo.
+    const creditoConRecargo = round2(creditoBase + recargoMonto);
+    tarjetaAmount = round2(Math.min(transferAmount, Math.max(creditoConRecargo, Number(input.tarjetaMonto) || 0)));
   } else if (input.paymentMethod === "transferencia" || input.paymentMethod === "debito") {
     cashAmount = 0;
     transferAmount = subtotal;
     total = subtotal;
+    if (input.paymentMethod === "debito") tarjetaAmount = total;
   } else {
     // efectivo, fiado, mercadopago, mercadopago_point, tarjeta: sin recargo,
     // se respeta lo que mando el cliente para cash/transfer (efectivo puede
@@ -114,7 +170,10 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
     total = subtotal;
   }
 
-  const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", {
+  if (input.paymentMethod === "tarjeta") tarjetaAmount = total;
+
+  return {
+    tarjetaAmount,
     p_items: items,
     p_total: total,
     p_payment_method: input.paymentMethod ?? "efectivo",
@@ -130,9 +189,5 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
     p_pagador_nombre: input.pagadorNombre ?? null,
     p_cuotas: input.cuotas ?? null,
     p_recargo_pct: recargoPct,
-  });
-
-  if (error) throw new Error(error.message);
-
-  return { id: data.id, saleNumber: data.sale_number, total: data.total };
+  };
 }

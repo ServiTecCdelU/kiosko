@@ -14,6 +14,7 @@ function mapCaja(d: Record<string, any>): Caja {
     montoCierre: d.monto_cierre != null ? Number(d.monto_cierre) : undefined,
     totalEfectivo: Number(d.total_efectivo) || 0,
     totalTransferencia: Number(d.total_transferencia) || 0,
+    totalTarjeta: Number(d.total_tarjeta) || 0,
     totalMercadoPago: Number(d.total_mercadopago) || 0,
     totalVentas: Number(d.total_ventas) || 0,
     cantidadVentas: Number(d.cantidad_ventas) || 0,
@@ -46,6 +47,8 @@ function mapCajaMov(d: Record<string, any>): CajaMovimiento {
 export interface ResumenCaja {
   totalEfectivo: number;
   totalTransferencia: number;
+  /** Debito y credito (posnet). */
+  totalTarjeta: number;
   /** Cobros por Mercado Pago (QR y Point), separados de la transferencia bancaria. */
   totalMercadoPago: number;
   totalVentas: number;
@@ -111,6 +114,7 @@ export async function getCajasDelDia(): Promise<CajaDelDia[]> {
     cajeroNombre: d.abierta_por_nombre ?? "",
     totalEfectivo: Number(d.total_efectivo) || 0,
     totalTransferencia: Number(d.total_transferencia) || 0,
+    totalTarjeta: Number(d.total_tarjeta) || 0,
     totalMercadoPago: Number(d.total_mercadopago) || 0,
     totalVentas: Number(d.total_ventas) || 0,
     cantidadVentas: Number(d.cantidad_ventas) || 0,

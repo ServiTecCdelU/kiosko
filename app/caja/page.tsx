@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Wallet, LockOpen, Lock, TrendingUp, Banknote, CreditCard,
+  Wallet, LockOpen, Lock, TrendingUp, Banknote, CreditCard, Landmark,
   ArrowDownCircle, ArrowUpCircle, ArrowUpRight, ArrowDownRight, Receipt, QrCode, Download, History, ShoppingCart,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -494,9 +494,14 @@ export default function CajaPage() {
                         valor={resumen?.totalEfectivo ?? 0}
                       />
                       <FilaArqueo
-                        icono={<CreditCard className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
-                        label="Transferencia y tarjeta" detalle="débito, crédito, posnet: va al banco"
+                        icono={<Landmark className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
+                        label="Transferencia" detalle="va al banco"
                         valor={resumen?.totalTransferencia ?? 0}
+                      />
+                      <FilaArqueo
+                        icono={<CreditCard className="h-4 w-4 text-violet-600 dark:text-violet-400" />}
+                        label="Tarjeta" detalle="débito y crédito: compará con el cierre del posnet"
+                        valor={resumen?.totalTarjeta ?? 0}
                       />
                       <FilaArqueo
                         icono={<QrCode className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />}
@@ -720,14 +725,18 @@ function ConsolidadoDia({ cajas }: { cajas: CajaDelDia[] }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
             <MiniStat
               label="Efectivo" value={formatCurrency(totales.totalEfectivo)} icon={<Banknote className="h-3.5 w-3.5" />}
               bgClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" iconBgClass="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
             />
             <MiniStat
-              label="Transf. y tarjeta" value={formatCurrency(totales.totalTransferencia)} icon={<CreditCard className="h-3.5 w-3.5" />}
+              label="Transferencia" value={formatCurrency(totales.totalTransferencia)} icon={<Landmark className="h-3.5 w-3.5" />}
               bgClass="bg-sky-500/10 text-sky-700 dark:text-sky-400" iconBgClass="bg-sky-500/15 text-sky-600 dark:text-sky-400"
+            />
+            <MiniStat
+              label="Tarjeta" value={formatCurrency(totales.totalTarjeta)} icon={<CreditCard className="h-3.5 w-3.5" />}
+              bgClass="bg-violet-500/10 text-violet-700 dark:text-violet-400" iconBgClass="bg-violet-500/15 text-violet-600 dark:text-violet-400"
             />
             <MiniStat
               label="Mercado Pago" value={formatCurrency(totales.totalMercadoPago)} icon={<QrCode className="h-3.5 w-3.5" />}
@@ -892,7 +901,8 @@ function HistorialTab({
                   <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{c.puestoNombre ?? "—"}</TableCell>
                   <TableCell className="cifra text-right">{formatCurrency(c.montoApertura)}</TableCell>
                   <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalEfectivo)}</TableCell>
-                  <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalTransferencia)}</TableCell>
+                  {/* Suma: las cajas cerradas antes de 61_tarjeta_aparte.sql tienen la tarjeta dentro de transferencia. */}
+                  <TableCell className="cifra hidden text-right sm:table-cell">{formatCurrency(c.totalTransferencia + c.totalTarjeta)}</TableCell>
                   <TableCell className="cifra hidden text-right lg:table-cell">{formatCurrency(c.totalVentas)}</TableCell>
                   <TableCell className="cifra hidden text-right md:table-cell">{formatCurrency(c.totalMercadoPago)}</TableCell>
                   <TableCell className={cn("cifra text-right font-medium", (c.diferencia ?? 0) < 0 ? "text-destructive" : (c.diferencia ?? 0) > 0 ? "text-warning" : "")}>

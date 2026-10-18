@@ -77,7 +77,7 @@ export const HOJAS: Hoja[] = [
       c("opened_at", "Apertura", "fecha"), c("closed_at", "Cierre", "fecha"), c("estado", "Estado"),
       c("abierta_por_nombre", "Abrió"), c("monto_apertura", "Fondo inicial", "numero"),
       c("total_ventas", "Total ventas", "numero"), c("cantidad_ventas", "Cantidad de ventas", "numero"),
-      c("total_efectivo", "Efectivo", "numero"), c("total_transferencia", "Transferencia", "numero"),
+      c("total_efectivo", "Efectivo", "numero"), c("total_transferencia", "Transferencia", "numero"), c("total_tarjeta", "Tarjeta", "numero"),
       c("total_mercadopago", "Mercado Pago", "numero"), c("total_retiros", "Retiros", "numero"),
       c("total_aportes", "Aportes", "numero"), c("total_gastos", "Gastos", "numero"),
       c("monto_cierre", "Contado al cierre", "numero"), c("diferencia", "Diferencia", "numero"),

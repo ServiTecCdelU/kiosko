@@ -11,6 +11,7 @@ function caja(parcial: Partial<CajaDelDia>): CajaDelDia {
     cajeroNombre: "Ana",
     totalEfectivo: 0,
     totalTransferencia: 0,
+    totalTarjeta: 0,
     totalMercadoPago: 0,
     totalVentas: 0,
     cantidadVentas: 0,
@@ -25,6 +26,7 @@ describe("consolidarDia — totales", () => {
     assert.deepEqual(totales, {
       totalEfectivo: 0,
       totalTransferencia: 0,
+      totalTarjeta: 0,
       totalMercadoPago: 0,
       totalVentas: 0,
       cantidadVentas: 0,

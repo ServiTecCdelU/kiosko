@@ -47,6 +47,25 @@ export async function POST(req: Request) {
   const comercioId = comercioIdDeSesion(req);
   const sesion = getSesion(req);
 
+  // Un pago mayor a la deuda es casi siempre un error de tipeo ($99.999 por $9.999)
+  // y dejaba un saldo a favor enorme sin aviso.
+  const { data: cliente, error: errorCliente } = await supabaseAdmin
+    .from("clientes")
+    .select("nombre, saldo")
+    .eq("comercio_id", comercioId)
+    .eq("id", clienteId)
+    .maybeSingle();
+  if (errorCliente) return NextResponse.json({ error: errorCliente.message }, { status: 400 });
+  if (!cliente) return NextResponse.json({ error: "El cliente no existe" }, { status: 404 });
+  const deuda = Math.max(0, Number(cliente.saldo) || 0);
+  if (monto > deuda + 0.005) {
+    const fmt = (n: number) => `$${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`;
+    return NextResponse.json(
+      { error: deuda > 0 ? `El cliente debe ${fmt(deuda)}: el pago no puede ser mayor` : "El cliente no tiene deuda" },
+      { status: 400 },
+    );
+  }
+
   // La caja se resuelve ANTES de tocar la deuda: sin caja abierta no se cobra en efectivo.
   let cajaId: string | null = null;
   if (medio === "efectivo") {
@@ -75,12 +94,6 @@ export async function POST(req: Request) {
 
   let avisoCaja: string | null = null;
   if (cajaId) {
-    const { data: cliente } = await supabaseAdmin
-      .from("clientes")
-      .select("nombre")
-      .eq("comercio_id", comercioId)
-      .eq("id", clienteId)
-      .maybeSingle();
     const { error: errorMov } = await supabaseAdmin.rpc("registrar_movimiento_caja", {
       p_caja_id: cajaId,
       p_comercio_id: comercioId,

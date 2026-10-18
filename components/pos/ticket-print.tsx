@@ -1,5 +1,6 @@
 // components/pos/ticket-print.tsx — ticket termico 80mm, no fiscal
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
+import { cantidadTexto } from "@/lib/cantidad";
 import type { PaymentMethod } from "@/lib/types";
 
 export interface TicketData {
@@ -52,7 +53,7 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
           <p className="line-clamp-2">{it.name}</p>
           <div className="flex justify-between">
             <span>
-              {it.unidad === "kg" ? `${it.quantity.toFixed(2)}kg` : it.quantity} x {formatCurrency(it.price)}
+              {cantidadTexto(it.quantity, it.unidad)} x {formatCurrency(it.price)}
             </span>
             <span>{formatCurrency(it.subtotal)}</span>
           </div>

@@ -1,7 +1,7 @@
 // app/api/ventas/route.ts — alta de venta atomica via RPC process_sale_kiosko
 import { NextResponse, after } from "next/server";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
-import { procesarVenta } from "@/lib/server/procesar-venta";
+import { procesarVenta, validarCaja } from "@/lib/server/procesar-venta";
 import { facturarSiEsAutomatico } from "@/lib/server/afip/facturar";
 
 export const runtime = "nodejs";
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
   try {
     const comercioId = comercioIdDeSesion(req);
+    await validarCaja(comercioId, body?.cajaId ?? null);
     const res = await procesarVenta({
       items: rawItems,
       paymentMethod: body?.paymentMethod ?? "efectivo",
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       cuotas: body?.cuotas ?? null,
       recargoPct: body?.recargoPct ?? null,
       creditoMonto: body?.creditoMonto ?? null,
+      tarjetaMonto: body?.tarjetaMonto ?? null,
     });
     // Facturacion automatica (si el comercio la activo): despues de responder,
     // asi el cobro nunca espera a AFIP.

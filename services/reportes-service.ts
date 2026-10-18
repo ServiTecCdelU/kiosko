@@ -9,6 +9,8 @@ export interface ResumenReporte {
   cantidad: number;
   efectivo: number;
   transferencia: number;
+  /** Debito y credito (posnet), aparte de la transferencia. */
+  tarjeta: number;
   /** Cobros por Mercado Pago (QR y Point), aparte de la transferencia bancaria. */
   mercadoPago: number;
   fiado: number;

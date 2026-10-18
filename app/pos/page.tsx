@@ -570,6 +570,7 @@ function PosScreen() {
         cuotas: data.cuotas,
         recargoPct: data.recargoPct,
         creditoMonto: data.creditoMonto,
+        tarjetaMonto: data.tarjetaMonto,
         discount: data.discount,
       };
 

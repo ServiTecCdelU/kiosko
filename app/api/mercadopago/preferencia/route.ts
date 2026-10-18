@@ -6,6 +6,7 @@ import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { crearPreferenciaMP } from "@/lib/server/mercadopago";
 import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 import { motivoSinMercadoPago } from "@/lib/server/plan";
+import { validarVenta } from "@/lib/server/procesar-venta";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,12 @@ export async function POST(req: Request) {
   // Mercado Pago es del plan Pro (lib/server/plan.ts).
   const motivo = await motivoSinMercadoPago(comercioId);
   if (motivo) return NextResponse.json({ error: motivo }, { status: 403 });
+  // Se valida antes de cobrar: una venta que el webhook rechace ya estaria pagada.
+  try {
+    await validarVenta({ ...saleInput, comercioId });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Venta invalida" }, { status: 400 });
+  }
 
   const externalReference = crypto.randomUUID();
 

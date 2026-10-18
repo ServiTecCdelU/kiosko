@@ -96,7 +96,7 @@ describe("lineasTicket", () => {
     assert.ok(lineas.includes(centrar("Almacen Dona Nata", 48)));
     assert.ok(lineas.includes(centrar("10/10/2026 14:05", 48)));
     assert.ok(lineas.includes(centrar("#0001-00000042", 48)));
-    assert.ok(lineas.some((l) => l.includes("0.35kg x $8.000") && l.endsWith("$2.800")));
+    assert.ok(lineas.some((l) => l.includes("0,350kg x $8.000") && l.endsWith("$2.800")));
     assert.ok(lineas.some((l) => l.startsWith("TOTAL") && l.endsWith("$5.200")));
     assert.ok(lineas.includes("Pago: Efectivo"));
     assert.ok(lineas.includes("Vuelto: $800"));

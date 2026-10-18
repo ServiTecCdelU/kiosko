@@ -11,6 +11,8 @@ import type { Reporte } from "@/services/reportes-service";
 import { agruparPorDiaSemana, agruparPorHora, momentoArgentina } from "@/lib/reportes-tiempo";
 import { agruparGastos } from "@/lib/gastos";
 import { resumenPerdidas } from "@/lib/perdidas";
+import { partesDeVenta } from "@/lib/arqueo";
+import { ajusteDevoluciones, devolucionResta, esMovimientoDeDevolucion } from "@/lib/devoluciones-reporte";
 
 interface ProductoAcum {
   productId: string;
@@ -50,7 +52,7 @@ export async function calcularReporte(
 ): Promise<Reporte> {
   const { data, error } = await supabaseAdmin
     .from("ventas")
-    .select("total,payment_method,transfer_amount,items,created_at")
+    .select("total,payment_method,transfer_amount,tarjeta_amount,items,created_at")
     .eq("comercio_id", comercioId)
     .eq("estado", "completada")
     .gte("created_at", desde.toISOString())
@@ -61,6 +63,7 @@ export async function calcularReporte(
   const ventas = data ?? [];
   let efectivo = 0;
   let transferencia = 0;
+  let tarjeta = 0;
   let mercadoPago = 0;
   let fiado = 0;
   const dias = new Map<string, number>();
@@ -75,15 +78,11 @@ export async function calcularReporte(
       // bancaria: queda en la cuenta de MP, asi que se reporta aparte.
       mercadoPago += total;
     } else {
-      // En 'mixto' se divide segun la porcion transferida; el resto es efectivo.
-      const tr =
-        ["transferencia", "tarjeta", "debito", "credito"].includes(v.payment_method)
-          ? total
-          : v.payment_method === "mixto"
-            ? Math.min(total, Number(v.transfer_amount) || 0)
-            : 0;
-      transferencia += tr;
-      efectivo += total - tr;
+      // Mismo reparto que el arqueo de caja (lib/arqueo.ts), con tarjeta aparte.
+      const partes = partesDeVenta(v);
+      transferencia += partes.transferencia;
+      tarjeta += partes.tarjeta;
+      efectivo += partes.efectivo;
     }
 
     const { dia } = momentoArgentina(v.created_at);
@@ -99,6 +98,50 @@ export async function calcularReporte(
       prev.total += Number(it.subtotal) || (Number(it.price) || 0) * cantidad;
       productos.set(id, prev);
     }
+  }
+
+  // Devoluciones del periodo: deshacen ventas, no son gastos (lib/devoluciones-reporte.ts).
+  const { data: devData, error: devError } = await supabaseAdmin
+    .from("devoluciones")
+    .select("id,total,reembolso,created_at,ventas(payment_method)")
+    .eq("comercio_id", comercioId)
+    .gte("created_at", desde.toISOString())
+    .lte("created_at", hasta.toISOString())
+    .limit(5000);
+  if (devError) throw new Error(devError.message);
+  const devs = (devData ?? []).filter((d: any) =>
+    devolucionResta({ reembolso: d.reembolso, metodoVenta: d.ventas?.payment_method ?? null }),
+  );
+  const itemsPorDevolucion = new Map<string, { productoId: string; cantidad: number; subtotal: number }[]>();
+  for (let i = 0; i < devs.length; i += 500) {
+    const { data: its } = await supabaseAdmin
+      .from("devolucion_items")
+      .select("devolucion_id,producto_id,cantidad,subtotal")
+      .eq("comercio_id", comercioId)
+      .in("devolucion_id", devs.slice(i, i + 500).map((d: any) => d.id));
+    for (const it of its ?? []) {
+      const lista = itemsPorDevolucion.get(it.devolucion_id) ?? [];
+      lista.push({ productoId: String(it.producto_id), cantidad: Number(it.cantidad) || 0, subtotal: Number(it.subtotal) || 0 });
+      itemsPorDevolucion.set(it.devolucion_id, lista);
+    }
+  }
+  const ajuste = ajusteDevoluciones(devs.map((d: any) => ({
+    total: Number(d.total) || 0,
+    reembolso: d.reembolso,
+    metodoVenta: d.ventas?.payment_method ?? null,
+    items: itemsPorDevolucion.get(d.id) ?? [],
+  })));
+  efectivo -= ajuste.efectivo;
+  fiado -= ajuste.fiado;
+  for (const d of devs as any[]) {
+    const { dia } = momentoArgentina(d.created_at);
+    dias.set(dia, (dias.get(dia) ?? 0) - (Number(d.total) || 0));
+  }
+  for (const [id, dev] of ajuste.porProducto) {
+    const p = productos.get(id);
+    if (!p) continue; // la venta original es de otro periodo
+    p.cantidad = Math.max(0, p.cantidad - dev.cantidad);
+    p.total = Math.max(0, p.total - dev.total);
   }
 
   // Perdidas del periodo: mermas y faltantes de recuento (lib/perdidas.ts).
@@ -144,19 +187,20 @@ export async function calcularReporte(
     rubros.set(rubro, r);
   }
 
-  const totalVentas = efectivo + transferencia + mercadoPago + fiado;
+  const totalVentas = efectivo + transferencia + tarjeta + mercadoPago + fiado;
   const cantidad = ventas.length;
   const margenBruto = totalVentas - costoTotal;
 
   const { data: gastosData } = await supabaseAdmin
     .from("caja_movimientos")
-    .select("monto,categoria")
+    .select("monto,categoria,concepto")
     .eq("comercio_id", comercioId)
     .eq("tipo", "gasto")
     .gte("fecha", desde.toISOString())
     .lte("fecha", hasta.toISOString())
     .limit(5000);
-  const gastos = gastosData ?? [];
+  // El reembolso de una devolucion ya se resto de las ventas: no es un gasto.
+  const gastos = (gastosData ?? []).filter((m) => !esMovimientoDeDevolucion(m.concepto));
   const gastosTotal = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const perdidas = resumenPerdidas(movsPerdida, costoPorId);
 
@@ -166,6 +210,7 @@ export async function calcularReporte(
       cantidad,
       efectivo,
       transferencia,
+      tarjeta,
       mercadoPago,
       fiado,
       ticketPromedio: cantidad > 0 ? totalVentas / cantidad : 0,
