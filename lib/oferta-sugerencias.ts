@@ -2,6 +2,7 @@
 // y productos con margen de sobra que rotan poco, y elige la promo mas fuerte
 // que todavia deja un margen minimo. Puro: el endpoint trae stock y ventas.
 import { analizarOferta, plantillasOferta, type PlantillaOferta } from "./oferta-analisis.ts";
+import { esFraccionable, type Unidad } from "./unidades.ts";
 
 export interface CandidatoOferta {
   price: number;
@@ -11,7 +12,7 @@ export interface CandidatoOferta {
   unidadesVendidas: number;
   /** Dias de historia disponibles (un producto recien creado tiene menos). */
   diasHistoria: number;
-  unidad: "un" | "kg";
+  unidad: Unidad;
 }
 
 export type MotivoSugerencia = "sin-ventas" | "estancado" | "margen-alto";
@@ -60,7 +61,7 @@ export function sugerirOferta(c: CandidatoOferta): SugerenciaOferta | null {
   const motivo = motivoDe(c, porDia, diasDeStock);
   if (!motivo) return null;
 
-  const plantillas = plantillasOferta(c.price).filter((p) => c.unidad !== "kg" || p.oferta.tipo !== "combo");
+  const plantillas = plantillasOferta(c.price).filter((p) => !esFraccionable(c.unidad) || p.oferta.tipo !== "combo");
   const opciones = PREFERENCIAS[motivo]
     .map((id) => plantillas.find((p) => p.id === id))
     .filter((p): p is PlantillaOferta => !!p);

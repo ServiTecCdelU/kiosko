@@ -22,6 +22,7 @@ import { OfertaPublicada, useNombreComercio } from "@/components/stock/oferta-pu
 import { OfertaVigenciaPicker } from "@/components/stock/oferta-vigencia-picker";
 import type { OfertaTipo, Product } from "@/lib/types";
 import type { SetOfertaInput } from "@/services/products-service";
+import { esFraccionable, porUnidad } from "@/lib/unidades";
 
 interface OfertaDialogProps {
   product: Product | null;
@@ -98,7 +99,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
 
   const num = Number(valor) || 0;
   const cant = Number(cantidad) || 0;
-  const esKg = product.unidad === "kg";
+  const esKg = esFraccionable(product.unidad);
   const analisis = analizarOferta(borrador);
 
   const error = !activa ? null
@@ -174,7 +175,7 @@ export function OfertaDialog({ product, open, onOpenChange, onSubmit, onImprimir
             <span className="line-clamp-1">Estudio de oferta · {product.name}</span>
           </DialogTitle>
           <DialogDescription className="cifra">
-            Precio {formatCurrency(product.price)}{esKg && "/kg"}
+            Precio {formatCurrency(product.price)}{porUnidad(product.unidad)}
             {product.precioBase ? ` · Costo ${formatCurrency(product.precioBase)}` : ""}
             {product.stockControlado ? ` · Stock ${product.stock}` : ""}
           </DialogDescription>

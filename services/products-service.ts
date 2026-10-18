@@ -7,6 +7,7 @@ import type { SugerenciaOferta } from "@/lib/oferta-sugerencias";
 import type { RegistroOferta } from "@/lib/oferta-historial";
 import { fechaDeDia } from "@/lib/oferta-vencimiento";
 import type { RitmoProducto } from "@/lib/pedir-mas";
+import { unidadValida, type Unidad } from "@/lib/unidades";
 
 export function mapRow(d: Record<string, any>): Product {
   return {
@@ -25,8 +26,9 @@ export function mapRow(d: Record<string, any>): Product {
     revisar: d.revisar ?? false,
     favorito: d.favorito ?? false,
     fechaVencimiento: fechaDeDia(d.fecha_vencimiento),
-    unidad: d.unidad === "kg" ? "kg" : "un",
+    unidad: unidadValida(d.unidad),
     stockControlado: d.stock_controlado ?? true,
+    precioLibre: d.precio_libre === true,
     iva: d.iva != null ? Number(d.iva) : 21,
     disabled: d.disabled ?? false,
     ofertaActiva: d.oferta_activa ?? false,
@@ -103,8 +105,9 @@ export interface UpdateProductInput {
   revisar: boolean;
   favorito: boolean;
   fechaVencimiento?: string; // YYYY-MM-DD
-  unidad: "un" | "kg";
+  unidad: Unidad;
   stockControlado: boolean;
+  precioLibre?: boolean;
   /** Alicuota de IVA (lib/iva.ts). Si no se manda, no se toca. */
   iva?: number;
 }
@@ -149,6 +152,18 @@ export async function getHistorialPrecio(productId: string, limit = 10): Promise
 export async function getCatalogoCompleto(): Promise<Product[]> {
   const { productos } = await consultar<{ productos: Record<string, any>[] }>("/api/consultas/productos", "catalogo");
   return productos.map(mapRow);
+}
+
+/** Aumento (o rebaja) masivo por % (RPC aumentar_precios). Devuelve cuantos productos cambiaron. */
+export async function aumentarPrecios(input: { porcentaje: number; rubro: string | null; redondeo: number }): Promise<number> {
+  const res = await fetch(apiUrl("/api/productos/aumento"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudieron actualizar los precios");
+  return Number(data?.actualizados) || 0;
 }
 
 export interface AumentoPrecio {
@@ -239,7 +254,7 @@ export async function getRitmoVenta(dias = 14): Promise<{ productos: RitmoProduc
     productos: res.productos.map((d) => ({
       id: d.producto_id,
       nombre: d.nombre,
-      unidad: d.unidad === "kg" ? "kg" : "un",
+      unidad: unidadValida(d.unidad),
       stock: Number(d.stock_actual) || 0,
       stockMinimo: Number(d.stock_minimo) || 0,
       vendidoReciente: Number(d.vendido_reciente) || 0,
@@ -346,11 +361,12 @@ export interface CreateProductInput {
   costo?: number;
   stockMinimo?: number;
   lote?: number;
-  unidad?: "un" | "kg";
+  unidad?: Unidad;
   fechaVencimiento?: string;
   favorito?: boolean;
   revisar?: boolean;
   stockControlado?: boolean;
+  precioLibre?: boolean;
   iva?: number;
 }
 

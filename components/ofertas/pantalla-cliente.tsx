@@ -15,6 +15,7 @@ import { pesos } from "@/lib/pricing";
 import { cantidadTexto } from "@/lib/cantidad";
 import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
 import type { Product } from "@/lib/types";
+import { esFraccionable } from "@/lib/unidades";
 
 const AMARILLO = "#ffd400";
 const VERDE = "#22c55e";
@@ -51,7 +52,7 @@ function Carrito({ lineas, total, ahorro, ofertas }: CarritoProps) {
         {lineas.map((l) => (
           <li key={l.id} className="flex animate-in fade-in slide-in-from-bottom-2 items-center gap-[1.2vw] rounded-[1.5vh] bg-white/5 px-[1.5vw] py-[1.4vh] duration-300">
             <span className="min-w-[4.5vw] font-bold text-white/60" style={{ fontSize: "2.8vh" }}>
-              {l.unidad === "kg" ? cantidadTexto(l.cantidad, "kg") : `${l.cantidad}x`}
+              {esFraccionable(l.unidad) ? cantidadTexto(l.cantidad, l.unidad) : `${l.cantidad}x`}
             </span>
             <span className="min-w-0 flex-1">
               <span className="line-clamp-1 font-semibold text-white" style={{ fontSize: "3vh" }}>{l.nombre}</span>

@@ -4,7 +4,7 @@ import { apiUrl } from "@/lib/utils/api-url"
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera, MonitorSmartphone, Settings2, Wallet } from "lucide-react";
+import { Search, ArrowLeft, ScanLine, Printer, PauseCircle, WifiOff, RefreshCw, Camera, MonitorSmartphone, Settings2, Wallet, CircleDollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -13,13 +13,16 @@ import { ahorroLinea, analizarOferta, etiquetaOferta } from "@/lib/oferta-analis
 import { usePantallaCliente } from "@/hooks/use-pantalla-cliente";
 import { useOfertasVigentes } from "@/hooks/use-ofertas-vigentes";
 import { useCart } from "@/hooks/useCart";
-import { searchProducts, findProductByCode, getFavoritos } from "@/services/products-service";
+import { searchProducts, findProductByCode, getFavoritos, createProduct } from "@/services/products-service";
+import { ImporteLibreDialog } from "@/components/pos/importe-libre-dialog";
+
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { parseCodigoBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
 import { leerFormatoBalanza } from "@/lib/balanza-config";
-import { cantidadTexto } from "@/lib/cantidad";
+import { ajustarCantidad, cantidadTexto, separarMultiplicador } from "@/lib/cantidad";
+import { esFraccionable, porUnidad } from "@/lib/unidades";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
@@ -56,6 +59,9 @@ import type { Caja, Product } from "@/lib/types";
 /** Ofertas que se imprimen al pie de cada ticket. */
 const OFERTAS_EN_TICKET = 3;
 
+/** Codigo del producto "Varios" a precio libre que crea el boton del POS. */
+const CODIGO_VARIOS = "VARIOS";
+
 export default function PosPage() {
   return (
     <AuthGuard>
@@ -79,6 +85,7 @@ function PosScreen() {
   const [cajasCargadas, setCajasCargadas] = useState(false);
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
+  const [importeLibreProduct, setImporteLibreProduct] = useState<Product | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
   // Id de la ultima venta registrada (para facturarla). null si quedo offline.
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
@@ -177,9 +184,12 @@ function PosScreen() {
     return () => window.removeEventListener("keydown", onKey);
   }, [focusInput]);
 
+  // "150*tornillo": la cantidad va delante del asterisco y se busca lo que sigue.
+  const { cantidad: multiplicador, texto: textoBusqueda } = separarMultiplicador(query);
+
   // Busqueda por nombre con debounce
   useEffect(() => {
-    const q = query.trim();
+    const q = textoBusqueda.trim();
     if (q.length < 2) {
       setResults([]);
       return;
@@ -195,49 +205,84 @@ function PosScreen() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query, isOnline]);
+  }, [textoBusqueda, isOnline]);
 
+  /** Suma `cantidad` al carrito si alcanza el stock (sin control de stock no hay tope). */
+  const agregarCantidad = useCallback(
+    (p: Product, cantidad: number): boolean => {
+      if (p.stockControlado) {
+        const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
+        if (enCarrito + cantidad > p.stock + 1e-9) {
+          toast.error(`Stock maximo (${cantidadTexto(p.stock, p.unidad)}) para ${p.name}`);
+          return false;
+        }
+      }
+      cart.addProduct(p, cantidad);
+      return true;
+    },
+    [cart],
+  );
+
+  /**
+   * `cantidad` viene del multiplicador del buscador ("150*tornillo"). Sin ella,
+   * lo fraccionable (kg, m, l) pide cuanto con el dialogo y lo demas suma 1.
+   */
   const addToCart = useCallback(
-    (p: Product) => {
+    (p: Product, cantidad: number | null = null) => {
       if (p.stockControlado && p.stock <= 0) {
         toast.error(`Sin stock: ${p.name}`, {
           description: "Cargá stock en Stock, o marcalo como sin control de stock si no se cuenta (pan, servicios).",
         });
         return;
       }
-      if (p.unidad === "kg") {
+      // Recargas, fotocopias, "varios": se pide el importe (el multiplicador no aplica).
+      if (p.precioLibre) {
+        setImporteLibreProduct(p);
+        return;
+      }
+      if (cantidad !== null) {
+        if (!esFraccionable(p.unidad) && !Number.isInteger(cantidad)) {
+          toast.error(`${p.name} se vende por unidad: la cantidad tiene que ser entera`);
+          return;
+        }
+        if (agregarCantidad(p, ajustarCantidad(cantidad, p.unidad))) {
+          toast.success(`${cantidadTexto(ajustarCantidad(cantidad, p.unidad), p.unidad)} × ${p.name}`);
+        }
+        return;
+      }
+      if (esFraccionable(p.unidad)) {
         setPesoProduct(p);
         return;
       }
-      if (p.stockControlado) {
-        const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
-        if (enCarrito + 1 > p.stock) {
-          toast.error(`Stock maximo (${p.stock}) para ${p.name}`);
-          return;
-        }
-      }
-      cart.addProduct(p, 1);
-      if (p.lote && p.lote > 1) {
+      if (agregarCantidad(p, 1) && p.lote && p.lote > 1) {
         toast.info(`${p.name} viene en paquete de ${p.lote} unidades`);
       }
     },
-    [cart],
+    [agregarCantidad],
   );
 
   const confirmarPeso = useCallback(
-    (kg: number) => {
-      if (!pesoProduct) return;
-      // Sin control de stock (pan, verdura que no se cuenta) se vende sin tope.
-      if (pesoProduct.stockControlado) {
-        const enCarrito = cart.items.find((i) => i.product.id === pesoProduct.id)?.quantity ?? 0;
-        if (enCarrito + kg > pesoProduct.stock + 1e-9) {
-          toast.error(`Stock maximo (${pesoProduct.stock}kg) para ${pesoProduct.name}`);
-          return;
-        }
-      }
-      cart.addProduct(pesoProduct, kg);
+    (cantidad: number) => {
+      if (pesoProduct) agregarCantidad(pesoProduct, cantidad);
     },
-    [cart, pesoProduct],
+    [agregarCantidad, pesoProduct],
+  );
+
+  /** Cantidad tipeada o +/− en el carrito: no deja pasar el stock. */
+  const cambiarCantidad = useCallback(
+    (productId: string, cantidad: number) => {
+      const linea = cart.items.find((i) => i.product.id === productId);
+      if (!linea) return;
+      const p = linea.product;
+      const q = ajustarCantidad(cantidad, p.unidad);
+      if (p.stockControlado && q > p.stock + 1e-9) {
+        toast.error(`Stock maximo (${cantidadTexto(p.stock, p.unidad)}) para ${p.name}`);
+        if (p.stock > 0) cart.setQuantity(productId, p.stock);
+        return;
+      }
+      cart.setQuantity(productId, q);
+    },
+    [cart],
   );
 
   const buscarPorCodigo = useCallback(
@@ -247,6 +292,35 @@ function PosScreen() {
         : buscarPorCodigoOffline(codigo),
     [isOnline],
   );
+
+  /**
+   * "Varios": producto de precio libre con codigo VARIOS. Se crea solo la primera
+   * vez (cualquier rol puede dar de alta desde el POS, como el alta rapida).
+   */
+  const venderVarios = useCallback(async () => {
+    try {
+      let varios = await buscarPorCodigo(CODIGO_VARIOS);
+      if (!varios) {
+        if (!isOnline) {
+          toast.error("Sin conexión no se puede crear “Varios”. Probá cuando vuelva internet.");
+          return;
+        }
+        await createProduct({
+          name: "Varios", price: 0, stock: 0, codigo: CODIGO_VARIOS,
+          stockControlado: false, precioLibre: true, revisar: false,
+        });
+        varios = await buscarPorCodigo(CODIGO_VARIOS);
+      }
+      if (!varios) throw new Error("No se encontró el producto Varios");
+      if (!varios.precioLibre) {
+        toast.error("El producto con código VARIOS no tiene precio libre. Activalo en Stock.");
+        return;
+      }
+      setImporteLibreProduct(varios);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo abrir Varios");
+    }
+  }, [buscarPorCodigo, isOnline]);
 
   // Etiqueta de balanza (EAN-13 prefijo 20-29): trae el PLU y el peso ya
   // embebidos, asi que el producto pesable se agrega directo sin PesoDialog.
@@ -289,11 +363,12 @@ function PosScreen() {
   );
 
   // Enter: el lector de codigo de barras "tipea" + Enter. Match exacto -> agrega directo.
+  // Con multiplicador ("12*7790...") el codigo es lo que sigue al asterisco.
   const handleEnter = useCallback(async () => {
-    const value = query.trim();
+    const value = textoBusqueda.trim();
     if (!value) return;
     try {
-      if (await procesarCodigoBalanza(value)) {
+      if (multiplicador === null && await procesarCodigoBalanza(value)) {
         setQuery("");
         setResults([]);
         focusInput();
@@ -301,14 +376,14 @@ function PosScreen() {
       }
       const found = await buscarPorCodigo(value);
       if (found) {
-        addToCart(found);
+        addToCart(found, multiplicador);
         setQuery("");
         setResults([]);
         focusInput();
         return;
       }
       if (results.length === 1) {
-        addToCart(results[0]);
+        addToCart(results[0], multiplicador);
         setQuery("");
         setResults([]);
         focusInput();
@@ -316,17 +391,19 @@ function PosScreen() {
     } catch {
       toast.error("Error al buscar");
     }
-  }, [query, results, addToCart, focusInput, buscarPorCodigo, procesarCodigoBalanza]);
+  }, [textoBusqueda, multiplicador, results, addToCart, focusInput, buscarPorCodigo, procesarCodigoBalanza]);
 
   const handleScanDetected = useCallback(
     async (codigo: string) => {
       setScannerOpen(false);
       try {
-        if (await procesarCodigoBalanza(codigo)) return;
+        if (multiplicador === null && await procesarCodigoBalanza(codigo)) return;
         const found = await buscarPorCodigo(codigo);
         if (found) {
-          addToCart(found);
-          toast.success(`${found.name} agregado`);
+          // "150*" tipeado antes de escanear con la camara aplica a lo escaneado.
+          addToCart(found, multiplicador);
+          if (multiplicador !== null) setQuery("");
+          else toast.success(`${found.name} agregado`);
         } else {
           setCodigoNoEncontrado(codigo);
         }
@@ -334,7 +411,7 @@ function PosScreen() {
         toast.error("Error al buscar el código");
       }
     },
-    [addToCart, buscarPorCodigo, procesarCodigoBalanza],
+    [addToCart, buscarPorCodigo, procesarCodigoBalanza, multiplicador],
   );
 
   const handleProductoCreado = useCallback(
@@ -690,6 +767,13 @@ function PosScreen() {
             </button>
           )}
           <button
+            onClick={venderVarios}
+            title="Cobrar un importe suelto (recarga, fotocopia, varios)"
+            className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <CircleDollarSign className="h-3.5 w-3.5" /> Varios
+          </button>
+          <button
             onClick={() => setImpresoraOpen(true)}
             title="Configurar la impresora de tickets y la balanza de esta PC"
             className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -760,9 +844,14 @@ function PosScreen() {
                     handleEnter();
                   }
                 }}
-                placeholder="Escaneá un código o buscá por nombre..."
+                placeholder="Escaneá un código o buscá por nombre (150* para cantidad)"
                 className="card-premium h-14 rounded-2xl border-0 pl-12 text-base font-medium shadow-none focus-visible:ring-2 focus-visible:ring-primary/40"
               />
+              {multiplicador !== null && (
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-primary/15 px-2 py-1 text-xs font-semibold text-primary">
+                  × {multiplicador.toLocaleString("es-AR")}
+                </span>
+              )}
             </div>
             <button
               onClick={() => setScannerOpen(true)}
@@ -774,10 +863,10 @@ function PosScreen() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-card p-2">
-            {query.trim().length < 2 ? (
+            {textoBusqueda.trim().length < 2 ? (
               favoritos.length > 0 || (ofertasVigentes?.length ?? 0) > 0 ? (
                 <div>
-                  <OfertasRapidas ofertas={ofertasVigentes ?? []} onAgregar={addToCart} />
+                  <OfertasRapidas ofertas={ofertasVigentes ?? []} onAgregar={(p) => addToCart(p)} />
                   {favoritos.length > 0 && (
                     <>
                       <p className="mb-2 px-1 text-xs font-medium text-muted-foreground">Productos rápidos</p>
@@ -787,7 +876,7 @@ function PosScreen() {
                           return (
                             <li key={p.id}>
                               <button
-                                onClick={() => addToCart(p)}
+                                onClick={() => { addToCart(p, multiplicador); if (multiplicador !== null) setQuery(""); }}
                                 aria-disabled={sinStock}
                                 className={cn(
                                   "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
@@ -821,7 +910,7 @@ function PosScreen() {
                   return (
                     <li key={p.id}>
                       <button
-                        onClick={() => addToCart(p)}
+                        onClick={() => { addToCart(p, multiplicador); if (multiplicador !== null) setQuery(""); }}
                         aria-disabled={sinStock}
                         className={cn(
                           "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
@@ -853,7 +942,7 @@ function PosScreen() {
                             </span>
                           )}
                           <span className={cn("text-sm font-semibold", tieneOferta(p) ? "text-money" : "text-primary")}>
-                            {formatCurrency(precioFinal(p))}{p.unidad === "kg" && "/kg"}
+                            {formatCurrency(precioFinal(p))}{porUnidad(p.unidad)}
                           </span>
                         </span>
                       </button>
@@ -871,7 +960,7 @@ function PosScreen() {
             ref={cartRef}
             items={cart.items}
             total={cart.total}
-            onSetQuantity={cart.setQuantity}
+            onSetQuantity={cambiarCantidad}
             onRemove={cart.removeProduct}
             onClear={cart.clear}
             onConfirm={handleConfirm}
@@ -884,6 +973,11 @@ function PosScreen() {
       </div>
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
+      <ImporteLibreDialog
+        product={importeLibreProduct}
+        onOpenChange={(o) => !o && setImporteLibreProduct(null)}
+        onConfirm={(importe) => importeLibreProduct && cart.addPrecioLibre(importeLibreProduct, importe)}
+      />
       <TicketPrint ticket={lastTicket} />
       <ImpresoraDialog
         open={impresoraOpen}

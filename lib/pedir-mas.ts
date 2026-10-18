@@ -5,6 +5,8 @@
 // La base no guarda "bultos": se usa la ultima compra como tamaño del pedido
 // (si compraste 20, sugiere de a 20).
 
+import { esFraccionable, simboloUnidad, type Unidad } from "./unidades.ts";
+
 export interface UltimaCompra {
   /** ISO de cuando se recibio. */
   fecha: string;
@@ -16,7 +18,7 @@ export interface UltimaCompra {
 export interface RitmoProducto {
   id: string;
   nombre: string;
-  unidad: "un" | "kg";
+  unidad: Unidad;
   stock: number;
   stockMinimo: number;
   /** Vendido en los ultimos `dias`. */
@@ -69,13 +71,13 @@ export const DIAS_COMPRA_RAPIDA = 21;
 /** Stock para menos de esto = se agota. */
 export const DIAS_SE_AGOTA = 7;
 /** Por debajo de esto lo vendido es ruido (unidades / kg en el periodo). */
-const MINIMO_VENDIDO = { un: 5, kg: 2 } as const;
+const MINIMO_VENDIDO: Record<Unidad, number> = { un: 5, kg: 2, m: 2, l: 2 };
 
 const DIA_MS = 86_400_000;
 
-function redondearArriba(n: number, unidad: "un" | "kg"): number {
-  // kg de a medio kilo; unidades enteras
-  return unidad === "kg" ? Math.ceil(n * 2) / 2 : Math.ceil(n - 1e-9);
+function redondearArriba(n: number, unidad: Unidad): number {
+  // kg, m y l de a medio; unidades enteras
+  return esFraccionable(unidad) ? Math.ceil(n * 2) / 2 : Math.ceil(n - 1e-9);
 }
 
 /** Analiza un producto; null si no hace falta pedir. */
@@ -145,9 +147,9 @@ export function sugerirPedidos(productos: RitmoProducto[], dias: number, ahora: 
       (b.cambioPct ?? 0) - (a.cambioPct ?? 0));
 }
 
-function cantidadTexto(n: number, unidad: "un" | "kg"): string {
+function cantidadTexto(n: number, unidad: Unidad): string {
   const num = n.toLocaleString("es-AR", { maximumFractionDigits: 1 });
-  return unidad === "kg" ? `${num} kg` : `${num} u.`;
+  return esFraccionable(unidad) ? `${num} ${simboloUnidad(unidad)}` : `${num} u.`;
 }
 
 /** Por que se sugiere, en castellano de mostrador. */

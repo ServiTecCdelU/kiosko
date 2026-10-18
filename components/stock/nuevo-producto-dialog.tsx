@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
 import { lookupNombrePorCodigoBarras } from "@/lib/barcode-lookup";
 import { createProduct, findProductByCode, type CreateProductInput } from "@/services/products-service";
+import { UNIDADES, esFraccionable, simboloUnidad, type Unidad } from "@/lib/unidades";
 
 interface NuevoProductoDialogProps {
   open: boolean;
@@ -33,9 +34,12 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const [lote, setLote] = useState("");
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
-  const [unidad, setUnidad] = useState<"un" | "kg">("un");
-  const porKg = unidad === "kg";
+  const [unidad, setUnidad] = useState<Unidad>("un");
+  // kg, m y l: precio y stock por esa unidad, con decimales y sin "unidades por bulto".
+  const porKg = esFraccionable(unidad);
+  const simbolo = simboloUnidad(unidad);
   const [stockControlado, setStockControlado] = useState(true);
+  const [precioLibre, setPrecioLibre] = useState(false);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
   // El aviso del nombre recien despues de tocarlo: no se reta antes de escribir.
@@ -65,6 +69,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setFechaVencimiento("");
     setUnidad("un");
     setStockControlado(true);
+    setPrecioLibre(false);
     setIva(IVA_DEFAULT);
   }, [open]);
 
@@ -108,9 +113,11 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
         fechaVencimiento: fechaVencimiento || undefined,
         favorito,
         stockControlado,
+        precioLibre,
         iva,
-        // Cargado a mano con todos sus datos no hay nada que revisar; sin precio, si.
-        revisar: priceNum <= 0,
+        // Cargado a mano con todos sus datos no hay nada que revisar; sin precio, si
+        // (salvo precio libre: el importe se pone al vender).
+        revisar: priceNum <= 0 && !precioLibre,
       };
       await createProduct(input);
       toast.success(`${input.name} guardado`);
@@ -184,13 +191,12 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             />
           </div>
 
-          {/* Va antes que precio y stock: los rotulos cambian si se vende por kg. */}
+          {/* Va antes que precio y stock: los rotulos cambian si se vende por kg, metro o litro. */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Se vende por</Label>
-              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={selectClass}>
-                <option value="un">Unidad</option>
-                <option value="kg">Peso (kg)</option>
+              <select value={unidad} onChange={(e) => setUnidad(e.target.value as Unidad)} className={selectClass}>
+                {UNIDADES.map((u) => <option key={u.valor} value={u.valor}>{u.label}</option>)}
               </select>
             </div>
             <div>
@@ -201,11 +207,11 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">{porKg ? "Precio por kg" : "Precio de venta"}</Label>
+              <Label className="mb-1 block text-xs">{porKg ? `Precio por ${simbolo}` : "Precio de venta"}</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">{porKg ? "Costo por kg" : "Costo"}</Label>
+              <Label className="mb-1 block text-xs">{porKg ? `Costo por ${simbolo}` : "Costo"}</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
             </div>
             <div>
@@ -233,14 +239,14 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
           {stockControlado && (
             <div className={cn("grid gap-2", porKg ? "grid-cols-2" : "grid-cols-3")}>
               <div>
-                <Label className="mb-1 block text-xs">{porKg ? "Stock inicial (kg)" : "Stock inicial"}</Label>
+                <Label className="mb-1 block text-xs">{porKg ? `Stock inicial (${simbolo})` : "Stock inicial"}</Label>
                 <Input
                   type="number" inputMode={porKg ? "decimal" : "numeric"} step={porKg ? "0.001" : "1"}
                   value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" className="rounded-xl"
                 />
               </div>
               <div>
-                <Label className="mb-1 block text-xs">{porKg ? "Stock mínimo (kg)" : "Stock mínimo"}</Label>
+                <Label className="mb-1 block text-xs">{porKg ? `Stock mínimo (${simbolo})` : "Stock mínimo"}</Label>
                 <Input
                   type="number" inputMode={porKg ? "decimal" : "numeric"} step={porKg ? "0.001" : "1"}
                   value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl"
@@ -268,6 +274,15 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
                 </span>
               </span>
               <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">
+                Precio libre
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Al venderlo se tipea el importe. Ej: recarga SUBE o de celular, varios
+                </span>
+              </span>
+              <Switch checked={precioLibre} onCheckedChange={setPrecioLibre} />
             </label>
           </div>
         </div>

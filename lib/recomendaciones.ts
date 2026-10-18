@@ -3,6 +3,7 @@
 import { tieneOferta, type ConOferta } from "./pricing.ts";
 import { sumarDias } from "./oferta-vigencia.ts";
 import { veredictoOferta, type ResultadoOferta } from "./oferta-resultados.ts";
+import type { Unidad } from "./unidades.ts";
 
 type ProductoBase = ConOferta;
 
@@ -44,7 +45,7 @@ interface ProductoCosto {
   precioBase?: number;
   stock: number;
   disabled: boolean;
-  unidad: "un" | "kg";
+  unidad: Unidad;
 }
 
 /** Productos con stock y sin costo cargado: sin costo no se puede medir margen ni ofertar con seguridad. */

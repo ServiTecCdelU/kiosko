@@ -5,12 +5,13 @@ import { pesos } from "@/lib/pricing";
 import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
 import { textoVigencia } from "@/lib/oferta-vigencia";
 import type { Product } from "@/lib/types";
+import { porUnidad } from "@/lib/unidades";
 
 export function DiapositivaOferta({ p }: { p: Product }) {
   const a = analizarOferta(p);
   const etiqueta = etiquetaOferta(p);
   const esCombo = p.ofertaTipo === "combo";
-  const porKg = p.unidad === "kg" ? "/kg" : "";
+  const porKg = porUnidad(p.unidad);
   return (
     <div className="flex h-full animate-in fade-in slide-in-from-right-8 flex-col items-center justify-center gap-[3vh] px-[5vw] text-center duration-700">
       {etiqueta && (

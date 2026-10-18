@@ -8,6 +8,7 @@ import { type ConOferta, pesos } from "./pricing.ts";
 import { analizarOferta, etiquetaOferta } from "./oferta-analisis.ts";
 import { textoVigencia } from "./oferta-vigencia.ts";
 import { tamanoTitulo, temaCartel, type TemaCartelId } from "./cartel-temas.ts";
+import { porUnidad, type Unidad } from "./unidades.ts";
 
 export type FormatoImagen = "historia" | "post";
 
@@ -18,7 +19,7 @@ export const MEDIDAS_IMAGEN: Record<FormatoImagen, { ancho: number; alto: number
 
 interface ProductoImagen extends ConOferta {
   name: string;
-  unidad?: "un" | "kg";
+  unidad?: Unidad;
 }
 
 interface OpcionesImagen {
@@ -114,7 +115,7 @@ export function dibujarImagenOferta(p: ProductoImagen, opciones: OpcionesImagen,
   const a = analizarOferta(p);
   const etiqueta = etiquetaOferta(p);
   const esCombo = p.ofertaTipo === "combo";
-  const porKg = p.unidad === "kg" ? "/kg" : "";
+  const porKg = porUnidad(p.unidad);
   const precioGrande = pesos(a.totalPromo);
 
   // Hoja blanca con borde del color del tema

@@ -1,7 +1,7 @@
 // lib/venta-validacion.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { errorCantidad, errorDescuento, ERROR_SIN_CAJA } from "./venta-validacion.ts";
+import { errorCantidad, errorDescuento, errorPrecioLibre, ERROR_SIN_CAJA } from "./venta-validacion.ts";
 import { esErrorDeCaja } from "./offline/cola.ts";
 
 describe("errorCantidad", () => {
@@ -21,6 +21,19 @@ describe("errorCantidad", () => {
     assert.ok(errorCantidad(0, "un", "x"));
     assert.ok(errorCantidad(-1, "kg", "x"));
     assert.ok(errorCantidad(NaN, "un", "x"));
+  });
+});
+
+describe("errorPrecioLibre", () => {
+  test("importe positivo en centavos pasa", () => {
+    assert.equal(errorPrecioLibre(5000, "Recarga SUBE"), null);
+    assert.equal(errorPrecioLibre(350.5, "Fotocopias"), null);
+  });
+  test("sin importe, con mas de 2 decimales o por encima del tope, no", () => {
+    assert.ok(errorPrecioLibre(0, "Varios"));
+    assert.ok(errorPrecioLibre(NaN, "Varios"));
+    assert.ok(errorPrecioLibre(10.005, "Varios"));
+    assert.ok(errorPrecioLibre(5_000_000, "Varios"));
   });
 });
 

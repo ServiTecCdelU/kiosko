@@ -66,6 +66,7 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/productos", "PATCH"), "gestion");
     assert.equal(reglaDeRuta("/api/productos", "PUT"), "gestion");
     assert.equal(reglaDeRuta("/api/stock", "POST"), "gestion");
+    assert.equal(reglaDeRuta("/api/productos/aumento", "POST"), "gestion");
     assert.equal(reglaDeRuta("/api/productos", "POST"), "sesion");
   });
 

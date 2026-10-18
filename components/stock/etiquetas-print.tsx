@@ -8,6 +8,7 @@ import { BarcodeEAN13 } from "@/components/stock/barcode-svg";
 import { precioFinal, tieneOferta } from "@/lib/pricing";
 import { etiquetaOferta } from "@/lib/oferta-analisis";
 import type { Product } from "@/lib/types";
+import { esFraccionable, porUnidad } from "@/lib/unidades";
 
 export function EtiquetasPrint({ productos }: { productos: Product[] }) {
   if (productos.length === 0) return null;
@@ -27,7 +28,7 @@ export function EtiquetasPrint({ productos }: { productos: Product[] }) {
               )}
               <p className="etiqueta-precio">
                 {formatCurrency(esCombo ? p.price : precioFinal(p))}
-                {p.unidad === "kg" ? <span className="etiqueta-unidad"> /kg</span> : esCombo && <span className="etiqueta-unidad"> c/u</span>}
+                {esFraccionable(p.unidad) ? <span className="etiqueta-unidad"> {porUnidad(p.unidad)}</span> : esCombo && <span className="etiqueta-unidad"> c/u</span>}
               </p>
               {p.codigoBarras ? (
                 <>

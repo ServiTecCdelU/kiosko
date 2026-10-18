@@ -2,7 +2,7 @@
 // La usan /api/ventas (cobro directo) y /api/mercadopago/webhook (cobro con QR confirmado).
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { precioLinea } from "@/lib/pricing";
-import { ERROR_SIN_CAJA, errorCantidad, errorDescuento } from "@/lib/venta-validacion";
+import { ERROR_SIN_CAJA, errorCantidad, errorDescuento, errorPrecioLibre } from "@/lib/venta-validacion";
 
 export interface ProcesarVentaInput {
   items: { productId: string; name?: string; quantity: number; price?: number }[];
@@ -102,20 +102,31 @@ async function prepararVenta(input: ProcesarVentaInput) {
     const quantity = Number(i.quantity);
     const errorCant = errorCantidad(quantity, db.unidad, db.name);
     if (errorCant) throw new Error(errorCant);
-    const subtotal = precioLinea(
-          {
-            price: Number(db.price),
-            ofertaActiva: db.oferta_activa,
-            ofertaTipo: db.oferta_tipo,
-            ofertaValor: db.oferta_valor,
-            ofertaCantidad: db.oferta_cantidad,
-            ofertaDesde: db.oferta_desde ?? null,
-            ofertaHasta: db.oferta_hasta ?? null,
-          },
-          quantity,
-        );
+    // Precio libre (64_precio_libre.sql: recargas, "varios"): el importe lo pone el
+    // POS. Solo para productos marcados asi; el resto siempre usa el precio de la base.
+    let subtotal: number;
+    if (db.precio_libre === true) {
+      const precio = Number(i.price);
+      const errorPrecio = errorPrecioLibre(precio, db.name);
+      if (errorPrecio) throw new Error(errorPrecio);
+      subtotal = round2(precio * quantity);
+    } else {
+      subtotal = precioLinea(
+        {
+          price: Number(db.price),
+          ofertaActiva: db.oferta_activa,
+          ofertaTipo: db.oferta_tipo,
+          ofertaValor: db.oferta_valor,
+          ofertaCantidad: db.oferta_cantidad,
+          ofertaDesde: db.oferta_desde ?? null,
+          ofertaHasta: db.oferta_hasta ?? null,
+        },
+        quantity,
+      );
+    }
     const name = db.name;
-    const price = subtotal / quantity;
+    // Precio unitario informativo (el total sale de subtotal): a centavos, sin 1349.9999.
+    const price = round2(subtotal / quantity);
     return { productId: id, name, quantity, price, subtotal };
   });
 

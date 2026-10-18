@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { precioLinea } from "@/lib/pricing";
+import { ajustarCantidad } from "@/lib/cantidad";
 import { claveDelComercioActual } from "@/lib/clave-comercio";
 import type { Product, CartItem } from "@/lib/types";
 
@@ -52,10 +53,29 @@ export function useCart() {
       const idx = prev.findIndex((i) => i.product.id === product.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + qty };
+        next[idx] = { ...next[idx], quantity: ajustarCantidad(next[idx].quantity + qty, product.unidad) };
         return next;
       }
       return [...prev, { product, quantity: qty }];
+    });
+  }, []);
+
+  /**
+   * Producto a precio libre (recargas, "varios"): la linea lleva el importe como
+   * precio y cantidad 1. Otro importe del mismo producto se suma a esa linea
+   * (el carrito tiene una linea por producto).
+   */
+  const addPrecioLibre = useCallback((product: Product, importe: number) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.product.id === product.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        const linea = next[idx];
+        const total = Math.round((linea.product.price * linea.quantity + importe) * 100) / 100;
+        next[idx] = { product: { ...linea.product, price: total }, quantity: 1 };
+        return next;
+      }
+      return [...prev, { product: { ...product, price: importe }, quantity: 1 }];
     });
   }, []);
 
@@ -63,8 +83,7 @@ export function useCart() {
     setItems((prev) =>
       prev.map((i) => {
         if (i.product.id !== productId) return i;
-        const min = i.product.unidad === "kg" ? 0.01 : 1;
-        return { ...i, quantity: Math.max(min, qty) };
+        return { ...i, quantity: ajustarCantidad(qty, i.product.unidad) };
       }),
     );
   }, []);
@@ -87,5 +106,5 @@ export function useCart() {
     [items],
   );
 
-  return { items, addProduct, setQuantity, removeProduct, clear, replaceAll, total, count };
+  return { items, addProduct, addPrecioLibre, setQuantity, removeProduct, clear, replaceAll, total, count };
 }

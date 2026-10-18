@@ -16,7 +16,8 @@ import { ahorroLinea, empujeCombo } from "@/lib/oferta-analisis";
 import { evaluarCredito } from "@/lib/credito";
 import { ClienteSelector } from "@/components/pos/cliente-selector";
 import type { CartItem, Cliente, PaymentMethod } from "@/lib/types";
-import { cantidadTexto } from "@/lib/cantidad";
+import { cantidadTexto, numeroCantidad, parseCantidad } from "@/lib/cantidad";
+import { esFraccionable, simboloUnidad, type Unidad } from "@/lib/unidades";
 
 export interface ConfirmData {
   paymentMethod: PaymentMethod;
@@ -67,6 +68,57 @@ interface CartPanelProps {
 }
 
 /** "¡Llevá 1 más gratis!": el cliente quedo a medio combo; un toque suma lo que falta. */
+/**
+ * Cantidad de la linea, tipeable: 150 tornillos no son 149 clics en "+".
+ * Se aplica al salir del campo o con Enter; Esc vuelve a la que estaba.
+ */
+function CantidadEditable({ cantidad, unidad, onCambiar }: {
+  cantidad: number;
+  unidad: Unidad;
+  onCambiar: (cantidad: number) => void;
+}) {
+  const mostrar = (q: number) => numeroCantidad(q, unidad);
+  const [texto, setTexto] = useState(() => mostrar(cantidad));
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    if (!editando) setTexto(mostrar(cantidad));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cantidad, editando]);
+
+  const aplicar = () => {
+    setEditando(false);
+    const q = parseCantidad(texto);
+    if (q !== null && q !== cantidad) onCambiar(q);
+    else setTexto(mostrar(cantidad));
+  };
+
+  return (
+    <span className="flex items-center">
+      <input
+        value={texto}
+        inputMode="decimal"
+        aria-label="Cantidad"
+        onFocus={(e) => { setEditando(true); e.target.select(); }}
+        onChange={(e) => setTexto(e.target.value)}
+        onBlur={aplicar}
+        onKeyDown={(e) => {
+          // Sin propagar: Esc y Enter son atajos del POS (limpiar busqueda, agregar).
+          e.stopPropagation();
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setTexto(mostrar(cantidad)); setEditando(false); e.currentTarget.blur(); }
+        }}
+        className={cn(
+          "h-7 rounded-lg border border-transparent bg-transparent text-center text-sm font-semibold outline-none",
+          "hover:border-border focus:border-primary focus:bg-background",
+          esFraccionable(unidad) ? "w-16" : "w-12",
+        )}
+      />
+      {esFraccionable(unidad) && <span className="text-xs text-muted-foreground">{simboloUnidad(unidad)}</span>}
+    </span>
+  );
+}
+
 function EmpujeComboAviso({ item, onSumar }: { item: CartItem; onSumar: (faltan: number) => void }) {
   const e = empujeCombo(item.product, item.quantity);
   if (!e) return null;
@@ -264,7 +316,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                 <div className="mt-1 flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     {(() => {
-                      const step = i.product.unidad === "kg" ? 0.1 : 1;
+                      const step = esFraccionable(i.product.unidad) ? 0.1 : 1;
                       return (
                         <>
                           <Button
@@ -273,9 +325,11 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-12 text-center text-sm font-semibold">
-                            {cantidadTexto(i.quantity, i.product.unidad)}
-                          </span>
+                          <CantidadEditable
+                            cantidad={i.quantity}
+                            unidad={i.product.unidad}
+                            onCambiar={(q) => onSetQuantity(i.product.id, q)}
+                          />
                           <Button
                             variant="outline" size="icon" className="h-7 w-7 rounded-lg"
                             onClick={() => onSetQuantity(i.product.id, i.quantity + step)}

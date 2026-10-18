@@ -7,6 +7,7 @@ import { analizarOferta, etiquetaOferta } from "@/lib/oferta-analisis";
 import { textoVigencia } from "@/lib/oferta-vigencia";
 import { temaCartel, type TemaCartel, type TemaCartelId } from "@/lib/cartel-temas";
 import type { Product } from "@/lib/types";
+import { porUnidad } from "@/lib/unidades";
 
 const POR_HOJA = 8;
 
@@ -14,7 +15,7 @@ function Tarjeta({ p, t }: { p: Product; t: TemaCartel }) {
   const a = analizarOferta(p);
   const etiqueta = etiquetaOferta(p);
   const esCombo = p.ofertaTipo === "combo";
-  const porKg = p.unidad === "kg" ? "/kg" : "";
+  const porKg = porUnidad(p.unidad);
   return (
     <div
       style={{

@@ -20,6 +20,7 @@ import { crearLote, darDeBajaLote, getLotes, type LoteProducto } from "@/service
 import { aDiaIso, diasHastaVencimiento, fechaDeDia, textoVencimiento } from "@/lib/oferta-vencimiento";
 import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
 import { MOTIVOS_MERMA, type MotivoMerma } from "@/lib/perdidas";
+import { UNIDADES, esFraccionable, simboloUnidad, type Unidad } from "@/lib/unidades";
 
 type AjusteTipo = "entrada" | "ajuste" | "rotura";
 
@@ -54,8 +55,9 @@ export function EditarProductoDialog({
   const [revisar, setRevisar] = useState(false);
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
-  const [unidad, setUnidad] = useState<"un" | "kg">("un");
+  const [unidad, setUnidad] = useState<Unidad>("un");
   const [stockControlado, setStockControlado] = useState(true);
+  const [precioLibre, setPrecioLibre] = useState(false);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [historial, setHistorial] = useState<CambioPrecio[]>([]);
   const [saving, setSaving] = useState(false);
@@ -91,6 +93,7 @@ export function EditarProductoDialog({
       setFechaVencimiento(product.fechaVencimiento ? aDiaIso(product.fechaVencimiento) : "");
       setUnidad(product.unidad);
       setStockControlado(product.stockControlado);
+      setPrecioLibre(!!product.precioLibre);
       setIva(product.iva ?? IVA_DEFAULT);
       getHistorialPrecio(product.id).then(setHistorial).catch(() => setHistorial([]));
       setAjusteTipo("entrada");
@@ -134,6 +137,7 @@ export function EditarProductoDialog({
         fechaVencimiento: tieneLotes ? (product.fechaVencimiento ? aDiaIso(product.fechaVencimiento) : undefined) : fechaVencimiento || undefined,
         unidad,
         stockControlado,
+        precioLibre,
         iva,
       });
       onOpenChange(false);
@@ -218,11 +222,11 @@ export function EditarProductoDialog({
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Precio por kg" : "Precio de venta"}</Label>
+              <Label className="mb-1 block text-xs">{esFraccionable(unidad) ? `Precio por ${simboloUnidad(unidad)}` : "Precio de venta"}</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Costo por kg" : "Costo"}</Label>
+              <Label className="mb-1 block text-xs">{esFraccionable(unidad) ? `Costo por ${simboloUnidad(unidad)}` : "Costo"}</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
             </div>
             <div>
@@ -245,8 +249,8 @@ export function EditarProductoDialog({
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Stock mínimo (kg)" : "Stock mínimo"}</Label>
-              <Input type="number" inputMode={unidad === "kg" ? "decimal" : "numeric"} value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
+              <Label className="mb-1 block text-xs">{esFraccionable(unidad) ? `Stock mínimo (${simboloUnidad(unidad)})` : "Stock mínimo"}</Label>
+              <Input type="number" inputMode={esFraccionable(unidad) ? "decimal" : "numeric"} value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
             </div>
             <div>
               <Label className="mb-1 block text-xs">Unidades por bulto</Label>
@@ -254,9 +258,8 @@ export function EditarProductoDialog({
             </div>
             <div>
               <Label className="mb-1 block text-xs">Se vende por</Label>
-              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={SELECT_CLASS}>
-                <option value="un">Unidad</option>
-                <option value="kg">Peso (kg)</option>
+              <select value={unidad} onChange={(e) => setUnidad(e.target.value as Unidad)} className={SELECT_CLASS}>
+                {UNIDADES.map((u) => <option key={u.valor} value={u.valor}>{u.label}</option>)}
               </select>
             </div>
           </div>
@@ -334,6 +337,15 @@ export function EditarProductoDialog({
                 </span>
               </span>
               <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />
+            </label>
+            <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
+              <span className="text-sm font-medium">
+                Precio libre
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Al venderlo se tipea el importe. Ej: recarga SUBE o de celular, varios
+                </span>
+              </span>
+              <Switch checked={precioLibre} onCheckedChange={setPrecioLibre} />
             </label>
           </div>
 

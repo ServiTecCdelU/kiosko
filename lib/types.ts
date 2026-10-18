@@ -1,4 +1,5 @@
 // lib/types.ts — tipos del Kiosko Despensa
+import type { Unidad } from "./unidades";
 
 export type OfertaTipo = "monto" | "porcentaje" | "combo";
 
@@ -18,8 +19,10 @@ export interface Product {
   revisar: boolean;
   favorito: boolean;
   fechaVencimiento?: Date;
-  unidad: "un" | "kg";
+  unidad: Unidad;
   stockControlado: boolean;
+  /** Se cobra el importe que se tipea en el POS (recargas, "varios"): 64_precio_libre.sql. */
+  precioLibre?: boolean;
   /** Alicuota de IVA (0, 2.5, 5, 10.5, 21, 27). La usa la Factura A/B. */
   iva: number;
   disabled: boolean;

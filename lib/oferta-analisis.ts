@@ -3,6 +3,7 @@
 import type { OfertaTipo } from "@/lib/types";
 import { type ConOferta, tieneOferta, precioFinal, precioLinea, comboLabel, pesos } from "./pricing.ts";
 import { textoVigencia } from "./oferta-vigencia.ts";
+import { porUnidad, type Unidad } from "./unidades.ts";
 
 export interface ConCosto extends ConOferta {
   /** Costo de compra (precio_base). Sin costo no se pueden calcular margenes. */
@@ -162,14 +163,14 @@ export function plantillasOferta(precio: number): PlantillaOferta[] {
 
 interface ConNombre extends ConOferta {
   name: string;
-  unidad?: "un" | "kg";
+  unidad?: Unidad;
 }
 
 /** Mensaje listo para mandar por WhatsApp (estados, grupos del barrio). */
 export function textoCompartirOferta(p: ConNombre, comercio?: string): string {
   const a = analizarOferta(p);
   const etiqueta = etiquetaOferta(p);
-  const porKg = p.unidad === "kg" ? "/kg" : "";
+  const porKg = porUnidad(p.unidad);
   const lineas =
     p.ofertaTipo === "combo" && etiqueta
       ? [
@@ -197,7 +198,7 @@ export function textoFolletoOfertas(productos: ConNombre[], comercio?: string): 
     const a = analizarOferta(p);
     const etiqueta = etiquetaOferta(p);
     if (!etiqueta) continue;
-    const porKg = p.unidad === "kg" ? "/kg" : "";
+    const porKg = porUnidad(p.unidad);
     const precio = p.ofertaTipo === "combo"
       ? `${a.unidades} por ${pesos(a.totalPromo)}`
       : `${pesos(a.totalPromo)}${porKg} (antes ${pesos(p.price)})`;

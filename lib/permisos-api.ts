@@ -61,7 +61,7 @@ const METODOS_ADMIN: Record<string, string[]> = {
  * nunca el cajero aunque llame a la API a mano. El alta de producto (POST
  * /api/productos) queda para todos: el POS la usa al escanear un codigo desconocido.
  */
-const RUTAS_GESTION = ["/api/stock"];
+const RUTAS_GESTION = ["/api/stock", "/api/productos/aumento"];
 const METODOS_GESTION: Record<string, string[]> = {
   "/api/productos": ["PATCH", "PUT"],
 };

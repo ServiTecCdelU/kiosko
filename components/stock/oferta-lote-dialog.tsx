@@ -16,6 +16,7 @@ import { errorVigencia, estadoVigencia, hoyArgentinaISO } from "@/lib/oferta-vig
 import { OfertaVigenciaPicker } from "@/components/stock/oferta-vigencia-picker";
 import { setOferta, type SetOfertaInput } from "@/services/products-service";
 import type { Product } from "@/lib/types";
+import { esFraccionable } from "@/lib/unidades";
 
 interface OfertaLoteDialogProps {
   productos: Product[];
@@ -32,7 +33,7 @@ type Opcion = { tipo: "pct"; valor: number } | { tipo: "combo"; id: string };
 
 function ofertaPara(p: Product, opcion: Opcion): SetOfertaInput | null {
   if (opcion.tipo === "pct") return { activa: true, tipo: "porcentaje", valor: opcion.valor };
-  if (p.unidad === "kg") return null; // los combos no aplican a productos por peso
+  if (esFraccionable(p.unidad)) return null; // los combos no aplican a lo que se vende por peso, metro o litro
   const plantilla = plantillasOferta(p.price).find((t) => t.id === opcion.id);
   return plantilla ? { activa: true, ...plantilla.oferta } : null;
 }

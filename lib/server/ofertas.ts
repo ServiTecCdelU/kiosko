@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hoyArgentinaISO, sumarDias } from "@/lib/oferta-vigencia";
 import { DIAS_BASE, resultadoOferta, type ResultadoOferta, type VentaResumen } from "@/lib/oferta-resultados";
 import { sugerirOferta, type SugerenciaOferta } from "@/lib/oferta-sugerencias";
+import { unidadValida } from "@/lib/unidades";
 
 /** Ofertas que empezaron hace mas de esto no se miden (la comparacion ya no dice nada). */
 const DIAS_MAX_OFERTA = 90;
@@ -125,7 +126,7 @@ export async function sugerenciasOfertas(comercioId: string): Promise<{
       stock: Number(p.stock) || 0,
       unidadesVendidas: vendidas.get(p.id) ?? 0,
       diasHistoria,
-      unidad: p.unidad === "kg" ? "kg" : "un",
+      unidad: unidadValida(p.unidad),
     });
     if (sugerencia) items.push({ producto: p, sugerencia });
   }

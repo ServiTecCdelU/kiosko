@@ -2,13 +2,14 @@
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { cantidadTexto } from "@/lib/cantidad";
 import type { PaymentMethod } from "@/lib/types";
+import type { Unidad } from "@/lib/unidades";
 
 export interface TicketData {
   /** Nombre del negocio (el de los carteles, por navegador). */
   comercio?: string;
   saleNumber: string;
   createdAt: Date;
-  items: { name: string; quantity: number; price: number; subtotal: number; unidad: "un" | "kg" }[];
+  items: { name: string; quantity: number; price: number; subtotal: number; unidad: Unidad }[];
   total: number;
   /** Suma de lo que el cliente se ahorro con ofertas de catalogo. */
   ahorroOfertas?: number;

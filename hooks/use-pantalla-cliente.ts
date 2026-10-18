@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { precioLinea } from "@/lib/pricing";
 import { ahorroLinea, etiquetaOferta } from "@/lib/oferta-analisis";
 import type { CartItem } from "@/lib/types";
+import type { Unidad } from "@/lib/unidades";
 
 export const CANAL_PANTALLA = "kiosko-pantalla-cliente";
 
@@ -14,7 +15,7 @@ export interface LineaPantalla {
   id: string;
   nombre: string;
   cantidad: number;
-  unidad: "un" | "kg";
+  unidad: Unidad;
   subtotal: number;
   ahorro: number;
   etiqueta: string | null;

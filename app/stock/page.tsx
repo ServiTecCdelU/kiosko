@@ -27,6 +27,7 @@ import { OfertaDialog } from "@/components/stock/oferta-dialog";
 import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
+import { AumentoPreciosDialog } from "@/components/stock/aumento-precios-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
 import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
@@ -40,6 +41,7 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 import { diasHastaVencimiento, textoVencimiento } from "@/lib/oferta-vencimiento";
 import { PedirMas } from "@/components/stock/pedir-mas";
+import { esFraccionable, porUnidad } from "@/lib/unidades";
 
 const PAGE_SIZE = 30;
 
@@ -66,6 +68,7 @@ export default function StockPage() {
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [aumentoOpen, setAumentoOpen] = useState(false);
   const [cambiosPrecio, setCambiosPrecio] = useState<CambioPrecioReciente[]>([]);
   const [seleccionadosPrecio, setSeleccionadosPrecio] = useState<Set<string>>(new Set());
   const [precioAbierto, setPrecioAbierto] = useState(false);
@@ -424,6 +427,9 @@ export default function StockPage() {
         <Button variant="outline" className="rounded-2xl" asChild>
           <Link href="/stock/inventario"><ClipboardCheck className="mr-2 h-4 w-4" /> Recuento</Link>
         </Button>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setAumentoOpen(true)}>
+          <TrendingUp className="mr-2 h-4 w-4" /> Aumentar precios
+        </Button>
         <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
           <PackagePlus className="mr-2 h-4 w-4" /> Nuevo producto
         </Button>
@@ -575,7 +581,7 @@ export default function StockPage() {
                         ) : (
                           formatCurrency(p.price)
                         )}
-                        {p.unidad === "kg" && <span className="ml-0.5 text-xs text-muted-foreground">/kg</span>}
+                        {esFraccionable(p.unidad) && <span className="ml-0.5 text-xs text-muted-foreground">{porUnidad(p.unidad)}</span>}
                       </TableCell>
                       <TableCell className="cifra text-right text-xs">
                         {p.precioBase && p.price > 0 ? (
@@ -681,6 +687,7 @@ export default function StockPage() {
         onOpenChange={setNuevoOpen}
         onCreated={() => refreshAll()}
       />
+      <AumentoPreciosDialog open={aumentoOpen} onOpenChange={setAumentoOpen} onAplicado={() => refreshAll()} />
       <EtiquetasPrint productos={productosEtiqueta} />
       {impresion}
     </AppShell>

@@ -11,6 +11,7 @@ import { textoVigencia } from "@/lib/oferta-vigencia";
 import { tamanoTitulo, temaCartel, type TemaCartelId } from "@/lib/cartel-temas";
 import { FORMATOS_CARTEL, type FormatoCartel } from "@/components/stock/cartel-preferencias";
 import type { Product } from "@/lib/types";
+import { porUnidad } from "@/lib/unidades";
 
 const VERDE = "#0f8a3c";
 
@@ -31,7 +32,7 @@ export function CartelOferta({ producto, comercio, tema, style }: CartelOfertaPr
   const a = analizarOferta(producto);
   const etiqueta = etiquetaOferta(producto);
   const esCombo = producto.ofertaTipo === "combo";
-  const porKg = producto.unidad === "kg" ? "/kg" : "";
+  const porKg = porUnidad(producto.unidad);
   const precioGrande = pesos(a.totalPromo);
 
   return (

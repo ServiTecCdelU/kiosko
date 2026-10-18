@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { comercioIdDeSesion, getSesion } from "@/lib/server/sesion";
 import { errorVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { registrarFinDeOferta } from "@/lib/server/ofertas";
+import { unidadValida } from "@/lib/unidades";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,6 +90,7 @@ export async function PATCH(req: Request) {
       fecha_vencimiento: input.fechaVencimiento || null,
       unidad: input.unidad,
       stock_controlado: input.stockControlado,
+      ...(input.precioLibre !== undefined ? { precio_libre: !!input.precioLibre } : {}),
     })
     .eq("comercio_id", comercioId)
     .eq("id", productId);
@@ -152,8 +154,9 @@ export async function POST(req: Request) {
       stock,
       stock_minimo: Number(input.stockMinimo) || 0,
       lote: input.lote ?? null,
-      unidad: input.unidad === "kg" ? "kg" : "un",
+      unidad: unidadValida(input.unidad),
       stock_controlado: input.stockControlado ?? true,
+      precio_libre: !!input.precioLibre,
       fecha_vencimiento: input.fechaVencimiento || null,
       favorito: !!input.favorito,
       revisar: input.revisar ?? true,
