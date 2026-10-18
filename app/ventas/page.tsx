@@ -120,7 +120,11 @@ export default function VentasPage() {
       usuarioId: user?.id,
       usuarioNombre: user?.nombre,
     });
-    toast.success(`Devolución registrada · ${formatCurrency(r.total)} · stock actualizado`);
+    toast.success(`Devolución registrada · ${formatCurrency(r.total)} · stock actualizado`, {
+      description: r.aCuenta > 0
+        ? `${formatCurrency(r.aCuenta)} se descontaron de la deuda del cliente${r.reembolsado > 0 ? ` y ${formatCurrency(r.reembolsado)} ${input.reembolso === "efectivo" ? "salieron del cajón" : "quedaron como cambio"}` : ""}.`
+        : undefined,
+    });
     await load(rango);
   };
 

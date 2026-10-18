@@ -83,5 +83,11 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   // Venta facturada: Nota de credito C por lo devuelto (sin frenar la devolucion).
   after(() => notaDeCreditoSiCorresponde(comercioId, input.ventaId, data.devolucionId));
-  return NextResponse.json({ devolucionId: data.devolucionId, total: Number(data.total) || 0 });
+  // aCuenta: lo que bajo la deuda del cliente (parte fiada); reembolsado: el resto (69_devolucion_mixto_fiado.sql).
+  return NextResponse.json({
+    devolucionId: data.devolucionId,
+    total: Number(data.total) || 0,
+    aCuenta: Number(data.aCuenta) || 0,
+    reembolsado: Number(data.reembolsado) || 0,
+  });
 }

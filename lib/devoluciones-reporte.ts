@@ -13,6 +13,8 @@ export interface DevolucionParaReporte {
   reembolso: string;
   /** Medio de pago de la venta original. */
   metodoVenta: string | null;
+  /** Parte que bajo la deuda del cliente (69_devolucion_mixto_fiado.sql; 0 en las viejas). */
+  aCuenta?: number;
   items: { productoId: string; cantidad: number; subtotal: number }[];
 }
 
@@ -24,23 +26,43 @@ export interface AjusteDevoluciones {
   porProducto: Map<string, { cantidad: number; total: number }>;
 }
 
+type ParaReparto = Pick<DevolucionParaReporte, "total" | "reembolso" | "metodoVenta" | "aCuenta">;
+
+/**
+ * Como se reparte una devolucion: aCuenta bajo la deuda del cliente, efectivo salio
+ * del cajon. Lo que no es ninguna de las dos fue un cambio (no resta).
+ * Las devoluciones anteriores a la 69 no guardan aCuenta: si la venta era 100%
+ * fiada, todo fue a la cuenta.
+ */
+export function repartoDevolucion(d: ParaReparto): { aCuenta: number; efectivo: number } {
+  const total = Number(d.total) || 0;
+  const aCuenta = Number(d.aCuenta) > 0 ? Math.min(total, Number(d.aCuenta)) : d.metodoVenta === "fiado" ? total : 0;
+  const efectivo = d.reembolso === "efectivo" ? total - aCuenta : 0;
+  return { aCuenta, efectivo };
+}
+
 /** ¿Resta de las ventas? Solo si se devolvio plata o se bajo una deuda de fiado. */
-export function devolucionResta(d: Pick<DevolucionParaReporte, "reembolso" | "metodoVenta">): boolean {
-  return d.reembolso === "efectivo" || d.metodoVenta === "fiado";
+export function devolucionResta(d: ParaReparto): boolean {
+  const r = repartoDevolucion(d);
+  return r.aCuenta > 0 || r.efectivo > 0;
 }
 
 export function ajusteDevoluciones(devoluciones: DevolucionParaReporte[]): AjusteDevoluciones {
   const r: AjusteDevoluciones = { efectivo: 0, fiado: 0, total: 0, porProducto: new Map() };
   for (const d of devoluciones) {
-    if (!devolucionResta(d)) continue;
+    const { aCuenta, efectivo } = repartoDevolucion(d);
+    const resta = aCuenta + efectivo;
+    if (resta <= 0) continue;
+    r.efectivo += efectivo;
+    r.fiado += aCuenta;
+    r.total += resta;
+    // Parte cambio y parte reembolso: se resta de lo vendido solo la proporcion que resto.
     const total = Number(d.total) || 0;
-    if (d.reembolso === "efectivo") r.efectivo += total;
-    else r.fiado += total;
-    r.total += total;
+    const factor = total > 0 ? resta / total : 1;
     for (const it of d.items) {
       const prev = r.porProducto.get(it.productoId) ?? { cantidad: 0, total: 0 };
-      prev.cantidad += Number(it.cantidad) || 0;
-      prev.total += Number(it.subtotal) || 0;
+      prev.cantidad += (Number(it.cantidad) || 0) * factor;
+      prev.total += (Number(it.subtotal) || 0) * factor;
       r.porProducto.set(it.productoId, prev);
     }
   }

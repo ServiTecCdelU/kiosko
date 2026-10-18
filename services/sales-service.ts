@@ -167,7 +167,8 @@ export interface DevolverVentaInput {
   usuarioNombre?: string;
 }
 
-export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolucionId: string; total: number }> {
+/** aCuenta: lo que se desconto de la deuda del cliente; reembolsado: el resto. */
+export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolucionId: string; total: number; aCuenta: number; reembolsado: number }> {
   const res = await fetch(apiUrl("/api/ventas/devolver"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -175,7 +176,12 @@ export async function devolverVenta(input: DevolverVentaInput): Promise<{ devolu
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la devolución");
-  return { devolucionId: data.devolucionId, total: Number(data.total) || 0 };
+  return {
+    devolucionId: data.devolucionId,
+    total: Number(data.total) || 0,
+    aCuenta: Number(data.aCuenta) || 0,
+    reembolsado: Number(data.reembolsado) || 0,
+  };
 }
 
 /** Cuanto de cada item de la venta ya fue devuelto (para topear el dialogo). */

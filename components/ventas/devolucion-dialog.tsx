@@ -36,6 +36,8 @@ export function DevolucionDialog({ venta, tieneCajaHoy, onOpenChange, onSubmit }
   const [working, setWorking] = useState(false);
 
   const esFiado = venta?.paymentMethod === "fiado";
+  // Mixto con parte fiada: lo devuelto baja primero la deuda (69_devolucion_mixto_fiado.sql).
+  const parteFiada = venta?.paymentMethod === "mixto" ? venta.fiadoAmount ?? 0 : 0;
 
   useEffect(() => {
     if (!venta) return;
@@ -137,6 +139,12 @@ export function DevolucionDialog({ venta, tieneCajaHoy, onOpenChange, onSubmit }
               </div>
             ) : (
               <div>
+                {parteFiada > 0 && (
+                  <p className="mb-2 rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    En esta venta quedaron {formatCurrency(parteFiada)} anotados: lo devuelto se descuenta primero de esa deuda
+                    y solo el resto se reembolsa.
+                  </p>
+                )}
                 <Label className="mb-1 block text-xs">Reembolso</Label>
                 <div className="flex gap-2">
                   <button

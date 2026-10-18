@@ -12,7 +12,7 @@ import { agruparPorDiaSemana, agruparPorHora, momentoArgentina } from "@/lib/rep
 import { agruparGastos } from "@/lib/gastos";
 import { resumenPerdidas } from "@/lib/perdidas";
 import { partesDeVenta } from "@/lib/arqueo";
-import { ajusteDevoluciones, devolucionResta, esMovimientoDeDevolucion } from "@/lib/devoluciones-reporte";
+import { ajusteDevoluciones, devolucionResta, esMovimientoDeDevolucion, repartoDevolucion } from "@/lib/devoluciones-reporte";
 
 interface ProductoAcum {
   productId: string;
@@ -104,15 +104,19 @@ export async function calcularReporte(
   // Devoluciones del periodo: deshacen ventas, no son gastos (lib/devoluciones-reporte.ts).
   const { data: devData, error: devError } = await supabaseAdmin
     .from("devoluciones")
-    .select("id,total,reembolso,created_at,ventas(payment_method)")
+    .select("id,total,reembolso,a_cuenta,created_at,ventas(payment_method)")
     .eq("comercio_id", comercioId)
     .gte("created_at", desde.toISOString())
     .lte("created_at", hasta.toISOString())
     .limit(5000);
   if (devError) throw new Error(devError.message);
-  const devs = (devData ?? []).filter((d: any) =>
-    devolucionResta({ reembolso: d.reembolso, metodoVenta: d.ventas?.payment_method ?? null }),
-  );
+  const paraReparto = (d: any) => ({
+    total: Number(d.total) || 0,
+    reembolso: d.reembolso,
+    metodoVenta: d.ventas?.payment_method ?? null,
+    aCuenta: Number(d.a_cuenta) || 0,
+  });
+  const devs = (devData ?? []).filter((d: any) => devolucionResta(paraReparto(d)));
   const itemsPorDevolucion = new Map<string, { productoId: string; cantidad: number; subtotal: number }[]>();
   for (let i = 0; i < devs.length; i += 500) {
     const { data: its } = await supabaseAdmin
@@ -126,17 +130,13 @@ export async function calcularReporte(
       itemsPorDevolucion.set(it.devolucion_id, lista);
     }
   }
-  const ajuste = ajusteDevoluciones(devs.map((d: any) => ({
-    total: Number(d.total) || 0,
-    reembolso: d.reembolso,
-    metodoVenta: d.ventas?.payment_method ?? null,
-    items: itemsPorDevolucion.get(d.id) ?? [],
-  })));
+  const ajuste = ajusteDevoluciones(devs.map((d: any) => ({ ...paraReparto(d), items: itemsPorDevolucion.get(d.id) ?? [] })));
   efectivo -= ajuste.efectivo;
   fiado -= ajuste.fiado;
   for (const d of devs as any[]) {
     const { dia } = momentoArgentina(d.created_at);
-    dias.set(dia, (dias.get(dia) ?? 0) - (Number(d.total) || 0));
+    const { aCuenta, efectivo: enEfectivo } = repartoDevolucion(paraReparto(d));
+    dias.set(dia, (dias.get(dia) ?? 0) - (aCuenta + enEfectivo));
   }
   for (const [id, dev] of ajuste.porProducto) {
     const p = productos.get(id);
