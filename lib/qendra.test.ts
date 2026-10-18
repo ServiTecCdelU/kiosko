@@ -26,10 +26,11 @@ describe("formato Qendra", () => {
     assert.equal(precioQendra(0.1 + 0.2), "0,30");
   });
 
-  test("PLU de 1 a 4000", () => {
+  test("codigo de PLU de 1 a 99997", () => {
     assert.equal(pluDe("105"), 105);
+    assert.equal(pluDe("7054"), 7054);
     assert.equal(pluDe("0"), null);
-    assert.equal(pluDe("4001"), null);
+    assert.equal(pluDe("99998"), null);
     assert.equal(pluDe("7790001234567"), null);
     assert.equal(pluDe("A12"), null);
   });
@@ -47,6 +48,30 @@ describe("que entra y que no", () => {
   test("solo los que tienen PLU, precio y no repiten", () => {
     assert.equal(r.incluidos, 1);
     assert.deepEqual(r.omitidos.map((o) => o.name), ["Vacío", "Pollo", "Matambre"]);
+  });
+});
+
+test("codigo de mas de 4000: va en la primera posicion libre de la balanza", () => {
+  const r = generarQendra([
+    { name: "Limon", codigo: "7051", price: 1000, unidad: "kg" },
+    { name: "Pera", codigo: "1", price: 1500, unidad: "kg" },
+    { name: "Kiwi", codigo: "7050", price: 3000, unidad: "kg" },
+  ]);
+  // Codigo de PLU (codigo de barras) y numero de PLU (posicion): 1 la ocupa Pera.
+  assert.deepEqual(r.lineas.map((l) => l.split(";").slice(1, 4).filter((_, i) => i !== 1)), [["7051", "3"], ["1", "1"], ["7050", "2"]]);
+});
+
+describe("ofertas", () => {
+  test("porcentaje y monto fijo van con el precio de oferta; un combo va a precio de lista y se avisa", () => {
+    const r = generarQendra([
+      { name: "Tomate", codigo: "7001", price: 2500, unidad: "kg", ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 20 },
+      { name: "Papa", codigo: "7002", price: 900, unidad: "kg", ofertaActiva: true, ofertaTipo: "monto", ofertaValor: 100 },
+      { name: "Banana", codigo: "7008", price: 1800, unidad: "kg", ofertaActiva: true, ofertaTipo: "combo", ofertaValor: 3000, ofertaCantidad: 2 },
+      { name: "Cebolla", codigo: "7003", price: 1100, unidad: "kg", ofertaActiva: true, ofertaTipo: "porcentaje", ofertaValor: 10, ofertaHasta: "2000-01-01" },
+    ]);
+    assert.deepEqual(r.lineas.map((l) => l.split(";")[4]), ["2000,00", "800,00", "1800,00", "1100,00"]);
+    assert.equal(r.conOferta, 2);
+    assert.deepEqual(r.combos, ["Banana"]);
   });
 });
 

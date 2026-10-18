@@ -6,6 +6,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte } from "./barcode-balanza.ts";
+import { generarQendra } from "./qendra.ts";
+import { precioFinal, precioLinea } from "./pricing.ts";
 
 function digitoEAN13(doce: string): number {
   let suma = 0;
@@ -76,6 +78,21 @@ describe("verduleria con Systel Cuora", () => {
     assert.equal(parseTicketBalanza(ticket, null, true), null);
     // Una etiqueta de producto (20) no es un ticket.
     assert.equal(parseTicketBalanza(cuora(4).lineas[0].etiqueta, "22", true), null);
+  });
+
+  test("oferta: Qendra manda el precio con -20% y la caja cobra lo mismo que la etiqueta", () => {
+    const tomate = { name: "Tomate", codigo: "7001", price: 2400, unidad: "kg", ofertaActiva: true, ofertaTipo: "porcentaje" as const, ofertaValor: 20 };
+    // Qendra: precio por kg que recibe la balanza.
+    const precioBalanza = Number(generarQendra([tomate]).lineas[0].split(";")[4].replace(",", "."));
+    assert.equal(precioBalanza, 1920);
+    // La Cuora pesa 0,735 kg e imprime el importe con ese precio.
+    const centavos = Math.round(precioBalanza * 0.735 * 100);
+    const etiqueta = ean(`207001${String(centavos).padStart(6, "0")}`);
+    // POS: peso con el precio de oferta, y el servidor cobra la linea con la oferta.
+    const leida = parseCodigoBalanza(etiqueta, "importe-centavos", 4)!;
+    const kg = pesoDesdeImporte(leida.importe!, precioFinal(tomate))!;
+    assert.equal(kg, 0.735);
+    assert.equal(precioLinea(tomate, kg), leida.importe);
   });
 
   test("un importe en centavos leido como pesos enteros cobraria 100 veces mas", () => {

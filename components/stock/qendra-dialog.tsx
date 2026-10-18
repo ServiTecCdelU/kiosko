@@ -36,6 +36,8 @@ export function QendraDialog({ open, onOpenChange, products }: QendraDialogProps
   const resultado = useMemo(
     () => generarQendra(products.map((p) => ({
       name: p.name, codigo: p.codigo, price: p.price, unidad: p.unidad, category: p.category, disabled: p.disabled,
+      ofertaActiva: p.ofertaActiva, ofertaTipo: p.ofertaTipo, ofertaValor: p.ofertaValor,
+      ofertaCantidad: p.ofertaCantidad, ofertaDesde: p.ofertaDesde, ofertaHasta: p.ofertaHasta,
     }))),
     [products],
   );
@@ -74,7 +76,7 @@ export function QendraDialog({ open, onOpenChange, products }: QendraDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Scale className="h-4 w-4 text-primary" /> Balanzas Systel (Qendra)</DialogTitle>
           <DialogDescription>
-            Pasa nombres y precios a las Cuora. Van los productos cuyo código es el PLU de la balanza (1 a 4000).
+            Pasa nombres y precios a las Cuora. Van los productos cuyo código es el de la balanza (un número de 1 a 99997).
           </DialogDescription>
         </DialogHeader>
 
@@ -82,7 +84,15 @@ export function QendraDialog({ open, onOpenChange, products }: QendraDialogProps
           <p className="rounded-xl bg-muted px-3 py-2">
             <b>{resultado.incluidos}</b> productos listos para la balanza
             {resultado.omitidos.length > 0 && <>, <b>{resultado.omitidos.length}</b> por kg quedan afuera</>}.
+            {resultado.conOferta > 0 && <> <b>{resultado.conOferta}</b> van con el precio de oferta de hoy.</>}
           </p>
+
+          {resultado.combos.length > 0 && (
+            <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              La balanza no puede hacer combos: <b>{resultado.combos.join(", ")}</b> va a precio de lista.
+              La caja aplica el combo igual cuando escanea la etiqueta.
+            </p>
+          )}
 
           {resultado.omitidos.length > 0 && (
             <details className="rounded-xl border px-3 py-2">
@@ -124,6 +134,7 @@ export function QendraDialog({ open, onOpenChange, products }: QendraDialogProps
           <p className="text-xs text-muted-foreground">
             En Qendra: Configuración → Importar, activá “Verificar la existencia del archivo cada N minutos” y
             “Transmitir novedades a las balanzas después de importar”. Así cada cambio de precio llega solo a la balanza.
+            Volvé a enviar cuando empiece o termine una oferta.
           </p>
         </div>
       </DialogContent>

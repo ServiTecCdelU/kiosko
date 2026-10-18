@@ -396,8 +396,11 @@ function PosScreen() {
           addToCart(p);
           return true;
         }
-        // Etiqueta con importe: el peso se saca del precio por kg del sistema.
-        const kg = balanza.importe !== null ? pesoDesdeImporte(balanza.importe, p.price) : balanza.pesoKg;
+        // Etiqueta con importe: el peso se saca del precio por kg del sistema, con la
+        // oferta de hoy (la balanza la recibe por Qendra, lib/qendra.ts). El cobro da
+        // siempre el importe de la etiqueta; si la balanza quedo desactualizada, solo
+        // se corre el peso que se descuenta del stock.
+        const kg = balanza.importe !== null ? pesoDesdeImporte(balanza.importe, precioFinal(p)) : balanza.pesoKg;
         if (!kg) {
           toast.error(`${p.name} no tiene precio por kg cargado`);
           return true;

@@ -69,6 +69,12 @@ interconectar datos entre un sistema de administración y Qendra".
 **Precios hacia la balanza (Qendra):** Stock → "Balanza" arma el CSV del instructivo
 (`Sección;PLU;Descripción;Nº PLU;Precio1;Precio2;P/U;Vencimiento;Ingredientes`, `;`,
 sin encabezado, Windows-1252, CRLF) con los productos cuyo código es un PLU 1-4000, y lo
-guarda en la carpeta que vigila Qendra (Chrome/Edge) o lo descarga. Va el precio de
-lista: una oferta del sistema no llega a la balanza, así que la etiqueta muestra el
-precio sin oferta y el POS cobra con la oferta (a favor del cliente). `lib/qendra.ts`.
+guarda en la carpeta que vigila Qendra (Chrome/Edge) o lo descarga. `lib/qendra.ts`.
+- Código de PLU (el del código de barras) = `productos.codigo`, 1-99997. Número de PLU
+  (posición en la memoria, 1-4000): el mismo si entra; si no, la primera libre.
+- **Va el precio con la oferta de hoy** (porcentaje o monto fijo, con su vigencia). El
+  POS saca el peso del importe con ese mismo precio, así que la caja cobra lo que dice
+  la etiqueta. Los combos ("2 kg x $3.000") la balanza no los puede hacer: van a precio
+  de lista y se avisan; la caja aplica el combo igual. Hay que volver a enviar cuando
+  empieza o termina una oferta (si la balanza queda desactualizada, la caja cobra igual
+  el importe de la etiqueta y solo se corre el peso que se descuenta del stock).

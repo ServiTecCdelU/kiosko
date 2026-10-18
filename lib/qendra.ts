@@ -5,15 +5,21 @@
 // administracion y el sistema de gestion Qendra"): CSV separado por ";" sin encabezado,
 //   Seccion;Codigo PLU;Descripcion;Numero de PLU;Precio 1;Precio 2;Tipo de venta;Vencimiento;Ingredientes
 //   Carniceria;105;Chorizo colorado;105;19,00;0,00;P;0;;
-// Seccion y descripcion: hasta 18 caracteres y solo los que muestra la Cuora. Numero de
-// PLU 1-4000 (posicion en la balanza); el codigo PLU es el del codigo de barras. Se usa
-// el mismo numero para los dos, como recomienda Systel: es productos.codigo, el que
-// ya lee el POS en las etiquetas (lib/barcode-balanza.ts).
+// Seccion y descripcion: hasta 18 caracteres y solo los que muestra la Cuora. Codigo de
+// PLU 1-99997: el del codigo de barras, es productos.codigo (el que ya lee el POS en
+// las etiquetas, lib/barcode-balanza.ts). Numero de PLU 1-4000: la posicion en la
+// memoria de la balanza. Systel recomienda usar el mismo numero; si el codigo pasa
+// de 4000 se le da la primera posicion libre, en orden de codigo (estable mientras no
+// cambien los productos).
 
-export const PLU_MAX = 4000;
+import { precioFinal, tieneOferta, type ConOferta } from "./pricing.ts";
+
+export const PLU_MAX = 99997;
+export const POSICIONES_MAX = 4000;
 const LARGO_TEXTO = 18;
 
-export interface ProductoQendra {
+/** Con los campos de oferta: la balanza recibe el precio CON la oferta de hoy (lib/pricing.ts). */
+export interface ProductoQendra extends ConOferta {
   name: string;
   codigo?: string | null;
   price: number;
@@ -28,6 +34,10 @@ export interface ResultadoQendra {
   incluidos: number;
   /** Productos por kg que no se pudieron pasar, con el motivo. */
   omitidos: { name: string; motivo: string }[];
+  /** Cuantos van con el precio de oferta. */
+  conOferta: number;
+  /** Ofertas combo ("2 kg x $3.000"): la balanza no las puede aplicar, van a precio de lista. */
+  combos: string[];
 }
 
 // La Cuora solo muestra ASCII imprimible mas ñ, Ñ y º (instructivo, nota 1).
@@ -47,10 +57,10 @@ export function precioQendra(n: number): string {
   return (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
 }
 
-/** PLU valido para la balanza: entero de 1 a 4000. */
+/** Codigo de PLU valido para la balanza: entero de 1 a 99997. */
 export function pluDe(codigo: string | null | undefined): number | null {
   const c = (codigo ?? "").trim();
-  if (!/^\d{1,4}$/.test(c)) return null;
+  if (!/^\d{1,5}$/.test(c)) return null;
   const n = Number(c);
   return n >= 1 && n <= PLU_MAX ? n : null;
 }
@@ -65,12 +75,15 @@ export function generarQendra(productos: ProductoQendra[], seccion: string | nul
   const lineas: string[] = [];
   const omitidos: { name: string; motivo: string }[] = [];
   const usados = new Set<number>();
+  let conOferta = 0;
+  const combos: string[] = [];
+  const elegidos: { p: ProductoQendra; plu: number; descripcion: string }[] = [];
 
   for (const p of productos) {
     if (p.disabled) continue;
     const plu = pluDe(p.codigo);
     if (plu === null) {
-      if (p.unidad === "kg") omitidos.push({ name: p.name, motivo: "sin código de balanza (PLU de 1 a 4000)" });
+      if (p.unidad === "kg") omitidos.push({ name: p.name, motivo: "sin código de balanza (número de 1 a 99997)" });
       continue;
     }
     if (usados.has(plu)) {
@@ -87,13 +100,38 @@ export function generarQendra(productos: ProductoQendra[], seccion: string | nul
       continue;
     }
     usados.add(plu);
+    elegidos.push({ p, plu, descripcion });
+  }
+
+  // Posicion en la memoria de la balanza: el mismo numero si entra, si no la primera libre.
+  const ocupadas = new Set(elegidos.map((e) => e.plu).filter((n) => n <= POSICIONES_MAX));
+  let libre = 1;
+  const posicion = new Map<number, number>();
+  for (const { plu } of [...elegidos].sort((a, b) => a.plu - b.plu)) {
+    if (plu <= POSICIONES_MAX) { posicion.set(plu, plu); continue; }
+    while (ocupadas.has(libre)) libre++;
+    if (libre > POSICIONES_MAX) break;
+    ocupadas.add(libre);
+    posicion.set(plu, libre);
+  }
+
+  for (const { p, plu, descripcion } of elegidos) {
+    const numero = posicion.get(plu);
+    if (numero === undefined) {
+      omitidos.push({ name: p.name, motivo: `la balanza ya tiene ${POSICIONES_MAX} productos` });
+      continue;
+    }
+    // Precio por kg/unidad con la oferta vigente: la etiqueta coincide con lo que cobra la caja.
+    const precio = precioFinal(p);
+    if (precio < p.price) conOferta++;
+    else if (tieneOferta(p) && p.ofertaTipo === "combo") combos.push(p.name);
     const sec = textoCuora(seccion ?? (p.category ?? "").split(" / ")[0]) || "General";
     lineas.push([
-      sec, plu, descripcion, plu, precioQendra(p.price), "0,00",
+      sec, plu, descripcion, numero, precioQendra(precio), "0,00",
       p.unidad === "kg" ? "P" : "U", 0, "",
     ].join(";") + ";");
   }
-  return { lineas, incluidos: lineas.length, omitidos };
+  return { lineas, incluidos: lineas.length, omitidos, conOferta, combos };
 }
 
 /**
