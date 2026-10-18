@@ -47,3 +47,28 @@ los ejemplos del manual: 710 g = `02 30 30 30 37 31 30 03 07`), `lib/balanza-pue
   protocolo USB propio, Chrome no la ve como puerto serie y hay que usar el RS-232 (si el
   modelo lo trae) o la etiqueta con código de balanza, que ya funciona.
 - Solo Chrome y Edge (Web Serial). Firefox y Safari no tienen la API.
+
+## Systel Cuora: etiquetas, ticket y Qendra (agregado el mismo día)
+
+Fuente: manual Cuora Neo (Systel, cód. 36832 rev. 07) e instructivo "Metodología para
+interconectar datos entre un sistema de administración y Qendra".
+
+**Códigos que imprime la Cuora** (configurables en Configuración → Códigos de barra):
+- Producto por peso: `20 PPPP IIIIII X`; por unidad: `21 PPPP IIIIII X`. De fábrica el
+  código de producto tiene 4 dígitos y el importe 6, con centavos. Las fotos del manual
+  usan 5+5. En "Impresora y balanza" se elige "importe con centavos" y el largo del
+  código (4 o 5). Ojo: 5 dígitos de importe con centavos llegan solo a $999,99.
+- Ticket de varios productos: `22 AA IIIIIIII X`. Trae **solo el total**: el manual dice
+  que no se puede incluir el código de artículo. Con "Leer el ticket de la balanza
+  (código 22)", el POS lo cobra como una línea "Varios". No descuenta stock ni sabe qué
+  verduras fueron.
+- Para que el POS tome cada verdura con su kg e importe, la balanza tiene que imprimir
+  **una etiqueta por producto** (modo etiqueta). Simulado en
+  `lib/balanza-verduleria.test.ts` y probado en el POS.
+
+**Precios hacia la balanza (Qendra):** Stock → "Balanza" arma el CSV del instructivo
+(`Sección;PLU;Descripción;Nº PLU;Precio1;Precio2;P/U;Vencimiento;Ingredientes`, `;`,
+sin encabezado, Windows-1252, CRLF) con los productos cuyo código es un PLU 1-4000, y lo
+guarda en la carpeta que vigila Qendra (Chrome/Edge) o lo descarga. Va el precio de
+lista: una oferta del sistema no llega a la balanza, así que la etiqueta muestra el
+precio sin oferta y el POS cobra con la oferta (a favor del cliente). `lib/qendra.ts`.

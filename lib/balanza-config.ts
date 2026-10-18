@@ -15,9 +15,59 @@ export function leerFormatoBalanza(): FormatoBalanza {
   try {
     const clave = claveDelComercioActual(CLAVE);
     const crudo = clave ? window.localStorage.getItem(clave) : null;
-    return crudo === "importe" ? "importe" : FORMATO_BALANZA_DEFAULT;
+    return crudo === "importe" || crudo === "importe-centavos" ? crudo : FORMATO_BALANZA_DEFAULT;
   } catch {
     return FORMATO_BALANZA_DEFAULT;
+  }
+}
+
+/** Digitos del codigo de producto en la etiqueta: 5 (lo comun) o 4 (Systel Cuora de fabrica). */
+const CLAVE_PLU = "kiosko:balanza-plu";
+
+export function leerDigitosPlu(): 4 | 5 {
+  if (typeof window === "undefined") return 5;
+  try {
+    const clave = claveDelComercioActual(CLAVE_PLU);
+    return clave && window.localStorage.getItem(clave) === "4" ? 4 : 5;
+  } catch {
+    return 5;
+  }
+}
+
+export function guardarDigitosPlu(digitos: 4 | 5): void {
+  if (typeof window === "undefined") return;
+  try {
+    const clave = claveDelComercioActual(CLAVE_PLU);
+    if (clave) window.localStorage.setItem(clave, String(digitos));
+  } catch {
+    // Sin localStorage: dura lo que dura la pestaña.
+  }
+}
+
+// ── Ticket de la balanza con varios productos (parseTicketBalanza) ───────────
+const CLAVE_TICKET = "kiosko:balanza-ticket";
+
+/** Prefijo del codigo de ticket ("22" en la Systel Cuora), o null si no se usa. */
+export function leerPrefijoTicket(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const clave = claveDelComercioActual(CLAVE_TICKET);
+    const crudo = clave ? window.localStorage.getItem(clave) : null;
+    return crudo && /^2[0-9]$/.test(crudo) ? crudo : null;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarPrefijoTicket(prefijo: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    const clave = claveDelComercioActual(CLAVE_TICKET);
+    if (!clave) return;
+    if (prefijo) window.localStorage.setItem(clave, prefijo);
+    else window.localStorage.removeItem(clave);
+  } catch {
+    // Sin localStorage (modo privado): dura lo que dura la pestaña.
   }
 }
 

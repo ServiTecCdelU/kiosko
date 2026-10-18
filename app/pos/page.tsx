@@ -23,8 +23,8 @@ import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { parseCodigoBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
-import { leerFormatoBalanza } from "@/lib/balanza-config";
+import { parseCodigoBalanza, parseTicketBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
+import { leerDigitosPlu, leerFormatoBalanza, leerPrefijoTicket } from "@/lib/balanza-config";
 import { ajustarCantidad, cantidadTexto, separarMultiplicador } from "@/lib/cantidad";
 import { esFraccionable, porUnidad } from "@/lib/unidades";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
@@ -334,36 +334,58 @@ function PosScreen() {
    * "Varios": producto de precio libre con codigo VARIOS. Se crea solo la primera
    * vez (cualquier rol puede dar de alta desde el POS, como el alta rapida).
    */
+  const obtenerVarios = useCallback(async (): Promise<Product | null> => {
+    let varios = await buscarPorCodigo(CODIGO_VARIOS);
+    if (!varios) {
+      if (!isOnline) {
+        toast.error("Sin conexión no se puede crear “Varios”. Probá cuando vuelva internet.");
+        return null;
+      }
+      await createProduct({
+        name: "Varios", price: 0, stock: 0, codigo: CODIGO_VARIOS,
+        stockControlado: false, precioLibre: true, revisar: false,
+      });
+      varios = await buscarPorCodigo(CODIGO_VARIOS);
+    }
+    if (!varios) throw new Error("No se encontró el producto Varios");
+    if (!varios.precioLibre) {
+      toast.error("El producto con código VARIOS no tiene precio libre. Activalo en Stock.");
+      return null;
+    }
+    return varios;
+  }, [buscarPorCodigo, isOnline]);
+
   const venderVarios = useCallback(async () => {
     try {
-      let varios = await buscarPorCodigo(CODIGO_VARIOS);
-      if (!varios) {
-        if (!isOnline) {
-          toast.error("Sin conexión no se puede crear “Varios”. Probá cuando vuelva internet.");
-          return;
-        }
-        await createProduct({
-          name: "Varios", price: 0, stock: 0, codigo: CODIGO_VARIOS,
-          stockControlado: false, precioLibre: true, revisar: false,
-        });
-        varios = await buscarPorCodigo(CODIGO_VARIOS);
-      }
-      if (!varios) throw new Error("No se encontró el producto Varios");
-      if (!varios.precioLibre) {
-        toast.error("El producto con código VARIOS no tiene precio libre. Activalo en Stock.");
-        return;
-      }
-      setImporteLibreProduct(varios);
+      const varios = await obtenerVarios();
+      if (varios) setImporteLibreProduct(varios);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo abrir Varios");
     }
-  }, [buscarPorCodigo, isOnline]);
+  }, [obtenerVarios]);
 
   // Etiqueta de balanza (EAN-13 prefijo 20-29): trae el PLU y el peso ya
   // embebidos, asi que el producto pesable se agrega directo sin PesoDialog.
   const procesarCodigoBalanza = useCallback(
     async (codigo: string): Promise<boolean> => {
-      const balanza = parseCodigoBalanza(codigo, leerFormatoBalanza());
+      const formato = leerFormatoBalanza();
+      // Ticket de la balanza con varios productos: solo trae el total (lib/barcode-balanza.ts).
+      const ticket = parseTicketBalanza(codigo, leerPrefijoTicket(), formato === "importe-centavos");
+      if (ticket) {
+        try {
+          const varios = await obtenerVarios();
+          if (varios) {
+            cart.addPrecioLibre(varios, ticket.importe);
+            toast.success(`Ticket de la balanza · ${formatCurrency(ticket.importe)}`, {
+              description: "Entra como Varios: el ticket trae solo el total, no las verduras.",
+            });
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "No se pudo cargar el ticket de la balanza");
+        }
+        return true;
+      }
+      const balanza = parseCodigoBalanza(codigo, formato, leerDigitosPlu());
       if (!balanza) return false;
       for (const c of balanza.codigosBusqueda) {
         const p = await buscarPorCodigo(c);
@@ -388,7 +410,7 @@ function PosScreen() {
         cart.addProduct(p, kg);
         toast.success(
           balanza.importe !== null
-            ? `${p.name} · $${balanza.importe} = ${kg.toFixed(3)} kg`
+            ? `${p.name} · ${formatCurrency(balanza.importe)} = ${cantidadTexto(kg, "kg")}`
             : `${p.name} · ${kg.toFixed(3)} kg`,
         );
         return true;
@@ -396,7 +418,7 @@ function PosScreen() {
       toast.error(`Etiqueta de balanza sin producto: PLU ${balanza.plu}`);
       return true;
     },
-    [buscarPorCodigo, addToCart, cart],
+    [buscarPorCodigo, addToCart, cart, obtenerVarios],
   );
 
   // Enter: el lector de codigo de barras "tipea" + Enter. Match exacto -> agrega directo.

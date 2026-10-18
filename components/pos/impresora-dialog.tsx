@@ -19,7 +19,9 @@ import { elegirImpresoraUsb, impresoraUsbGuardada, nombreDispositivo, soportaWeb
 import { estadoAgente } from "@/lib/impresora/agente";
 import { abrirCajon, imprimirTicketDePrueba } from "@/lib/impresora/imprimir";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
-import { guardarFormatoBalanza, leerFormatoBalanza } from "@/lib/balanza-config";
+import {
+  guardarDigitosPlu, guardarFormatoBalanza, guardarPrefijoTicket, leerDigitosPlu, leerFormatoBalanza, leerPrefijoTicket,
+} from "@/lib/balanza-config";
 import { BalanzaSerieSection } from "@/components/pos/balanza-serie-section";
 import type { FormatoBalanza } from "@/lib/barcode-balanza";
 import type { TicketData } from "@/components/pos/ticket-print";
@@ -48,6 +50,8 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
   const [agenteEstado, setAgenteEstado] = useState<{ ok: boolean; impresoras: string[]; error?: string } | null>(null);
   const [ocupado, setOcupado] = useState<"usb" | "agente" | "prueba" | "cajon" | null>(null);
   const [formatoBalanza, setFormatoBalanza] = useState<FormatoBalanza>(leerFormatoBalanza);
+  const [digitosPlu, setDigitosPlu] = useState<4 | 5>(leerDigitosPlu);
+  const [ticketBalanza, setTicketBalanza] = useState<boolean>(() => leerPrefijoTicket() !== null);
 
   useEffect(() => {
     if (!open) return;
@@ -272,6 +276,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
             {([
               { valor: "peso", titulo: "Traen el peso", ayuda: "Ej.: 0,350 kg. Es lo más común en verdulerías y panaderías." },
               { valor: "importe", titulo: "Traen el importe", ayuda: "Ej.: $3.000. Común en carnicerías y fiambrerías. El peso se calcula con el precio por kg del sistema." },
+              { valor: "importe-centavos", titulo: "Traen el importe con centavos", ayuda: "Ej.: 176400 = $1.764,00. Así sale de fábrica la Systel Cuora." },
             ] as const).map((f) => (
               <label
                 key={f.valor}
@@ -290,6 +295,30 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
                 </span>
               </label>
             ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <label className="text-xs">Código del producto en la etiqueta
+              <select
+                value={digitosPlu}
+                onChange={(e) => { const d = Number(e.target.value) === 4 ? 4 : 5; setDigitosPlu(d); guardarDigitosPlu(d); }}
+                className="mt-1 h-9 w-full rounded-xl border bg-transparent px-2 text-sm"
+              >
+                <option value={5}>5 dígitos (lo más común)</option>
+                <option value={4}>4 dígitos (Systel Cuora de fábrica)</option>
+              </select>
+            </label>
+            <label className="flex items-start gap-2 rounded-xl border p-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-primary"
+                checked={ticketBalanza}
+                onChange={(e) => { setTicketBalanza(e.target.checked); guardarPrefijoTicket(e.target.checked ? "22" : null); }}
+              />
+              <span>
+                <span className="font-medium">Leer el ticket de la balanza (código 22)</span>
+                <span className="block text-muted-foreground">El ticket con varios productos trae solo el total: entra como “Varios”.</span>
+              </span>
+            </label>
           </div>
         </section>
 
