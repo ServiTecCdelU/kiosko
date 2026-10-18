@@ -45,7 +45,8 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - `/pantalla-cliente` y `/ofertas-tv` → pantallas secundarias (visor del
     cliente y TV de ofertas).
 - **Alta self-service** (`/registro`, CTA "Probar gratis" de la landing y link en el
-  login): "Continuar con Google"; si el correo no tiene comercio, `google-verify` deja
+  login): "Continuar con Google" o "Seguir con mi correo" (código por correo, spec
+  `docs/superpowers/specs/2026-10-18-registro-con-correo-design.md`); si el correo no tiene comercio, `google-verify` deja
   una cookie firmada `kiosko_registro` (30 min) y lleva al formulario (nombre del
   comercio, rubro, **plan Básico o Pro con su precio, cuántas cajas** si es Pro, nombre,
   WhatsApp). `POST /api/registro` llama a la RPC atómica

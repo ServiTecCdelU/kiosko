@@ -148,7 +148,7 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
 - Deploy: Vercel (proyecto `kiosko`), servido en `www.servitec.net.ar/comercio`
 
 ## Auth y roles
-- Admin del comercio: Google · Cajero/encargado: PIN · Superadmin del SaaS: Google +
+- Admin del comercio: Google o código por correo (`lib/auth-correo.ts`, SMTP Resend) · Cajero/encargado: PIN · Superadmin del SaaS: Google +
   tabla `superadmins` (panel `/superadmin`, puede entrar a un comercio en modo soporte).
 - Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`.
 - Sesión: cookie `kiosko_sesion` firmada con HMAC (12 h). Demo pública: slug `demo`; se entra dejando nombre y WhatsApp (`demo_visitas`).

@@ -3,7 +3,7 @@
 // app/login/page.tsx — tres formas de entrar:
 //   · "Acceso a demo": pide nombre y WhatsApp y entra directo a la demo
 //     (components/demo/entrar-demo-form.tsx). /login?demo=landing la abre de una.
-//   · "Entrar con Google": dueños (admin) de cada comercio.
+//   · "Entrar con Google" o "Entrar con mi correo" (codigo, lib/auth-correo.ts): dueños (admin) de cada comercio.
 //   · "Soy empleado": PIN de 6 numeros, SOLO en una PC registrada por el dueño
 //     (la PC sabe su comercio y su caja: "Super Patricia · Caja 1"). El PIN
 //     viejo de 4 sirve una ultima vez para elegir el nuevo (app/cambiar-pin).
@@ -12,13 +12,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX } from "lucide-react";
+import { Delete, Loader2, Chrome, ArrowLeft, PlayCircle, KeyRound, MonitorX, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { login } from "@/services/auth-service";
 import { getEstaPc, type EstaPc } from "@/services/dispositivo-service";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
 import { TRIAL_DAYS } from "@/lib/marketing/contact";
 import { EntrarDemoForm } from "@/components/demo/entrar-demo-form";
+import { EntrarConCorreo } from "@/components/auth/entrar-con-correo";
 import logoServitec from "@/public/servitec-logo.png";
 import { LARGO_PIN, LARGO_PIN_VIEJO } from "@/lib/pin";
 import { panelHref } from "@/lib/panel";
@@ -26,7 +27,7 @@ import type { Usuario } from "@/lib/types";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
 
-type Modo = "inicio" | "demo" | "pin";
+type Modo = "inicio" | "demo" | "pin" | "correo";
 
 export default function LoginPage() {
   return (
@@ -147,7 +148,7 @@ function LoginContent() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-white">ServiTec</h1>
         <p className="text-sm text-muted-foreground">
-          {modo === "inicio" ? "Punto de venta para tu comercio" : modo === "demo" ? "Acceso a la demo" : "Ingresá tu PIN de empleado"}
+          {modo === "inicio" ? "Punto de venta para tu comercio" : modo === "demo" ? "Acceso a la demo" : modo === "correo" ? "Entrá con un código a tu correo" : "Ingresá tu PIN de empleado"}
         </p>
       </div>
 
@@ -179,6 +180,14 @@ function LoginContent() {
             Entrar con Google
           </button>
 
+          {/* Dueños sin Google: codigo por correo (lib/auth-correo.ts). */}
+          <button
+            onClick={() => abrir("correo")}
+            className="-mt-1 flex items-center justify-center gap-2 rounded-2xl border bg-card py-3 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            <Mail className="h-4 w-4" /> Entrar con mi correo
+          </button>
+
           <Link
             href="/registro"
             className="rounded-2xl border border-dashed border-primary/40 px-4 py-2.5 text-center text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
@@ -194,8 +203,18 @@ function LoginContent() {
           </button>
         </div>
       ) : (
-        <div className={cn("relative flex w-full animate-in fade-in flex-col items-center gap-6 duration-300", modo === "demo" ? "max-w-sm" : "max-w-[260px]")}>
+        <div className={cn("relative flex w-full animate-in fade-in flex-col items-center gap-6 duration-300", modo === "demo" || modo === "correo" ? "max-w-sm" : "max-w-[260px]")}>
           {modo === "demo" && <EntrarDemoForm origen={origenDemo} />}
+
+          {modo === "correo" && (
+            <div className="card-premium w-full rounded-2xl p-5">
+              <EntrarConCorreo
+                onEntrar={(destino) => router.replace(destino)}
+                onVolver={volver}
+                claseBoton="bg-blue-600 text-white hover:bg-blue-500"
+              />
+            </div>
+          )}
 
           {modo === "pin" && pc === undefined && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
 
@@ -262,12 +281,15 @@ function LoginContent() {
             </>
           )}
 
-          <button
-            onClick={volver}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </button>
+          {/* Con correo el "Volver" ya esta adentro del formulario. */}
+          {modo !== "correo" && (
+            <button
+              onClick={volver}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" /> Volver
+            </button>
+          )}
         </div>
       )}
     </main>

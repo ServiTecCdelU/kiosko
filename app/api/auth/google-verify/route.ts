@@ -1,4 +1,6 @@
-// app/api/auth/google-verify/route.ts — segunda mitad del login con Google.
+// app/api/auth/google-verify/route.ts — segunda mitad del login con Google y del
+// login con codigo por correo (lib/auth-correo.ts): los dos traen un access_token
+// de Supabase Auth con el correo ya verificado.
 // El intercambio del codigo de OAuth por sesion (PKCE) lo hace el NAVEGADOR
 // (app/auth/callback/page.tsx), porque ahi vive el code_verifier que Supabase
 // Auth guarda en localStorage al iniciar el flujo — un server route nunca

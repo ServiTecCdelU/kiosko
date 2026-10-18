@@ -1,15 +1,16 @@
 "use client";
 
 // app/registro/page.tsx — alta self-service de un comercio.
-// Paso 1: "Continuar con Google" (mismo OAuth del login). Si el correo no tiene
-// comercio, google-verify deja una cookie de registro y vuelve aca.
+// Paso 1: "Continuar con Google" (mismo OAuth del login) o "Seguir con mi correo"
+// (codigo por correo, lib/auth-correo.ts). Si el correo no tiene comercio,
+// google-verify deja una cookie de registro y vuelve aca.
 // Paso 2: datos del comercio → POST /api/registro → panel /<slug>, en prueba.
 // Spec: docs/superpowers/specs/2026-10-03-autoregistro-design.md
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Loader2, PlayCircle, Store } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Mail, PlayCircle, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import { getCurrentUser, setCurrentUser } from "@/hooks/use-auth";
 import { DEMO_SLUG } from "@/lib/demo";
 import { trackRegistroCompletado } from "@/lib/analytics";
 import { iniciarLoginGoogle } from "@/lib/auth-google";
-import { WhatsAppLink } from "@/components/analytics/whatsapp-link";
+import { EntrarConCorreo } from "@/components/auth/entrar-con-correo";
 import { MAX_CAJAS_REGISTRO, PLANES_REGISTRO, RUBROS, validarRegistro } from "@/lib/registro";
 import { slugDeNombre } from "@/lib/slug";
 import { ROUTES, TRIAL_DAYS } from "@/lib/marketing/contact";
@@ -81,7 +82,20 @@ const BENEFICIOS = [
   "Tus datos son tuyos: los exportás cuando quieras",
 ];
 
+/** Datos del correo ya verificado (Google o codigo), o null si todavia no entro. */
+async function cargarRegistro(): Promise<DatosGoogle | null> {
+  try {
+    const r = await fetch(apiUrl("/api/registro"));
+    // Sin registro el servidor responde { registro: false }: todavia no paso por Google.
+    const data = r.ok ? ((await r.json()) as Partial<DatosGoogle>) : null;
+    return data?.email ? (data as DatosGoogle) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function RegistroPage() {
+  const router = useRouter();
   // undefined = cargando; null = todavia no paso por Google.
   // Arranca mostrando el boton de Google (es lo que ve casi todo el que llega,
   // y asi sale en el HTML sin esperar a nadie). Solo quien vuelve de Google
@@ -98,15 +112,19 @@ export default function RegistroPage() {
       setCurrentUser(null);
       fetch(apiUrl("/api/auth/logout"), { method: "POST" }).catch(() => {});
     }
-    fetch(apiUrl("/api/registro"))
-      // Sin registro el servidor responde { registro: false }: todavia no paso por Google.
-      .then(async (r) => {
-        const data = r.ok ? ((await r.json()) as Partial<DatosGoogle>) : null;
-        return data?.email ? (data as DatosGoogle) : null;
-      })
-      .then(setGoogle)
-      .catch(() => setGoogle(null));
+    cargarRegistro().then(setGoogle);
   }, []);
+
+  // Entro con el codigo por correo sin salir de esta pagina: si el correo es
+  // nuevo se cargan sus datos (paso 2); si ya tiene comercio, va a su panel.
+  const alEntrarConCorreo = (redirectTo: string) => {
+    if (redirectTo.startsWith("/registro")) {
+      setGoogle(undefined);
+      cargarRegistro().then(setGoogle);
+    } else {
+      router.replace(redirectTo);
+    }
+  };
 
   return (
     // Mismo tema oscuro que la landing (.landing-theme en globals.css): quien
@@ -134,7 +152,7 @@ export default function RegistroPage() {
       {google === undefined ? (
         <Loader2 className="relative h-6 w-6 animate-spin text-muted-foreground" />
       ) : google === null ? (
-        <PasoGoogle />
+        <PasoGoogle onEntrarConCorreo={alEntrarConCorreo} />
       ) : (
         <FormularioComercio google={google} />
       )}
@@ -146,8 +164,9 @@ export default function RegistroPage() {
   );
 }
 
-function PasoGoogle() {
+function PasoGoogle({ onEntrarConCorreo }: { onEntrarConCorreo: (redirectTo: string) => void }) {
   const [entrando, setEntrando] = useState(false);
+  const [conCorreo, setConCorreo] = useState(false);
 
   const continuar = async () => {
     setEntrando(true);
@@ -168,6 +187,10 @@ function PasoGoogle() {
           </li>
         ))}
       </ul>
+      {conCorreo ? (
+        <EntrarConCorreo onEntrar={onEntrarConCorreo} onVolver={() => setConCorreo(false)} claseBoton={BOTON} claseCampo={CAMPO} />
+      ) : (
+      <>
       <Button onClick={continuar} disabled={entrando} className={`h-12 rounded-2xl text-base sm:text-sm ${BOTON}`}>
         {entrando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogoGoogle />}
         Continuar con Google
@@ -175,17 +198,16 @@ function PasoGoogle() {
       <p className="text-center text-xs text-muted-foreground">
         Con tu cuenta de Google entrás siempre a tu comercio, sin contraseñas.
       </p>
-      {/* El alta es solo con Google: el que no tiene Gmail no queda afuera. */}
-      <p className="-mt-2 text-center text-xs text-muted-foreground">
-        ¿No tenés cuenta de Google?{" "}
-        <WhatsAppLink
-          ubicacion="registro-sin-google"
-          mensaje="Hola, quiero probar el sistema pero no tengo cuenta de Google."
-          className="font-semibold text-primary hover:underline"
-        >
-          Escribinos y te ayudamos
-        </WhatsAppLink>
-      </p>
+      {/* Sin cuenta de Google: codigo por correo (lib/auth-correo.ts). */}
+      <button
+        type="button"
+        onClick={() => setConCorreo(true)}
+        className="-mt-1 flex items-center justify-center gap-1.5 rounded-2xl border border-border px-4 py-3 text-sm transition-colors hover:border-primary/60"
+      >
+        <Mail className="h-4 w-4 text-primary" /> Seguir con mi correo
+      </button>
+      </>
+      )}
       {/* Para quien todavia no se decide: ver el sistema sin registrarse. */}
       <Link
         href={ROUTES.demo}
