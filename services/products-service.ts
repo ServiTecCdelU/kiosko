@@ -400,3 +400,46 @@ export async function findProductByCode(code: string): Promise<Product | null> {
   );
   return producto ? mapRow(producto) : null;
 }
+
+// ---- Fotos de productos (75_fotos_productos.sql) ----
+
+/** Sube la foto (ya achicada, lib/foto-producto.ts). Devuelve la URL publica. */
+export async function subirFotoProducto(productoId: string, foto: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("productoId", productoId);
+  form.append("foto", foto, foto.type === "image/webp" ? "foto.webp" : "foto.jpg");
+  const res = await fetch(apiUrl("/api/productos/foto"), { method: "POST", body: form });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo subir la foto");
+  return String(data.url);
+}
+
+export async function quitarFotoProducto(productoId: string): Promise<void> {
+  const res = await fetch(apiUrl("/api/productos/foto"), {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productoId }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo quitar la foto");
+}
+
+/** Productos sin foto que tienen codigo de barras (candidatos a foto automatica). */
+export async function contarFotosAutomaticas(): Promise<number> {
+  const res = await fetch(apiUrl("/api/productos/fotos-automaticas"));
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo consultar");
+  return Number(data.pendientes) || 0;
+}
+
+/** Una tanda de busqueda en Open Food Facts (app/api/productos/fotos-automaticas). */
+export async function buscarFotosAutomaticas(desde: number): Promise<{ revisados: number; encontradas: number; siguiente: number; quedan: number }> {
+  const res = await fetch(apiUrl("/api/productos/fotos-automaticas"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ desde }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudieron buscar las fotos");
+  return data;
+}

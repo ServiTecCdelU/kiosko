@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FotoProducto } from "@/components/stock/foto-producto";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -30,6 +31,8 @@ interface EditarProductoDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (input: UpdateProductInput) => Promise<void>;
   onAjustarStock: (tipo: AjusteTipo, cantidad: number, motivo?: MotivoMerma, nota?: string) => Promise<void>;
+  /** Se subio o quito la foto (se guarda al instante): recargar la lista. */
+  onFotoCambiada?: () => void;
 }
 
 const AJUSTE_TIPOS: { value: AjusteTipo; label: string }[] = [
@@ -41,7 +44,7 @@ const AJUSTE_TIPOS: { value: AjusteTipo; label: string }[] = [
 const SELECT_CLASS = "border-input h-9 w-full rounded-xl border bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function EditarProductoDialog({
-  product, open, onOpenChange, onSave, onAjustarStock,
+  product, open, onOpenChange, onSave, onAjustarStock, onFotoCambiada,
 }: EditarProductoDialogProps) {
   const [codigo, setCodigo] = useState("");
   const [codigoBarras, setCodigoBarras] = useState("");
@@ -198,6 +201,9 @@ export function EditarProductoDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {product && (
+            <FotoProducto key={product.id} productoId={product.id} nombre={product.name} url={product.imageUrl} onCambio={() => onFotoCambiada?.()} />
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="mb-1 block text-xs">Código de barra</Label>

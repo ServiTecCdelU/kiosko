@@ -67,6 +67,10 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/productos", "PUT"), "gestion");
     assert.equal(reglaDeRuta("/api/stock", "POST"), "gestion");
     assert.equal(reglaDeRuta("/api/productos/aumento", "POST"), "gestion");
+    // Fotos de productos (75_fotos_productos.sql): como cambiar precios, el cajero no.
+    assert.equal(reglaDeRuta("/api/productos/foto", "POST"), "gestion");
+    assert.equal(reglaDeRuta("/api/productos/foto", "DELETE"), "gestion");
+    assert.equal(reglaDeRuta("/api/productos/fotos-automaticas", "POST"), "gestion");
     assert.equal(reglaDeRuta("/api/productos", "POST"), "sesion");
   });
 

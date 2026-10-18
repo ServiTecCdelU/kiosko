@@ -229,6 +229,10 @@ export function CatalogoTienda({ slug }: { slug: string }) {
 
         <p className="pt-4 text-center text-xs text-muted-foreground">
           Precios con las ofertas de hoy · Tienda online hecha con <span className="font-semibold text-foreground">ServiTec</span>
+          {/* Fotos copiadas de Open Food Facts (prefijo off-, lib/server/fotos-producto.ts): licencia CC BY-SA. */}
+          {productos.some((p) => p.imageUrl?.includes("/off-")) && (
+            <> · Algunas fotos: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer" className="underline">Open Food Facts</a> (CC BY-SA)</>
+          )}
         </p>
       </main>
 

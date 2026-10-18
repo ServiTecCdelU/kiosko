@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
-  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, Scale, ChevronDown, Megaphone,
+  Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, Scale, Image as ImageIcon, ChevronDown, Megaphone,
   CalendarClock, ClipboardCheck, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
@@ -29,6 +29,7 @@ import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog"
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { AumentoPreciosDialog } from "@/components/stock/aumento-precios-dialog";
 import { QendraDialog } from "@/components/stock/qendra-dialog";
+import { FotosAutomaticasDialog } from "@/components/stock/fotos-automaticas-dialog";
 import { ProductosTipicosDialog } from "@/components/stock/productos-tipicos-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
@@ -75,6 +76,7 @@ export default function StockPage() {
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [aumentoOpen, setAumentoOpen] = useState(false);
   const [qendraOpen, setQendraOpen] = useState(false);
+  const [fotosOpen, setFotosOpen] = useState(false);
   const [tipicosOpen, setTipicosOpen] = useState(false);
 
   // Primeros pasos -> "Cargar los típicos" abre /stock?tipicos=1.
@@ -447,6 +449,9 @@ export default function StockPage() {
         <Button variant="outline" className="rounded-2xl" onClick={() => setAumentoOpen(true)}>
           <TrendingUp className="mr-2 h-4 w-4" /> Aumentar precios
         </Button>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setFotosOpen(true)} title="Buscar fotos por código de barras">
+          <ImageIcon className="mr-2 h-4 w-4" /> Fotos
+        </Button>
         {conBalanza && (
           <Button variant="outline" className="rounded-2xl" onClick={() => setQendraOpen(true)} title="Pasar productos y precios a las balanzas Systel por Qendra">
             <Scale className="mr-2 h-4 w-4" /> Balanza
@@ -566,7 +571,13 @@ export default function StockPage() {
                       <TableCell className="text-xs text-muted-foreground">{p.codigoBarras || "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.codigo || "—"}</TableCell>
                       <TableCell>
-                        <p className="line-clamp-1 font-medium">{p.name}</p>
+                        <div className="flex items-center gap-2">
+                          {p.imageUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.imageUrl} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded-lg border object-cover" />
+                          )}
+                          <p className="line-clamp-1 font-medium">{p.name}</p>
+                        </div>
                         <EtiquetaVencimiento fecha={p.fechaVencimiento} />
                         {p.revisar && (
                           <Badge variant="outline" className="mt-1 border-warning text-warning">
@@ -689,6 +700,7 @@ export default function StockPage() {
         onOpenChange={setEditOpen}
         onSave={handleSaveProduct}
         onAjustarStock={handleAjuste}
+        onFotoCambiada={() => refreshAll()}
       />
       <OfertaDialog
         product={ofertaProduct}
@@ -713,6 +725,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <AumentoPreciosDialog open={aumentoOpen} onOpenChange={setAumentoOpen} onAplicado={() => refreshAll()} />
+      <FotosAutomaticasDialog open={fotosOpen} onOpenChange={setFotosOpen} onCambio={() => refreshAll()} />
       <QendraDialog open={qendraOpen} onOpenChange={setQendraOpen} onCambio={() => refreshAll()} />
       <ProductosTipicosDialog open={tipicosOpen} onOpenChange={setTipicosOpen} onCreados={() => refreshAll()} />
       <EtiquetasPrint productos={productosEtiqueta} />
