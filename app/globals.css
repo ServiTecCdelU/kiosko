@@ -430,6 +430,27 @@
   #etiquetas-print {
     position: static;
   }
+  /* Hojas A4 (etiquetas, carteles, folleto; imprimirA4 en
+     components/stock/impresion-ofertas.ts): con visibility:hidden el resto de la
+     pantalla seguia ocupando lugar, y la etiqueta salia en la segunda hoja con la
+     primera en blanco. Todo lo que no es la hoja ni la contiene, fuera; y los
+     contenedores de la hoja, sin margen, alto fijo ni scroll. */
+  body[data-imprimir="a4"] *:not(:has(#etiquetas-print, #cartel-print, #folleto-print)):not(#etiquetas-print, #etiquetas-print *, #cartel-print, #cartel-print *, #folleto-print, #folleto-print *) {
+    display: none !important;
+  }
+  body[data-imprimir="a4"],
+  body[data-imprimir="a4"] :has(#etiquetas-print, #cartel-print, #folleto-print) {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
   #etiquetas-print .etiquetas-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

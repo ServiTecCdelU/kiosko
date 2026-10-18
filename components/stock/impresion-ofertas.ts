@@ -30,7 +30,11 @@ export function imprimirA4(margen: string, limpiar: () => void, pagina = "A4"): 
     const style = document.createElement("style");
     style.textContent = `@page { size: ${pagina}; margin: ${margen}; }`;
     document.head.appendChild(style);
+    // Saca el resto de la pantalla del papel (app/globals.css, data-imprimir="a4"):
+    // oculto pero ocupando lugar mandaba la etiqueta a la segunda hoja.
+    document.body.dataset.imprimir = "a4";
     window.print();
+    delete document.body.dataset.imprimir;
     document.head.removeChild(style);
     limpiar();
   }, 150);
