@@ -37,6 +37,8 @@ interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported: () => void;
+  /** Primera carga (sin productos): no hay "producto que ya existe", se oculta esa eleccion. */
+  stockVacio?: boolean;
 }
 
 type Step = "archivo" | "preview" | "progreso" | "resultado";
@@ -50,7 +52,7 @@ const STRATEGIES: { value: StockStrategy; label: string; hint: string }[] = [
   { value: "solo_nuevos", label: "Solo agregar nuevos", hint: "No modifica productos existentes" },
 ];
 
-export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogProps) {
+export function ImportDialog({ open, onOpenChange, onImported, stockVacio = false }: ImportDialogProps) {
   const [step, setStep] = useState<Step>("archivo");
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [columnLetters, setColumnLetters] = useState<string[]>([]);
@@ -278,6 +280,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
               </div>
             )}
 
+            {!stockVacio && (
             <div>
               <Label className="mb-2 block">Si el producto ya existe en tu stock</Label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -296,6 +299,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                 ))}
               </div>
             </div>
+            )}
           </div>
         )}
 

@@ -85,9 +85,14 @@ interface GuiaAccesoEmpleadosProps {
   version?: number;
   /** Ocultar la guia cuando ya esta todo hecho (en Caja no hace falta verla siempre). */
   ocultarSiCompleta?: boolean;
+  /**
+   * Arrancar plegada aunque falten pasos: en Caja lo primero es abrir/cerrar la
+   * caja, y el dueño que atiende solo no necesita la guia desplegada.
+   */
+  plegadaAlInicio?: boolean;
 }
 
-export function GuiaAccesoEmpleados({ version = 0, ocultarSiCompleta = false }: GuiaAccesoEmpleadosProps) {
+export function GuiaAccesoEmpleados({ version = 0, ocultarSiCompleta = false, plegadaAlInicio = false }: GuiaAccesoEmpleadosProps) {
   const [estado, setEstado] = useState<Estado | null>(null);
   const [abierta, setAbierta] = useState<boolean | null>(null);
   const pathname = usePathname();
@@ -105,7 +110,7 @@ export function GuiaAccesoEmpleados({ version = 0, ocultarSiCompleta = false }: 
   const completa = hechos === PASOS.length;
   if (completa && ocultarSiCompleta) return null;
   // Abierta mientras falte algo; ya completa, plegada (se puede abrir para repasar).
-  const verPasos = abierta ?? !completa;
+  const verPasos = abierta ?? (!completa && !plegadaAlInicio);
   const siguiente = PASOS.find((p) => !estado[p.id])?.id;
 
   return (

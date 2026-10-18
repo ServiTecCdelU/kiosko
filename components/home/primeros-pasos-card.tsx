@@ -17,10 +17,12 @@ interface Pasos {
   mercadoPago: boolean;
 }
 
-const PASOS: { id: keyof Pasos; titulo: string; detalle: string; href: string; accion: string }[] = [
+// opcional: no cuenta para el progreso ni para dar la guia por terminada (quien
+// atiende solo nunca suma cajeros y la tarjeta quedaba en "2 de 3" para siempre).
+const PASOS: { id: keyof Pasos; titulo: string; detalle: string; href: string; accion: string; opcional?: boolean }[] = [
   { id: "productos", titulo: "Cargá tus productos", detalle: "Importalos desde Excel o cargalos a mano.", href: "/stock", accion: "Ir a Stock" },
   { id: "venta", titulo: "Hacé tu primera venta", detalle: "Abrí la caja y cobrá desde el Punto de Venta.", href: "/pos", accion: "Vender" },
-  { id: "cajeros", titulo: "Sumá a tus cajeros", detalle: "Crealos con su PIN y registrá la PC de la caja: ahí entran con “Soy empleado”.", href: "/usuarios", accion: "Empleados" },
+  { id: "cajeros", titulo: "Sumá a tus cajeros", detalle: "Crealos con su PIN y registrá la PC de la caja: ahí entran con “Soy empleado”.", href: "/usuarios", accion: "Empleados", opcional: true },
   { id: "mercadoPago", titulo: "Conectá Mercado Pago", detalle: "Cobrá con QR y lector Point (está en Facturación).", href: "/facturacion#mercado-pago", accion: "Conectar" },
 ];
 
@@ -54,8 +56,9 @@ export function PrimerosPasosCard() {
   if (oculta || !pasos) return null;
   // Plan Basico: sin Mercado Pago, ese paso no se puede completar.
   const visibles = PASOS.filter((p) => p.id !== "mercadoPago" || conMercadoPago);
-  const hechos = visibles.filter((p) => pasos[p.id]).length;
-  if (hechos === visibles.length) return null;
+  const obligatorios = visibles.filter((p) => !p.opcional);
+  const hechos = obligatorios.filter((p) => pasos[p.id]).length;
+  if (hechos === obligatorios.length) return null;
 
   const ocultar = () => {
     setOculta(true);
@@ -76,7 +79,7 @@ export function PrimerosPasosCard() {
           </span>
           <div>
             <h3 id="primeros-pasos-titulo" className="font-semibold text-foreground">Primeros pasos</h3>
-            <p className="text-xs text-muted-foreground">{hechos} de {visibles.length} listos</p>
+            <p className="text-xs text-muted-foreground">{hechos} de {obligatorios.length} listos</p>
           </div>
         </div>
         <button onClick={ocultar} className="text-muted-foreground/70 hover:text-foreground" aria-label="Ocultar primeros pasos">
@@ -85,7 +88,7 @@ export function PrimerosPasosCard() {
       </div>
 
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-        <div className="grad-brand h-full rounded-full transition-[width] duration-500" style={{ width: `${(hechos / visibles.length) * 100}%` }} />
+        <div className="grad-brand h-full rounded-full transition-[width] duration-500" style={{ width: `${(hechos / obligatorios.length) * 100}%` }} />
       </div>
 
       <ol className="mt-4 divide-y">
@@ -103,7 +106,12 @@ export function PrimerosPasosCard() {
                 {hecho && <Check className="h-3.5 w-3.5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className={cn("text-sm font-medium", hecho && "text-muted-foreground line-through")}>{p.titulo}</p>
+                <p className={cn("text-sm font-medium", hecho && "text-muted-foreground line-through")}>
+                  {p.titulo}
+                  {p.opcional && !hecho && (
+                    <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">Opcional</span>
+                  )}
+                </p>
                 {!hecho && <p className="text-xs text-muted-foreground">{p.detalle}</p>}
               </div>
               {!hecho && (

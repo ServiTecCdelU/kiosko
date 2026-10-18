@@ -23,6 +23,8 @@ export function PedirMas() {
   const { user } = useAuth();
   const [sugerencias, setSugerencias] = useState<SugerenciaPedido[] | null>(null);
   const [error, setError] = useState(false);
+  // Sin ventas recientes no hay ritmo que medir (comercio nuevo): no se dice "tenés stock".
+  const [sinVentas, setSinVentas] = useState(false);
   const [abierto, setAbierto] = useState(true);
   const [verTodos, setVerTodos] = useState(false);
 
@@ -30,7 +32,9 @@ export function PedirMas() {
     let vigente = true;
     getRitmoVenta(14)
       .then(({ productos, dias }) => {
-        if (vigente) setSugerencias(sugerirPedidos(productos, dias, new Date()));
+        if (!vigente) return;
+        setSinVentas(!productos.some((p) => p.vendidoReciente > 0 || p.vendidoAnterior > 0));
+        setSugerencias(sugerirPedidos(productos, dias, new Date()));
       })
       .catch(() => {
         if (vigente) setError(true);
@@ -59,7 +63,9 @@ export function PedirMas() {
               ? "No se pudo calcular qué conviene pedir. Probá de nuevo en un rato."
               : !sugerencias
                 ? "Calculando qué se está vendiendo bien…"
-                : "Por ahora no hace falta pedir nada: lo que se vende tiene stock para 2 semanas. Te avisamos acá cuando algo se venda más rápido."}
+                : sinVentas
+                  ? "Cuando empieces a vender, acá te avisamos qué productos se venden rápido y cuánto conviene pedir."
+                  : "Por ahora no hace falta pedir nada: lo que se vende tiene stock para 2 semanas. Te avisamos acá cuando algo se venda más rápido."}
           </p>
         </div>
       </section>

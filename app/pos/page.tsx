@@ -603,8 +603,9 @@ function PosScreen() {
       <p>Elegí arriba en qué caja va esta venta.</p>
     ) : (
       <p>
-        La caja está cerrada. Abrila para cobrar: así la venta entra en el cierre del día.{" "}
-        <Link href="/caja" className="font-semibold text-primary underline-offset-2 hover:underline">Abrir caja</Link>
+        La caja está cerrada. Abrila para cobrar: así la venta entra en el cierre del día.
+        Lo que tenés en el carrito te espera.{" "}
+        <Link href="/caja?volver=pos" className="font-semibold text-primary underline-offset-2 hover:underline">Abrir caja</Link>
       </p>
     )
   ) : undefined;

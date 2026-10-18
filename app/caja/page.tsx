@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Wallet, LockOpen, Lock, TrendingUp, Banknote, CreditCard,
-  ArrowDownCircle, ArrowUpCircle, ArrowUpRight, ArrowDownRight, Receipt, QrCode, Download, History,
+  ArrowDownCircle, ArrowUpCircle, ArrowUpRight, ArrowDownRight, Receipt, QrCode, Download, History, ShoppingCart,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,7 @@ function fechaCorta(d: Date): string {
 }
 
 export default function CajaPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("actual");
   const [caja, setCaja] = useState<Caja | null>(null);
   const [resumen, setResumen] = useState<ResumenCaja | null>(null);
@@ -163,6 +166,11 @@ export default function CajaPage() {
     try {
       const abierta = await abrirCaja(monto, puestoId, user?.id, user?.nombre);
       toast.success(`Caja abierta en ${abierta.puestoNombre ?? "el puesto"}`);
+      // Vino del aviso "caja cerrada" del POS: vuelve a cobrar (el carrito lo espera).
+      if (new URLSearchParams(window.location.search).get("volver") === "pos") {
+        router.push("/pos");
+        return;
+      }
       setMontoApertura("");
       setPuestoApertura("");
       setMostrarApertura(false);
@@ -296,7 +304,7 @@ export default function CajaPage() {
           </div>
 
           {/* Dueño: que le falta para que sus empleados entren con PIN (se oculta al completarse). */}
-          {esAdmin && <GuiaAccesoEmpleados version={versionGuia} ocultarSiCompleta />}
+          {esAdmin && <GuiaAccesoEmpleados version={versionGuia} ocultarSiCompleta plegadaAlInicio />}
 
           {/* Encargado/admin: una pastilla por caja abierta para cambiar de cajon */}
           {!loading && puedeGestionar && (cajasAbiertas.length > 0 || esAdmin) && (
@@ -410,9 +418,15 @@ export default function CajaPage() {
                     {caja.abiertaPorNombre ? `${caja.abiertaPorNombre} · ` : ""}desde {formatDateTime(caja.openedAt)}
                   </span>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-xl" onClick={handleDescargarPdf}>
-                  <Download className="mr-2 h-4 w-4" /> Descargar PDF
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" className="rounded-xl" onClick={handleDescargarPdf}>
+                    <Download className="mr-2 h-4 w-4" /> Descargar PDF
+                  </Button>
+                  {/* Con la caja abierta lo siguiente es vender: sin esto no habia como volver. */}
+                  <Button asChild size="sm" className="rounded-xl">
+                    <Link href="/pos"><ShoppingCart className="mr-2 h-4 w-4" /> Ir a vender</Link>
+                  </Button>
+                </div>
               </div>
 
               {/* Cerrar caja va arriba de todo: es la accion mas importante del dia */}

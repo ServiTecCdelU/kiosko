@@ -160,21 +160,12 @@ function LoginContent() {
             </p>
           )}
 
-          <button
-            onClick={() => abrir("demo")}
-            className="grad-brand shadow-brand flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <PlayCircle className="h-6 w-6 shrink-0" />
-            <span>
-              <span className="block text-sm font-semibold">Acceso a demo</span>
-              <span className="block text-xs text-white/80">Mirá el sistema ya, con datos de ejemplo</span>
-            </span>
-          </button>
-
+          {/* Primero el dueño que vuelve a su comercio (a esta pantalla se llega
+              con "Ingresar"); la demo tiene su propia entrada en la landing. */}
           <button
             onClick={entrarConGoogle}
             disabled={entrandoGoogle}
-            className="flex items-center justify-center gap-2 rounded-2xl border bg-card py-3.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-[0_8px_32px_-8px_rgba(59,139,255,0.65)] transition-colors hover:bg-blue-500 disabled:opacity-60"
           >
             {entrandoGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Chrome className="h-4 w-4" />}
             Entrar con Google
@@ -186,6 +177,17 @@ function LoginContent() {
             className="-mt-1 flex items-center justify-center gap-2 rounded-2xl border bg-card py-3 text-sm font-medium transition-colors hover:bg-accent"
           >
             <Mail className="h-4 w-4" /> Entrar con mi correo
+          </button>
+
+          <button
+            onClick={() => abrir("demo")}
+            className="flex items-center gap-3 rounded-2xl border border-primary/40 px-4 py-3 text-left transition-colors hover:border-primary"
+          >
+            <PlayCircle className="h-5 w-5 shrink-0 text-primary" />
+            <span>
+              <span className="block text-sm font-semibold">Acceso a demo</span>
+              <span className="block text-xs text-muted-foreground">Mirá el sistema ya, con datos de ejemplo</span>
+            </span>
           </button>
 
           <Link

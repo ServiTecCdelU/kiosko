@@ -470,7 +470,29 @@ export default function StockPage() {
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         ) : products.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Sin productos</p>
+          !debounced && quickFilter === "todos" && !categoria ? (
+            // Comercio sin productos todavia: que sepa por donde arrancar.
+            <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+              <PackagePlus className="h-8 w-8 text-primary" />
+              <div>
+                <p className="font-semibold">Todavía no cargaste productos</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Lo más rápido es importar la lista de precios de tu proveedor (Excel o CSV).
+                  También podés cargarlos de a uno, escaneando el código de barras.
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" /> Importar mi lista
+                </Button>
+                <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
+                  <PackagePlus className="mr-2 h-4 w-4" /> Cargar uno
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="py-12 text-center text-sm text-muted-foreground">No hay productos que coincidan con la búsqueda o el filtro.</p>
+          )
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -654,7 +676,7 @@ export default function StockPage() {
           load();
         }}
       />
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} stockVacio={stats?.total === 0} />
       <NuevoProductoDialog
         open={nuevoOpen}
         onOpenChange={setNuevoOpen}
