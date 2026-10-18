@@ -26,6 +26,8 @@ export interface ProcesarVentaInput {
   creditoMonto?: number | null;
   /** Venta que sale de un presupuesto: si sigue vigente se respetan sus precios. */
   presupuestoId?: string | null;
+  /** Mixto: parte que queda en la cuenta corriente del cliente ("el resto anotamelo"). */
+  fiadoMonto?: number | null;
   /** Mixto: monto (con recargo) que se paso por el posnet, debito y/o credito. Para separar tarjeta en el arqueo. */
   tarjetaMonto?: number | null;
 }
@@ -191,6 +193,7 @@ async function prepararVenta(input: ProcesarVentaInput) {
   let total = subtotal;
   let recargoPct = 0;
   let tarjetaAmount = 0;
+  let fiadoAmount = 0;
 
   if (input.paymentMethod === "credito") {
     recargoPct = Math.max(0, Number(input.recargoPct) || 0);
@@ -203,7 +206,10 @@ async function prepararVenta(input: ProcesarVentaInput) {
     // transferencia + credito, o credito + debito). Solo la porcion que se
     // paga a credito lleva recargo; creditoMonto es esa porcion SIN recargo.
     cashAmount = Math.max(0, Math.min(cashAmount, subtotal));
-    const restoSinRecargo = subtotal - cashAmount;
+    // Parte a fiado (67_mixto_con_fiado.sql): va a la cuenta corriente, sin recargo.
+    // La RPC exige cliente y controla su limite de credito.
+    fiadoAmount = round2(Math.max(0, Math.min(Number(input.fiadoMonto) || 0, subtotal - cashAmount)));
+    const restoSinRecargo = round2(subtotal - cashAmount - fiadoAmount);
     recargoPct = Math.max(0, Number(input.recargoPct) || 0);
     const creditoBase = Math.max(0, Math.min(Number(input.creditoMonto) || 0, restoSinRecargo));
     const recargoMonto = creditoBase * (recargoPct / 100);
@@ -244,5 +250,6 @@ async function prepararVenta(input: ProcesarVentaInput) {
     p_pagador_nombre: input.pagadorNombre ?? null,
     p_cuotas: input.cuotas ?? null,
     p_recargo_pct: recargoPct,
+    p_fiado_monto: fiadoAmount,
   };
 }

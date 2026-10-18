@@ -52,7 +52,7 @@ export async function calcularReporte(
 ): Promise<Reporte> {
   const { data, error } = await supabaseAdmin
     .from("ventas")
-    .select("total,payment_method,transfer_amount,tarjeta_amount,items,created_at")
+    .select("total,payment_method,transfer_amount,tarjeta_amount,fiado_amount,items,created_at")
     .eq("comercio_id", comercioId)
     .eq("estado", "completada")
     .gte("created_at", desde.toISOString())
@@ -82,6 +82,7 @@ export async function calcularReporte(
       const partes = partesDeVenta(v);
       transferencia += partes.transferencia;
       tarjeta += partes.tarjeta;
+      fiado += partes.fiado;
       efectivo += partes.efectivo;
     }
 

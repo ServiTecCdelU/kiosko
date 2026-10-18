@@ -28,6 +28,7 @@ import { getCurrentUser } from "@/hooks/use-auth";
 import { descargarVentasPdf } from "@/lib/utils/ventas-pdf";
 import { descargarVentasExcel } from "@/lib/utils/ventas-excel";
 import type { Sale, PaymentMethod } from "@/lib/types";
+import { partesDeVenta } from "@/lib/arqueo";
 
 const METODOS_FILTRO: PaymentMethod[] = [
   "efectivo", "transferencia", "debito", "credito", "mixto", "fiado", "mercadopago", "mercadopago_point",
@@ -188,7 +189,18 @@ export default function VentasPage() {
     for (const v of vigentes) {
       total += v.total;
       if (v.paymentMethod === "efectivo") efectivo += v.total;
-      else if (v.paymentMethod === "transferencia" || v.paymentMethod === "mixto") transferencia += v.total;
+      else if (v.paymentMethod === "transferencia") transferencia += v.total;
+      else if (v.paymentMethod === "mixto") {
+        // Mismo reparto que el arqueo (lib/arqueo.ts): efectivo, transferencia, tarjeta y fiado.
+        const p = partesDeVenta({
+          total: v.total, payment_method: "mixto", transfer_amount: v.transferAmount,
+          tarjeta_amount: v.tarjetaAmount, fiado_amount: v.fiadoAmount,
+        });
+        efectivo += p.efectivo;
+        transferencia += p.transferencia;
+        tarjeta += p.tarjeta;
+        fiado += p.fiado;
+      }
       else if (v.paymentMethod === "debito" || v.paymentMethod === "credito" || v.paymentMethod === "tarjeta") tarjeta += v.total;
       else if (v.paymentMethod === "mercadopago" || v.paymentMethod === "mercadopago_point") mercadopago += v.total;
       else if (v.paymentMethod === "fiado") fiado += v.total;

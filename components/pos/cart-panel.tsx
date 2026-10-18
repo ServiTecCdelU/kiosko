@@ -33,18 +33,22 @@ export interface ConfirmData {
   creditoMonto?: number;
   /** Mixto: monto (con recargo) que va por posnet, debito y/o credito. */
   tarjetaMonto?: number;
+  /** Mixto: parte que queda en la cuenta corriente del cliente. */
+  fiadoMonto?: number;
 }
 
 /** Metodos que no identifican por si solos a quien paga: hace falta pedir nombre y apellido. */
 const METODOS_CON_PAGADOR: PaymentMethod[] = ["transferencia", "debito", "credito", "mixto"];
 
-type MixtoMetodo = "efectivo" | "transferencia" | "debito" | "credito";
+type MixtoMetodo = "efectivo" | "transferencia" | "debito" | "credito" | "fiado";
 
 const MIXTO_METODOS: { value: MixtoMetodo; label: string; icon: React.ReactNode }[] = [
   { value: "efectivo", label: "Efectivo", icon: <Banknote className="h-3.5 w-3.5" /> },
   { value: "transferencia", label: "Transfer.", icon: <CreditCard className="h-3.5 w-3.5" /> },
   { value: "debito", label: "Débito", icon: <CreditCard className="h-3.5 w-3.5" /> },
   { value: "credito", label: "Crédito", icon: <CreditCard className="h-3.5 w-3.5" /> },
+  // "Te dejo $5.000 y el resto anotámelo": esa parte va a la cuenta corriente.
+  { value: "fiado", label: "Fiado", icon: <NotebookPen className="h-3.5 w-3.5" /> },
 ];
 
 /** Handle imperativo para disparar el cobro desde un atajo de teclado (F2). */
@@ -202,9 +206,15 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const mixtoTieneCredito = parte1EsCredito || parte2EsCredito;
   const creditoBaseMixto = parte1EsCredito ? parte1MontoNum : parte2EsCredito ? parte2MontoNum : 0;
 
-  const faltaCliente = method === "fiado" && !cliente;
+  // Fiado puro, o mixto con una parte a fiado: hace falta el cliente de la cuenta corriente.
+  const mixtoConFiado = method === "mixto" && (mixtoParte1Metodo === "fiado" || mixtoParte2Metodo === "fiado");
+  const usaFiado = method === "fiado" || mixtoConFiado;
+  const faltaCliente = usaFiado && !cliente;
 
-  const requierePagador = METODOS_CON_PAGADOR.includes(method);
+  // Efectivo + fiado no tiene un pagador que identificar (lo identifica el cliente).
+  const mixtoSoloEfectivoYFiado = method === "mixto"
+    && [mixtoParte1Metodo, mixtoParte2Metodo].every((m) => m === "efectivo" || m === "fiado");
+  const requierePagador = METODOS_CON_PAGADOR.includes(method) && !mixtoSoloEfectivoYFiado;
   const faltaPagador = requierePagador && pagadorNombre.trim().length === 0;
 
   const esCredito = method === "credito" || mixtoTieneCredito;
@@ -220,8 +230,12 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
   const parte2Final = parte2MontoNum + (parte2EsCredito ? recargoMonto : 0);
   const cashPortion =
     (mixtoParte1Metodo === "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo === "efectivo" ? parte2Final : 0);
+  // Lo cobrado que no es efectivo ni fiado (transferencia, debito, credito).
+  const esCobradoNoEfectivo = (m: MixtoMetodo) => m !== "efectivo" && m !== "fiado";
   const transferPortion =
-    (mixtoParte1Metodo !== "efectivo" ? parte1Final : 0) + (mixtoParte2Metodo !== "efectivo" ? parte2Final : 0);
+    (esCobradoNoEfectivo(mixtoParte1Metodo) ? parte1Final : 0) + (esCobradoNoEfectivo(mixtoParte2Metodo) ? parte2Final : 0);
+  const fiadoPortion =
+    (mixtoParte1Metodo === "fiado" ? parte1Final : 0) + (mixtoParte2Metodo === "fiado" ? parte2Final : 0);
   // Parte por posnet: el arqueo la muestra aparte de la transferencia.
   const esTarjeta = (m: MixtoMetodo) => m === "debito" || m === "credito";
   const tarjetaPortion =
@@ -229,9 +243,10 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
 
   // La validacion definitiva la hace la RPC (process_sale_kiosko); esto avisa
   // antes de confirmar. La regla vive en lib/credito.ts para poder testearla.
-  const credito = cliente ? evaluarCredito(cliente.saldo, cliente.limiteCredito, total) : null;
+  const montoFiado = method === "fiado" ? total : fiadoPortion;
+  const credito = cliente ? evaluarCredito(cliente.saldo, cliente.limiteCredito, montoFiado) : null;
   const deudaProyectada = credito?.deudaProyectada ?? 0;
-  const excedeCredito = method === "fiado" && !!credito && credito.supera;
+  const excedeCredito = usaFiado && !!credito && credito.supera;
 
   const disabled = items.length === 0 || processing || !!avisoBloqueo || faltaEfectivo || faltaCliente || excedeCredito || faltaPagador;
 
@@ -253,7 +268,8 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
     } else if (method === "mixto") {
       onConfirm({
         paymentMethod: "mixto", cashAmount: cashPortion, changeAmount: 0, transferAmount: transferPortion,
-        tarjetaMonto: tarjetaPortion, pagadorNombre, discount, clienteId: clienteIdFidelizacion,
+        tarjetaMonto: tarjetaPortion, pagadorNombre, discount,
+        ...(mixtoConFiado ? { fiadoMonto: fiadoPortion, clienteId: cliente?.id } : { clienteId: clienteIdFidelizacion }),
         ...(mixtoTieneCredito ? { cuotas: cuotasNum, recargoPct: recargoPctNum, creditoMonto: creditoBaseMixto } : {}),
       });
     } else if (method === "fiado") {
@@ -470,9 +486,9 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           </div>
         )}
 
-        {method === "fiado" && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
+        {usaFiado && <ClienteSelector cliente={cliente} onSelect={setCliente} />}
 
-        {method !== "fiado" && (
+        {!usaFiado && (
           <div className="mb-3">
             {!mostrarFidelizacion && !clienteFidelizacion ? (
               <button
@@ -487,7 +503,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
           </div>
         )}
 
-        {method === "fiado" && cliente && (
+        {usaFiado && cliente && (
           <div
             className={cn(
               "mb-3 rounded-xl px-3 py-2 text-sm",
@@ -499,7 +515,7 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
               <span className="cifra font-semibold">{formatCurrency(cliente.saldo)}</span>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <span>Con esta venta</span>
+              <span>{mixtoConFiado ? `Con ${formatCurrency(fiadoPortion)} anotados` : "Con esta venta"}</span>
               <span className="cifra font-semibold">{formatCurrency(deudaProyectada)}</span>
             </div>
             {cliente.limiteCredito > 0 && (

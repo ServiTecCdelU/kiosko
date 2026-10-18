@@ -69,6 +69,10 @@ export interface Sale {
   cashAmount: number;
   changeAmount: number;
   transferAmount: number;
+  /** Parte con tarjeta (61_tarjeta_aparte.sql). */
+  tarjetaAmount?: number;
+  /** Parte que quedo fiada en un mixto (67_mixto_con_fiado.sql). */
+  fiadoAmount?: number;
   cajaId?: string;
   clienteId?: string;
   userId?: string;

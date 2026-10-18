@@ -20,7 +20,7 @@ export async function calcularResumenCaja(
   const [{ data: ventas }, { data: movs }] = await Promise.all([
     supabaseAdmin
       .from("ventas")
-      .select("total,payment_method,transfer_amount,tarjeta_amount")
+      .select("total,payment_method,transfer_amount,tarjeta_amount,fiado_amount")
       .eq("comercio_id", comercioId)
       .eq("caja_id", cajaId)
       .eq("estado", "completada"),

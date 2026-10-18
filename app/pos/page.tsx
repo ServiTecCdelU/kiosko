@@ -692,6 +692,7 @@ function PosScreen() {
         recargoPct: data.recargoPct,
         creditoMonto: data.creditoMonto,
         tarjetaMonto: data.tarjetaMonto,
+        fiadoMonto: data.fiadoMonto,
         discount: data.discount,
       };
 

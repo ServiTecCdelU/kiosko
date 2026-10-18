@@ -70,6 +70,26 @@ describe("agregarResumenCaja — medios de pago", () => {
     assert.equal(r.totalTransferencia, 0);
   });
 
+  test("mixto con parte a fiado: esa parte no entra a la caja", () => {
+    // $1.000 en efectivo y $3.500 anotados
+    const r = agregarResumenCaja(
+      [{ total: 4500, payment_method: "mixto", transfer_amount: 0, fiado_amount: 3500 }],
+      sinMovimientos,
+    );
+    assert.equal(r.totalEfectivo, 1000);
+    assert.equal(r.totalTransferencia, 0);
+    assert.equal(r.totalVentas, 1000);
+  });
+
+  test("mixto transferencia + fiado", () => {
+    const r = agregarResumenCaja(
+      [{ total: 4500, payment_method: "mixto", transfer_amount: 1500, fiado_amount: 3000 }],
+      sinMovimientos,
+    );
+    assert.equal(r.totalEfectivo, 0);
+    assert.equal(r.totalTransferencia, 1500);
+  });
+
   test("mixto transferencia + credito se reparte entre los dos", () => {
     const r = agregarResumenCaja(
       [{ total: 1000, payment_method: "mixto", transfer_amount: 1000, tarjeta_amount: 700 }],

@@ -30,6 +30,8 @@ export interface CreateSaleInput {
   tarjetaMonto?: number;
   /** Cobro de un presupuesto: el servidor respeta sus precios si sigue vigente. */
   presupuestoId?: string | null;
+  /** Mixto: parte que queda en la cuenta corriente del cliente (67_mixto_con_fiado.sql). */
+  fiadoMonto?: number;
 }
 
 export interface ProcessSaleResult {
@@ -91,6 +93,8 @@ function mapSale(d: Record<string, any>): Sale {
     cashAmount: Number(d.cash_amount) || 0,
     changeAmount: Number(d.change_amount) || 0,
     transferAmount: Number(d.transfer_amount) || 0,
+    tarjetaAmount: Number(d.tarjeta_amount) || 0,
+    fiadoAmount: Number(d.fiado_amount) || 0,
     cajaId: d.caja_id ?? undefined,
     clienteId: d.cliente_id ?? undefined,
     userId: d.user_id ?? undefined,
