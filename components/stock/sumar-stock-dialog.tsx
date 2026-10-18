@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ajustarStock } from "@/services/stock-service";
 import { getCurrentUser } from "@/hooks/use-auth";
+import { useCantidadConLector } from "@/hooks/use-cantidad-con-lector";
 import { esCodigoDelProducto, leerEntradaCantidad } from "@/lib/escaneo-stock";
 import { esFraccionable } from "@/lib/unidades";
 import { cantidadTexto } from "@/lib/cantidad";
@@ -28,38 +29,15 @@ interface Props {
 }
 
 export function SumarStockDialog({ producto, onOpenChange, onSumado, onOtroCodigo }: Props) {
-  const [cantidad, setCantidad] = useState("1");
+  const { valor: cantidad, cambiar, fijar, antes } = useCantidadConLector("1");
   const [guardando, setGuardando] = useState(false);
-  // Lo que tenia el campo antes de que el lector empezara a tipear encima.
-  const confirmada = useRef("1");
-  // El lector tipea mucho mas rapido que una persona: asi se sabe donde empezo a escanear.
-  const ultimaTecla = useRef(0);
-  const previo = useRef("1");
-  const enRafaga = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const cambiar = (valor: string) => {
-    const ahora = Date.now();
-    const rapido = ahora - ultimaTecla.current < 40;
-    if (rapido && !enRafaga.current) {
-      confirmada.current = previo.current;
-      enRafaga.current = true;
-    }
-    if (!rapido) {
-      enRafaga.current = false;
-      previo.current = cantidad;
-    }
-    ultimaTecla.current = ahora;
-    setCantidad(valor);
-  };
 
   useEffect(() => {
     if (!producto) return;
-    setCantidad("1");
-    confirmada.current = "1";
-    previo.current = "1";
-    enRafaga.current = false;
+    fijar("1");
     setTimeout(() => inputRef.current?.select(), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [producto]);
 
   if (!producto) return null;
@@ -68,19 +46,16 @@ export function SumarStockDialog({ producto, onOpenChange, onSumado, onOtroCodig
   const esPack = !!producto.packDe;
   const sinControl = !producto.stockControlado;
 
-  const leida = leerEntradaCantidad(cantidad, confirmada.current, porUnidad);
+  const leida = leerEntradaCantidad(cantidad, antes(), porUnidad);
   const stockNuevo = leida.tipo === "cantidad" ? producto.stock + leida.valor : null;
 
   const sumar = async () => {
-    const entrada = leerEntradaCantidad(cantidad, confirmada.current, porUnidad);
+    const entrada = leerEntradaCantidad(cantidad, antes(), porUnidad);
     if (entrada.tipo === "codigo") {
       if (esCodigoDelProducto(entrada.codigo, producto)) {
         // El mismo producto otra vez: una unidad mas.
-        const siguiente = String(Number(confirmada.current.replace(",", ".")) + 1 || 1);
-        setCantidad(siguiente);
-        confirmada.current = siguiente;
-        previo.current = siguiente;
-        enRafaga.current = false;
+        const siguiente = String(Number(antes().replace(",", ".")) + 1 || 1);
+        fijar(siguiente);
       } else {
         onOtroCodigo(entrada.codigo);
       }
@@ -88,8 +63,7 @@ export function SumarStockDialog({ producto, onOpenChange, onSumado, onOtroCodig
     }
     if (entrada.tipo === "invalida") {
       toast.error(porUnidad ? "Poné una cantidad entera mayor a cero" : "Poné una cantidad mayor a cero");
-      setCantidad(confirmada.current);
-      enRafaga.current = false;
+      fijar(antes());
       return;
     }
     if (esPack || sinControl) return;

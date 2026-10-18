@@ -1,8 +1,9 @@
 "use client";
 
 // /stock/inventario — recuento fisico de stock (solo admin).
-// Se abre un recuento (todo o un rubro), se cuenta con el lector o buscando,
-// y al cerrar el sistema ajusta el stock de lo contado.
+// Se abre un recuento (todo o un rubro), se cuenta con el lector o buscando
+// (pasar de nuevo el mismo producto suma uno; un codigo que no esta en el catalogo abre
+// el alta), y al cerrar el sistema ajusta el stock de lo contado.
 // Spec: docs/superpowers/specs/2026-10-10-inventario-y-mermas-design.md
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -17,6 +18,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
+import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
+import { useCantidadConLector } from "@/hooks/use-cantidad-con-lector";
+import { esCodigoDelProducto, leerEntradaCantidad } from "@/lib/escaneo-stock";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { getCurrentUser } from "@/hooks/use-auth";
@@ -196,8 +200,11 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
   const [texto, setTexto] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [enfocado, setEnfocado] = useState<string | null>(null);
-  const [cantidad, setCantidad] = useState("");
+  const { valor: cantidad, cambiar: cambiarCantidad, fijar: fijarCantidad, antes: cantidadAntes } = useCantidadConLector();
   const [guardando, setGuardando] = useState(false);
+  // Codigo que no estaba en el catalogo: se da de alta y despues se cuenta.
+  const [codigoNuevo, setCodigoNuevo] = useState("");
+  const altaPendiente = useRef("");
   const [cerrarOpen, setCerrarOpen] = useState(false);
   const [cerrando, setCerrando] = useState(false);
   const cantidadRef = useRef<HTMLInputElement>(null);
@@ -228,13 +235,29 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
   const enfocar = (productoId: string) => {
     const it = items.find((i) => i.productoId === productoId);
     setEnfocado(productoId);
-    setCantidad(it?.contado != null ? String(it.contado) : "");
-    setTimeout(() => cantidadRef.current?.focus(), 50);
+    fijarCantidad(it?.contado != null ? String(it.contado) : "");
+    setTimeout(() => cantidadRef.current?.select(), 50);
+  };
+
+  // Enter en la cantidad: puede ser lo tipeado o el lector escaneando encima.
+  const enterEnCantidad = () => {
+    const entrada = leerEntradaCantidad(cantidad, cantidadAntes(), false);
+    if (entrada.tipo !== "codigo") {
+      void guardar();
+      return;
+    }
+    if (itemEnfocado && esCodigoDelProducto(entrada.codigo, { codigoBarras: itemEnfocado.codigoBarras })) {
+      // El mismo producto otra vez: se cuenta uno mas.
+      fijarCantidad(String((Number(cantidadAntes().replace(",", ".")) || 0) + 1));
+      setTimeout(() => cantidadRef.current?.select(), 0);
+      return;
+    }
+    void procesarCodigo(entrada.codigo);
   };
 
   const guardar = async () => {
     if (!enfocado || cantidad === "") return;
-    const n = Number(cantidad);
+    const n = Number(cantidad.replace(",", "."));
     if (!Number.isFinite(n) || n < 0) return;
     setGuardando(true);
     try {
@@ -245,7 +268,7 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
         return [...prev, { productoId: r.productoId, nombre: r.nombre, stockSistema: r.stockSistema, contado: r.contado }];
       });
       setEnfocado(null);
-      setCantidad("");
+      fijarCantidad("");
       setTexto("");
       setTimeout(() => buscadorRef.current?.focus(), 50);
     } catch (e) {
@@ -267,7 +290,11 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
     try {
       const p = await findProductByCode(c);
       if (!p) {
-        toast.error(`No hay ningún producto con el código ${c}`);
+        // No esta en el catalogo: se da de alta ahi mismo y despues se cuenta.
+        setEnfocado(null);
+        setTexto("");
+        altaPendiente.current = c;
+        setCodigoNuevo(c);
         return;
       }
       setItems((prev) => prev.some((i) => i.productoId === p.id)
@@ -366,13 +393,13 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
             </div>
             <Input
               ref={cantidadRef}
-              type="number" inputMode="decimal"
+              inputMode="decimal"
               value={cantidad}
-              onChange={(e) => setCantidad(e.target.value)}
+              onChange={(e) => cambiarCantidad(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  guardar();
+                  enterEnCantidad();
                 }
                 if (e.key === "Escape") setEnfocado(null);
               }}
@@ -428,6 +455,22 @@ function Recuento({ inventarioId, onCerrado }: { inventarioId: string; onCerrado
       </Card>
 
       <BarcodeScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onDetected={(c) => { setScannerOpen(false); procesarCodigo(c); }} />
+      <NuevoProductoDialog
+        open={!!codigoNuevo}
+        onOpenChange={(o) => {
+          if (o) return;
+          setCodigoNuevo("");
+          altaPendiente.current = "";
+          setTimeout(() => buscadorRef.current?.focus(), 100);
+        }}
+        onCreated={() => {
+          // Se llama otra vez si despues se guarda la foto: solo la primera suma al recuento.
+          const c = altaPendiente.current;
+          altaPendiente.current = "";
+          if (c) void procesarCodigo(c);
+        }}
+        codigoBarrasInicial={codigoNuevo || undefined}
+      />
 
       <Dialog open={cerrarOpen} onOpenChange={setCerrarOpen}>
         <DialogContent className="rounded-2xl sm:max-w-md">
