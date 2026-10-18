@@ -1,7 +1,7 @@
-# Plan Tienda ($80.000): catálogo y pedidos online — diseño (borrador 2026-10-18)
+# Plan Tienda ($80.000): catálogo y pedidos online — diseño (2026-10-18)
 
-Estado: **etapas 1 y 2 hechas (2026-10-18)**: catálogo público, pedidos en el sistema, plan Tienda
-(migraciones 72 y 73), configuración en Mi comercio. Etapa 3 (pago online) pendiente.
+Estado: **etapas 1, 2 y 3 hechas (2026-10-18)**: catálogo, pedidos en el sistema y pago online, plan Tienda
+(migraciones 72 a 74), configuración en Mi comercio. Pago online sin probar con MP real.
 
 ## Etapa 1 implementada
 
@@ -35,6 +35,26 @@ Estado: **etapas 1 y 2 hechas (2026-10-18)**: catálogo público, pedidos en el 
 - **Pasar a venta**: `/pos?pedido=<id>` arma el carrito con los productos y el precio de
   hoy (lo de por kg se pesa ahí); la venta lleva `pedidoId` y deja el pedido entregado
   con su `venta_id` (`lib/server/procesar-venta.ts`). No reserva stock.
+
+## Etapa 3 implementada (2026-10-18)
+
+- Migración 74: `pedidos.pago_estado` (null / pendiente / aprobado / rechazado),
+  `pago_ref` (`pedido:<id>`, único), `pago_id`, `pago_monto`.
+- La tienda ofrece "Pagar ahora con Mercado Pago" solo si el comercio tiene MP conectado
+  (`tiendaDeSlug().pagoOnline`). Al crear el pedido se genera la preferencia por el total
+  con la cuenta del comercio y la vuelta a `/tienda/<slug>?pedido=N&pago=…`; si MP falla,
+  el pedido queda y se paga al retirar.
+- Webhook de MP (`app/api/mercadopago/webhook`): una referencia `pedido:` va a
+  `registrarPagoDePedido` (pago consultado con el token del comercio, idempotente).
+- **Regla de plata**: un pedido pagado online NO se cobra de nuevo (`prepararVenta` lo
+  rechaza en caja, QR y Point). Se entrega desde Pedidos con **Entregar (ya pagó)**
+  (`POST /api/pedidos/entregar`): venta al precio pagado (`procesarVentaDePedidoPagado`,
+  subtotales del pedido, no un campo del input), como Mercado Pago, en la caja de quien
+  entrega (o la única abierta), con las cantidades pedidas.
+- Cancelar un pedido pagado avisa que hay que devolver el pago desde Mercado Pago (la
+  devolución no es automática).
+- **No probado con un pago real**: ningún comercio tiene MP conectado. Probado simulando
+  el estado que deja el webhook.
 
 ## Problema
 

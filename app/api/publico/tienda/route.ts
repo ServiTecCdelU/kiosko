@@ -28,6 +28,7 @@ export async function GET(req: Request) {
         whatsapp: tienda.whatsapp,
         retiro: tienda.config.retiro,
         envio: tienda.config.envio,
+        pagoOnline: tienda.pagoOnline,
         productos,
       },
       // Precios y stock cambian: cache corto en el CDN para aguantar visitas.

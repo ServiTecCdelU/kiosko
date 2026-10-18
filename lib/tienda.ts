@@ -283,3 +283,37 @@ export function mensajeEstadoPedido(
     default: return null;
   }
 }
+
+// ---- Etapa 3: pago online con Mercado Pago (74_pedidos_pago_online.sql) ----
+
+export type EstadoPagoPedido = "pendiente" | "aprobado" | "rechazado";
+
+/**
+ * external_reference del cobro de un pedido. El webhook de MP la usa para separar los
+ * pedidos de los cobros con QR de la caja (que van a pagos_mp_pendientes).
+ */
+const PREFIJO_REF_PEDIDO = "pedido:";
+
+export function referenciaPagoPedido(pedidoId: string): string {
+  return `${PREFIJO_REF_PEDIDO}${pedidoId}`;
+}
+
+/** Id del pedido de una external_reference, o null si no es de un pedido. */
+export function pedidoDeReferencia(ref: string | null | undefined): string | null {
+  if (!ref || !ref.startsWith(PREFIJO_REF_PEDIDO)) return null;
+  const id = ref.slice(PREFIJO_REF_PEDIDO.length);
+  return id ? id : null;
+}
+
+/** Estado del pago de un pedido segun el status de MP (null: no cambia nada). */
+export function estadoPagoDeMP(status: string): EstadoPagoPedido | null {
+  if (status === "approved") return "aprobado";
+  if (status === "rejected" || status === "cancelled") return "rechazado";
+  if (status === "pending" || status === "in_process" || status === "authorized") return "pendiente";
+  return null;
+}
+
+/** Lo pagado cubre el pedido (al centavo). */
+export function pagoCubrePedido(pagado: number, total: number): boolean {
+  return Number.isFinite(pagado) && pagado + 0.009 >= total;
+}

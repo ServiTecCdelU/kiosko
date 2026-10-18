@@ -68,7 +68,24 @@ export async function validarCaja(comercioId: string, cajaId: string | null | un
 
 /** Recalcula precios/subtotales autoritativos desde la BD e inserta la venta via RPC atomica. */
 export async function procesarVenta(input: ProcesarVentaInput): Promise<ProcesarVentaResult> {
-  const { tarjetaAmount, ...params } = await prepararVenta(input);
+  return insertarVenta(input);
+}
+
+/**
+ * Entrega de un pedido de la tienda YA PAGADO online (74_pedidos_pago_online.sql): la
+ * venta queda al precio que pago el cliente (`subtotales` por producto, del pedido).
+ * Solo la llama /api/pedidos/entregar: no es un campo del input, porque el input del
+ * cobro con QR lo arma el navegador.
+ */
+export async function procesarVentaDePedidoPagado(
+  input: ProcesarVentaInput,
+  subtotales: Map<string, number>,
+): Promise<ProcesarVentaResult> {
+  return insertarVenta(input, subtotales);
+}
+
+async function insertarVenta(input: ProcesarVentaInput, subtotalesPagados?: Map<string, number>): Promise<ProcesarVentaResult> {
+  const { tarjetaAmount, ...params } = await prepararVenta(input, subtotalesPagados);
   const { data, error } = await supabaseAdmin.rpc("process_sale_kiosko", params);
   if (error) throw new Error(error.message);
   // La RPC no conoce la columna (61_tarjeta_aparte.sql): se completa despues.
@@ -113,6 +130,8 @@ export async function calcularLineas(
   comercioId: string,
   rawItems: ProcesarVentaInput["items"],
   presupuestados?: Map<string, number>,
+  /** Subtotales ya pagados online (pedido de la tienda): se respetan tal cual. */
+  subtotalesPagados?: Map<string, number>,
 ): Promise<{ productId: string; name: string; quantity: number; price: number; subtotal: number; unidad: string }[]> {
   if (rawItems.length === 0) {
     throw new Error("El carrito esta vacio");
@@ -160,11 +179,20 @@ export async function calcularLineas(
     if (presupuestados && db.precio_libre !== true) {
       subtotal = subtotalConPresupuesto(subtotal, presupuestados.get(id), quantity);
     }
+    const pagado = subtotalesPagados?.get(id);
+    if (pagado !== undefined) subtotal = round2(pagado);
     const name = db.name;
     // Precio unitario informativo (el total sale de subtotal): a centavos, sin 1349.9999.
     const price = round2(subtotal / quantity);
     return { productId: id, name, quantity, price, subtotal, unidad: String(db.unidad ?? "un") };
   });
+}
+
+async function pedidoPagadoOnline(comercioId: string, pedidoId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("pedidos").select("pago_estado").eq("comercio_id", comercioId).eq("id", pedidoId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.pago_estado === "aprobado";
 }
 
 /** Precios del presupuesto si es del comercio y sigue vigente; si no, undefined (precio de hoy). */
@@ -181,11 +209,15 @@ async function preciosDelPresupuesto(comercioId: string, presupuestoId: string |
 }
 
 /** Precios, totales y recargos autoritativos; tira error si la venta no es valida. */
-async function prepararVenta(input: ProcesarVentaInput) {
+async function prepararVenta(input: ProcesarVentaInput, subtotalesPagados?: Map<string, number>) {
   const comercioId = input.comercioId;
+  // Un pedido pagado online no se cobra de nuevo (caja, QR ni Point): se entrega desde Pedidos.
+  if (input.pedidoId && !subtotalesPagados && (await pedidoPagadoOnline(comercioId, input.pedidoId))) {
+    throw new Error("Este pedido ya está pagado online: entregalo desde Pedidos");
+  }
   const presupuestados = await preciosDelPresupuesto(comercioId, input.presupuestoId);
   // La unidad no va a la venta: ventas.items queda como siempre.
-  const items = (await calcularLineas(comercioId, input.items, presupuestados))
+  const items = (await calcularLineas(comercioId, input.items, presupuestados, subtotalesPagados))
     .map(({ unidad: _unidad, ...linea }) => linea);
 
   const discount = Number(input.discount) || 0;

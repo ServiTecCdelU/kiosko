@@ -3,8 +3,9 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { accesoDeComercio } from "@/lib/server/acceso";
 import { leerTodo } from "@/lib/server/leer-todo";
+import { estadoConexionMP } from "@/lib/server/mercadopago-credencial";
 import { planIncluyeTienda } from "@/lib/suscripcion";
-import { configTiendaValida, numeroWhatsapp, type ConfigTienda } from "@/lib/tienda";
+import { configTiendaValida, estadoPagoDeMP, numeroWhatsapp, type ConfigTienda } from "@/lib/tienda";
 
 export interface TiendaDeSlug {
   comercioId: string;
@@ -14,6 +15,8 @@ export interface TiendaDeSlug {
   whatsapp: string | null;
   /** Plan con tienda, activada por el dueño, WhatsApp valido y acceso completo. */
   abierta: boolean;
+  /** Puede cobrar online: Mercado Pago del comercio conectado (74_pedidos_pago_online.sql). */
+  pagoOnline: boolean;
 }
 
 export function slugValido(slug: unknown): slug is string {
@@ -33,7 +36,8 @@ export async function tiendaDeSlug(slug: string): Promise<TiendaDeSlug | null> {
   const whatsapp = numeroWhatsapp(config.whatsapp);
   const abierta = planIncluyeTienda(data.plan) && config.activa && !!whatsapp
     && (await accesoDeComercio(data.id)).nivel === "completo";
-  return { comercioId: data.id, nombre: data.nombre, config, whatsapp, abierta };
+  const pagoOnline = abierta && (await estadoConexionMP(data.id).catch(() => null))?.conectado === true;
+  return { comercioId: data.id, nombre: data.nombre, config, whatsapp, abierta, pagoOnline };
 }
 
 /** Tope del catalogo publico (una despensa grande tiene unos miles). */
@@ -93,4 +97,38 @@ export async function productosDeTienda(comercioId: string, ids?: string[]): Pro
     return q.order("id").range(desde, hasta);
   }, MAX_PRODUCTOS);
   return filas.map(aPublico).filter((p) => p.name);
+}
+
+/**
+ * El webhook de Mercado Pago avisa el pago de un pedido (external_reference
+ * "pedido:<id>", lib/tienda.ts). `pago` ya viene consultado a MP con el token del
+ * comercio: un aviso falso no puede marcar pagado un pedido. Idempotente.
+ */
+export async function registrarPagoDePedido(
+  comercios: string[],
+  pedidoId: string,
+  pago: { id: string; status: string; monto: number },
+): Promise<void> {
+  const nuevo = estadoPagoDeMP(pago.status);
+  if (!nuevo) return;
+  const { data: pedido, error } = await supabaseAdmin
+    .from("pedidos")
+    .select("id, comercio_id, pago_estado")
+    .in("comercio_id", comercios)
+    .eq("id", pedidoId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  // Ya aprobado: MP repite avisos; no se pisa con un estado viejo.
+  if (!pedido || pedido.pago_estado === "aprobado") return;
+  const { error: errorUpd } = await supabaseAdmin
+    .from("pedidos")
+    .update({
+      pago_estado: nuevo,
+      pago_id: pago.id,
+      ...(nuevo === "aprobado" ? { pago_monto: pago.monto } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("comercio_id", pedido.comercio_id)
+    .eq("id", pedido.id);
+  if (errorUpd) throw new Error(errorUpd.message);
 }

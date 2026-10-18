@@ -300,6 +300,10 @@ function PosScreen() {
           toast.error(`El pedido N° ${pedido.numero} ya está ${pedido.estado}`);
           return;
         }
+        if (pedido.pagoEstado === "aprobado") {
+          toast.error(`El pedido N° ${pedido.numero} ya está pagado online: entregalo desde Pedidos`);
+          return;
+        }
         const { items, faltantes } = carritoDePedido(pedido, productos);
         cart.replaceAll(items);
         setPresupuestoActivo(null);

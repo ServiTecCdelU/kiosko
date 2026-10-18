@@ -6,6 +6,8 @@ import { getPagoMP } from "@/lib/server/mercadopago";
 import { comerciosDeCuentaMP, MPNoConectado, tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 import { procesarVenta } from "@/lib/server/procesar-venta";
 import { facturarSiEsAutomatico } from "@/lib/server/afip/facturar";
+import { registrarPagoDePedido } from "@/lib/server/tienda";
+import { pedidoDeReferencia } from "@/lib/tienda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +61,13 @@ export async function POST(req: Request) {
     // falso no puede hacer pasar el pago de otra cuenta como propio.
     const pago = await getPagoMP(token, paymentId);
     if (!pago.externalReference) return NextResponse.json({ ok: true });
+
+    // Pago de un pedido de la tienda online (74_pedidos_pago_online.sql).
+    const pedidoId = pedidoDeReferencia(pago.externalReference);
+    if (pedidoId) {
+      await registrarPagoDePedido(comercios, pedidoId, pago);
+      return NextResponse.json({ ok: true });
+    }
 
     const { data: pendiente, error: findErr } = await supabaseAdmin
       .from("pagos_mp_pendientes")

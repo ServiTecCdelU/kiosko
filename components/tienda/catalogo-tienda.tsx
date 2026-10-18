@@ -31,6 +31,8 @@ interface DatosTienda {
   whatsapp?: string;
   retiro?: boolean;
   envio?: boolean;
+  /** Cobra online con Mercado Pago (cuenta del comercio conectada). */
+  pagoOnline?: boolean;
   productos?: ProductoTienda[];
 }
 
@@ -51,7 +53,19 @@ export function CatalogoTienda({ slug }: { slug: string }) {
   const [rubro, setRubro] = useState<string | null>(null);
   const [carrito, setCarrito] = useState<Carrito>({});
   const [verPedido, setVerPedido] = useState(false);
+  // Vuelta de Mercado Pago: /tienda/<slug>?pedido=N&pago=aprobado|pendiente|fallido
+  const [vueltaPago, setVueltaPago] = useState<{ numero: string; estado: string } | null>(null);
   const claveCarrito = `tienda-carrito:${slug}`;
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const numero = q.get("pedido");
+    const estado = q.get("pago");
+    if (numero && estado) {
+      setVueltaPago({ numero, estado });
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     fetch(apiUrl(`/api/publico/tienda?slug=${encodeURIComponent(slug)}`))
@@ -122,6 +136,7 @@ export function CatalogoTienda({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-screen bg-background pb-28">
+      {vueltaPago && <AvisoPago {...vueltaPago} comercio={datos.nombre} onCerrar={() => setVueltaPago(null)} />}
       <header className="border-b bg-card">
         <div className="mx-auto max-w-5xl px-4 py-5">
           <div className="flex items-center gap-3">
@@ -195,6 +210,24 @@ export function CatalogoTienda({ slug }: { slug: string }) {
           onEnviado={() => setCarrito({})}
         />
       )}
+    </div>
+  );
+}
+
+function AvisoPago({ numero, estado, comercio, onCerrar }: { numero: string; estado: string; comercio: string; onCerrar: () => void }) {
+  const [icono, titulo, texto] = estado === "aprobado"
+    ? ["✅", `¡Pago recibido! Pedido N° ${numero}`, `${comercio} ya tiene tu pedido pagado. Te avisan por WhatsApp cuando esté listo.`]
+    : estado === "pendiente"
+      ? ["⏳", `Pedido N° ${numero}: pago en proceso`, "Mercado Pago está confirmando el pago. El comercio ya tiene tu pedido."]
+      : ["⚠️", `Pedido N° ${numero}: el pago no se completó`, `Tu pedido quedó igual en ${comercio}: podés pagarlo al retirar o recibir.`];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCerrar}>
+      <div className="w-full max-w-lg space-y-3 rounded-t-2xl bg-card p-6 text-center sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <p className="text-4xl">{icono}</p>
+        <h2 className="text-xl font-bold">{titulo}</h2>
+        <p className="text-sm text-muted-foreground">{texto}</p>
+        <Button className="h-11 w-full rounded-2xl" onClick={onCerrar}>Listo</Button>
+      </div>
     </div>
   );
 }
@@ -295,7 +328,7 @@ function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, on
   const [telefono, setTelefono] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
-  const [confirmado, setConfirmado] = useState<{ numero: number; texto: string } | null>(null);
+  const [confirmado, setConfirmado] = useState<{ numero: number; texto: string; sinPagoOnline?: boolean } | null>(null);
   const [entrega, setEntrega] = useState<DatosPedido["entrega"]>(datos.retiro ? "retiro" : "envio");
   const [direccion, setDireccion] = useState("");
   const [pago, setPago] = useState<DatosPedido["pago"]>("efectivo");
@@ -324,10 +357,20 @@ function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, on
       });
       const r = await res.json().catch(() => null);
       if (!res.ok) throw new Error(r?.error ?? "No se pudo mandar el pedido");
+      // Pago online: el pedido ya quedo guardado; se va a Mercado Pago a pagarlo.
+      if (r.pagoUrl) {
+        onEnviado();
+        window.location.href = r.pagoUrl;
+        return;
+      }
       const confirmados: ItemPedido[] = r.items.map((i: { name: string; quantity: number; unidad: string; price: number }) => (
         { nombre: i.name, cantidad: i.quantity, unidad: i.unidad, precio: i.price }
       ));
-      setConfirmado({ numero: r.numero, texto: mensajePedido(datos.nombre, confirmados, { nombre, entrega, direccion, pago, nota }, r.numero) });
+      setConfirmado({
+        numero: r.numero,
+        texto: mensajePedido(datos.nombre, confirmados, { nombre, entrega, direccion, pago, nota }, r.numero),
+        sinPagoOnline: pago === "mercadopago" && !!datos.pagoOnline,
+      });
       onEnviado();
     } catch (e) {
       setErrorEnvio(e instanceof Error ? e.message : "No se pudo mandar el pedido");
@@ -345,6 +388,9 @@ function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, on
           <p className="text-sm text-muted-foreground">
             {datos.nombre} ya lo recibió. Te van a escribir al {telefono} cuando esté {entrega === "envio" ? "en camino" : "listo para retirar"}.
           </p>
+          {confirmado.sinPagoOnline && (
+            <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800">No pudimos abrir el pago online: lo pagás con Mercado Pago al retirar o recibir.</p>
+          )}
           <Button asChild variant="outline" className="h-11 w-full rounded-2xl">
             <a href={urlWhatsapp(datos.whatsapp!, confirmado.texto)} target="_blank" rel="noopener noreferrer">Avisarles también por WhatsApp</a>
           </Button>
@@ -408,7 +454,7 @@ function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, on
             <div className="grid grid-cols-3 gap-2">
               <Opcion activa={pago === "efectivo"} onClick={() => setPago("efectivo")}>Efectivo</Opcion>
               <Opcion activa={pago === "transferencia"} onClick={() => setPago("transferencia")}>Transferencia</Opcion>
-              <Opcion activa={pago === "mercadopago"} onClick={() => setPago("mercadopago")}>Mercado Pago</Opcion>
+              <Opcion activa={pago === "mercadopago"} onClick={() => setPago("mercadopago")}>{datos.pagoOnline ? "Pagar ahora con Mercado Pago" : "Mercado Pago"}</Opcion>
             </div>
           </Campo>
           <Campo etiqueta="Nota (opcional)">
@@ -418,7 +464,7 @@ function PanelPedido({ slug, datos, items, total, porId, onCambiar, onCerrar, on
 
         {errorEnvio && <p className="mt-4 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-700">{errorEnvio}</p>}
         <Button className="mt-5 h-12 w-full rounded-2xl text-base" disabled={enviando} onClick={() => void enviar()}>
-          {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Enviar pedido
+          {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {pago === "mercadopago" && datos.pagoOnline ? "Enviar y pagar" : "Enviar pedido"}
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">El comercio lo recibe al instante y te avisa por WhatsApp.</p>
       </div>

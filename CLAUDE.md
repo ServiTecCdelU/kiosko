@@ -71,7 +71,7 @@ con la URL de producción. Nunca apuntar esto al proyecto real.
   (`ALTER TABLE` / `CREATE TABLE`) ANTES de escribir el código que las usa. El usuario
   ejecuta el SQL primero y después se implementa el código.
 - El SQL nuevo va en `supabase/NN_descripcion.sql` con el siguiente número libre
-  (hoy la última es `73`), no destructivo y re-ejecutable cuando se pueda.
+  (hoy la última es `74`), no destructivo y re-ejecutable cuando se pueda.
 - Features grandes: spec en `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` antes de codear.
 - Lógica de plata nueva: test en `lib/**/*.test.ts` (y en `tests/db/` si toca una RPC).
 
@@ -154,7 +154,8 @@ Un solo commit y push cuando todo funcione o se terminen todos los cambios de un
   `lib/tienda.ts`, `/api/publico/tienda` y `/api/publico/tienda/pedido` (las únicas rutas públicas
   de datos del comercio: nunca costo
   ni stock exacto). Pedidos en `/pedidos` (tabla `pedidos`, migración 73) y se cobran con
-  `/pos?pedido=<id>`. Spec `2026-10-18-plan-tienda-design.md`.
+  `/pos?pedido=<id>`; pago online con MP del comercio (migración 74): un pedido pagado no se
+  cobra de nuevo, se entrega con `/api/pedidos/entregar`. Spec `2026-10-18-plan-tienda-design.md`.
 - Roles `admin` / `encargado` / `cajero`; visibilidad de pantallas en `lib/nav.ts`. Módulos por rubro
   (Producción, Presupuestos, Balanza) en `lib/modulos.ts`: el dueño los prende o apaga en
   `/mi-comercio` (`comercios.config.modulos`, le gana al rubro).

@@ -10,7 +10,9 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { productosDeTienda, slugValido, tiendaDeSlug } from "@/lib/server/tienda";
 import { crearLimitador, ipDe } from "@/lib/server/limite-intentos";
-import { armarItemsPedido, datosClienteValidos } from "@/lib/tienda";
+import { armarItemsPedido, datosClienteValidos, referenciaPagoPedido } from "@/lib/tienda";
+import { crearPreferenciaMP, urlAbsolutaApp } from "@/lib/server/mercadopago";
+import { tokenMPDeComercio } from "@/lib/server/mercadopago-credencial";
 import { precioLinea } from "@/lib/pricing";
 
 const porIp = crearLimitador(10, 60 * 60_000);
@@ -52,9 +54,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ya mandaste varios pedidos recién. Esperá unos minutos o escribile al comercio." }, { status: 429 });
     }
 
+    const pedidoId = `ped_${randomUUID()}`;
     const { data, error } = await supabaseAdmin.rpc("crear_pedido_tienda", {
       p_comercio_id: tienda.comercioId,
-      p_id: `ped_${randomUUID()}`,
+      p_id: pedidoId,
       p_cliente_nombre: datos.nombre,
       p_cliente_telefono: datos.telefono,
       p_entrega: datos.entrega,
@@ -66,7 +69,32 @@ export async function POST(req: Request) {
     });
     if (error) return NextResponse.json({ error: "No se pudo guardar el pedido. Probá de nuevo." }, { status: 500 });
     porIp.registrar(ip);
-    return NextResponse.json({ ok: true, numero: data.numero, total: armado.total, items: armado.items });
+
+    // Pago online (etapa 3): link de Mercado Pago por el total, a la cuenta del comercio.
+    // Si MP falla el pedido ya quedo guardado: se paga al retirar o recibir.
+    let pagoUrl: string | null = null;
+    if (datos.pago === "mercadopago" && tienda.pagoOnline) {
+      try {
+        const ref = referenciaPagoPedido(pedidoId);
+        const volver = (estado: string) => urlAbsolutaApp(`/tienda/${slug}?pedido=${data.numero}&pago=${estado}`);
+        const preferencia = await crearPreferenciaMP(await tokenMPDeComercio(tienda.comercioId), {
+          total: armado.total,
+          externalReference: ref,
+          descripcion: `Pedido N° ${data.numero} - ${tienda.nombre}`.slice(0, 120),
+          comercioId: tienda.comercioId,
+          volverA: { aprobado: volver("aprobado"), fallido: volver("fallido"), pendiente: volver("pendiente") },
+        });
+        await supabaseAdmin
+          .from("pedidos")
+          .update({ pago_estado: "pendiente", pago_ref: ref, updated_at: new Date().toISOString() })
+          .eq("comercio_id", tienda.comercioId)
+          .eq("id", pedidoId);
+        pagoUrl = preferencia.initPoint;
+      } catch (e) {
+        console.error("[tienda] link de pago:", e instanceof Error ? e.message : e);
+      }
+    }
+    return NextResponse.json({ ok: true, numero: data.numero, total: armado.total, items: armado.items, pagoUrl });
   } catch {
     return NextResponse.json({ error: "No se pudo guardar el pedido. Probá de nuevo." }, { status: 500 });
   }

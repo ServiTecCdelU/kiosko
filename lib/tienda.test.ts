@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   armarItemsPedido, configTiendaValida, datosClienteValidos, mensajeEstadoPedido, mensajePedido, numeroWhatsapp,
-  puedePasarA, totalPedido, urlWhatsapp,
+  estadoPagoDeMP, pagoCubrePedido, pedidoDeReferencia, puedePasarA, referenciaPagoPedido, totalPedido, urlWhatsapp,
 } from "./tienda.ts";
 import { precioLinea } from "./pricing.ts";
 
@@ -101,5 +101,27 @@ describe("pedidos (etapa 2)", () => {
     assert.equal(puedePasarA("entregado", "cancelado"), false);
     assert.equal(puedePasarA("listo", "preparando"), false);
     assert.equal(mensajeEstadoPedido("listo", 7, "Don Tito", "retiro", "Juan Pérez"), "Hola Juan! Te escribimos de Don Tito. Tu pedido N° 7 está listo para retirar.");
+  });
+});
+
+describe("pago online (etapa 3)", () => {
+  test("referencia del pago: ida y vuelta, y no confunde los cobros de la caja", () => {
+    assert.equal(referenciaPagoPedido("ped_123"), "pedido:ped_123");
+    assert.equal(pedidoDeReferencia("pedido:ped_123"), "ped_123");
+    assert.equal(pedidoDeReferencia("3f2c9a1e-uuid-del-qr"), null);
+    assert.equal(pedidoDeReferencia("pedido:"), null);
+    assert.equal(pedidoDeReferencia(null), null);
+  });
+  test("estados de Mercado Pago", () => {
+    assert.equal(estadoPagoDeMP("approved"), "aprobado");
+    assert.equal(estadoPagoDeMP("rejected"), "rechazado");
+    assert.equal(estadoPagoDeMP("cancelled"), "rechazado");
+    assert.equal(estadoPagoDeMP("in_process"), "pendiente");
+    assert.equal(estadoPagoDeMP("refunded"), null);
+  });
+  test("lo pagado cubre el pedido", () => {
+    assert.equal(pagoCubrePedido(3300, 3300), true);
+    assert.equal(pagoCubrePedido(3299.99, 3300), false);
+    assert.equal(pagoCubrePedido(NaN, 3300), false);
   });
 });

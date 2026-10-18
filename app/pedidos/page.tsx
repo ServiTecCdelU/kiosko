@@ -19,7 +19,7 @@ import { planIncluyeTienda } from "@/lib/suscripcion";
 import {
   ESTADO_PEDIDO_LABEL, mensajeEstadoPedido, puedePasarA, urlWhatsapp, type EstadoPedido,
 } from "@/lib/tienda";
-import { cambiarEstadoPedido, listarPedidos, type Pedido } from "@/services/pedidos-service";
+import { cambiarEstadoPedido, entregarPedidoPagado, listarPedidos, type Pedido } from "@/services/pedidos-service";
 
 const CADA_MS = 20_000;
 
@@ -96,6 +96,19 @@ export default function PedidosPage() {
     return () => clearInterval(t);
   }, [cargar]);
 
+  const entregar = async (p: Pedido) => {
+    setOcupado(p.id);
+    try {
+      const r = await entregarPedidoPagado(p.id);
+      toast.success(`Pedido N° ${p.numero} entregado`, { description: `Venta N° ${r.saleNumber} por ${formatCurrency(r.total)} (Mercado Pago)` });
+      await cargar(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo registrar la entrega");
+    } finally {
+      setOcupado(null);
+    }
+  };
+
   const cambiar = async (p: Pedido, estado: EstadoPedido) => {
     setOcupado(p.id);
     try {
@@ -155,6 +168,7 @@ export default function PedidosPage() {
               comercio={user?.comercioNombre ?? "el comercio"}
               ocupado={ocupado === p.id}
               onCambiar={(e) => void cambiar(p, e)}
+              onEntregar={() => void entregar(p)}
             />
           ))}
         </div>
@@ -163,12 +177,14 @@ export default function PedidosPage() {
   );
 }
 
-function TarjetaPedido({ p, comercio, ocupado, onCambiar }: {
+function TarjetaPedido({ p, comercio, ocupado, onCambiar, onEntregar }: {
   p: Pedido;
   comercio: string;
   ocupado: boolean;
   onCambiar: (e: EstadoPedido) => void;
+  onEntregar: () => void;
 }) {
+  const pagado = p.pagoEstado === "aprobado";
   const aviso = mensajeEstadoPedido(p.estado, p.numero, comercio, p.entrega, p.clienteNombre);
   const hayPesables = p.items.some((i) => i.unidad !== "un");
   const activo = p.estado !== "entregado" && p.estado !== "cancelado";
@@ -180,14 +196,21 @@ function TarjetaPedido({ p, comercio, ocupado, onCambiar }: {
           <p className="text-lg font-bold">Pedido N° {p.numero}</p>
           <p className="text-xs text-muted-foreground">{haceCuanto(p.createdAt)}</p>
         </div>
-        <Badge variant="outline" className={ESTADO_CLASE[p.estado]}>{ESTADO_PEDIDO_LABEL[p.estado]}</Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant="outline" className={ESTADO_CLASE[p.estado]}>{ESTADO_PEDIDO_LABEL[p.estado]}</Badge>
+          {pagado && (
+            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Pagado online {formatCurrency(p.pagoMonto ?? p.total)}</Badge>
+          )}
+          {p.pagoEstado === "pendiente" && <Badge variant="outline" className="border-amber-500 text-amber-700">Esperando el pago</Badge>}
+          {p.pagoEstado === "rechazado" && <Badge variant="outline" className="border-red-500 text-red-600">Pago rechazado</Badge>}
+        </div>
       </div>
 
       <div className="space-y-1 text-sm">
         <p className="font-medium">{p.clienteNombre}</p>
         <p className="flex items-center gap-1.5 text-muted-foreground">
           {p.entrega === "envio" ? <Bike className="h-3.5 w-3.5" /> : <Store className="h-3.5 w-3.5" />}
-          {p.entrega === "envio" ? `Envío a ${p.direccion}` : "Retira en el local"} · Paga con {PAGO_LABEL[p.pago].toLowerCase()}
+          {p.entrega === "envio" ? `Envío a ${p.direccion}` : "Retira en el local"} · {pagado ? "Ya pagó con Mercado Pago" : `Paga con ${PAGO_LABEL[p.pago].toLowerCase()}`}
         </p>
         {p.nota && <p className="rounded-xl bg-muted px-3 py-1.5 text-xs">Nota: {p.nota}</p>}
       </div>
@@ -200,13 +223,19 @@ function TarjetaPedido({ p, comercio, ocupado, onCambiar }: {
           </li>
         ))}
         <li className="flex justify-between border-t pt-1 font-semibold">
-          <span>Total{hayPesables ? " aprox." : ""}</span>
+          <span>Total{hayPesables && !pagado ? " aprox." : ""}</span>
           <span>{formatCurrency(p.total)}</span>
         </li>
       </ul>
 
       <div className="flex flex-wrap gap-2">
-        {activo && (
+        {activo && pagado && (
+          <Button size="sm" className="rounded-xl bg-emerald-600 hover:bg-emerald-700" disabled={ocupado} onClick={onEntregar}
+            title="Registra la venta al precio pagado online, sin volver a cobrar">
+            <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Entregar (ya pagó)
+          </Button>
+        )}
+        {activo && !pagado && (
           <Button asChild size="sm" className="rounded-xl">
             <Link href={`/pos?pedido=${encodeURIComponent(p.id)}`}><ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Pasar a venta</Link>
           </Button>
@@ -219,7 +248,7 @@ function TarjetaPedido({ p, comercio, ocupado, onCambiar }: {
             {p.entrega === "envio" ? "Listo para enviar" : "Listo para retirar"}
           </Button>
         )}
-        {p.estado === "listo" && (
+        {p.estado === "listo" && !pagado && (
           <Button size="sm" variant="outline" className="rounded-xl" disabled={ocupado} onClick={() => onCambiar("entregado")}
             title="Si lo cobraste por fuera de la caja">
             Entregado sin cobrar acá
@@ -234,7 +263,12 @@ function TarjetaPedido({ p, comercio, ocupado, onCambiar }: {
         )}
         {activo && (
           <Button size="sm" variant="ghost" className="rounded-xl text-muted-foreground" disabled={ocupado}
-            onClick={() => { if (window.confirm(`¿Cancelar el pedido N° ${p.numero}?`)) onCambiar("cancelado"); }}>
+            onClick={() => {
+              const aviso = pagado
+                ? `¿Cancelar el pedido N° ${p.numero}? Ya lo pagó online: devolvele ${formatCurrency(p.pagoMonto ?? p.total)} desde tu Mercado Pago (Actividad → el pago → Devolver).`
+                : `¿Cancelar el pedido N° ${p.numero}?`;
+              if (window.confirm(aviso)) onCambiar("cancelado");
+            }}>
             Cancelar
           </Button>
         )}

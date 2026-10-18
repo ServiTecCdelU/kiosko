@@ -20,6 +20,9 @@ export interface Pedido {
   estado: EstadoPedido;
   ventaId: string | null;
   createdAt: string;
+  /** Pago online (74_pedidos_pago_online.sql): null = paga al retirar o recibir. */
+  pagoEstado: "pendiente" | "aprobado" | "rechazado" | null;
+  pagoMonto: number | null;
 }
 
 function mapPedido(d: Record<string, any>): Pedido {
@@ -37,6 +40,8 @@ function mapPedido(d: Record<string, any>): Pedido {
     estado: d.estado,
     ventaId: d.venta_id ?? null,
     createdAt: String(d.created_at),
+    pagoEstado: d.pago_estado ?? null,
+    pagoMonto: d.pago_monto != null ? Number(d.pago_monto) : null,
   };
 }
 
@@ -66,6 +71,18 @@ export async function cambiarEstadoPedido(id: string, estado: EstadoPedido): Pro
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error ?? "No se pudo cambiar el pedido");
+}
+
+/** Entrega de un pedido pagado online: registra la venta al precio pagado (app/api/pedidos/entregar). */
+export async function entregarPedidoPagado(id: string): Promise<{ saleNumber: string; total: number }> {
+  const res = await fetch(apiUrl("/api/pedidos/entregar"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar la entrega");
+  return { saleNumber: data.saleNumber, total: Number(data.total) || 0 };
 }
 
 /**

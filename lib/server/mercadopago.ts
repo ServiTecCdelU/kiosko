@@ -13,6 +13,11 @@ function getAppUrl(): string {
   return absoluta.replace(/\/$/, "");
 }
 
+/** URL absoluta de una pagina de la app (ej. la vuelta de Mercado Pago a la tienda). */
+export function urlAbsolutaApp(path: string): string {
+  return `${getAppUrl()}${path}`;
+}
+
 /** URL del webhook. Lleva el comercio para saber con que token consultar el pago. */
 export function urlWebhookMP(comercioId: string): string {
   return `${getAppUrl()}/api/mercadopago/webhook?comercio=${encodeURIComponent(comercioId)}`;
@@ -44,6 +49,8 @@ export interface CrearPreferenciaInput {
   externalReference: string;
   descripcion: string;
   comercioId: string;
+  /** Adonde vuelve el comprador (absoluta). Sin esto, al POS (cobro con QR). */
+  volverA?: { aprobado: string; fallido: string; pendiente: string };
 }
 
 export interface PreferenciaMP {
@@ -72,11 +79,9 @@ export async function crearPreferenciaMP(token: string, input: CrearPreferenciaI
       ],
       external_reference: input.externalReference,
       notification_url: urlWebhookMP(input.comercioId),
-      back_urls: {
-        success: `${appUrl}/pos`,
-        failure: `${appUrl}/pos`,
-        pending: `${appUrl}/pos`,
-      },
+      back_urls: input.volverA
+        ? { success: input.volverA.aprobado, failure: input.volverA.fallido, pending: input.volverA.pendiente }
+        : { success: `${appUrl}/pos`, failure: `${appUrl}/pos`, pending: `${appUrl}/pos` },
       auto_return: "approved",
     }),
   });
@@ -91,6 +96,8 @@ export interface PagoMP {
   id: string;
   status: string;
   externalReference: string | null;
+  /** Monto cobrado (transaction_amount). */
+  monto: number;
 }
 
 export async function getPagoMP(token: string, paymentId: string): Promise<PagoMP> {
@@ -99,7 +106,10 @@ export async function getPagoMP(token: string, paymentId: string): Promise<PagoM
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message ?? "No se pudo consultar el pago en Mercado Pago");
-  return { id: String(data.id), status: data.status, externalReference: data.external_reference ?? null };
+  return {
+    id: String(data.id), status: data.status, externalReference: data.external_reference ?? null,
+    monto: Number(data.transaction_amount) || 0,
+  };
 }
 
 // ============================================================
