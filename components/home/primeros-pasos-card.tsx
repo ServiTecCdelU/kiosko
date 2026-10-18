@@ -20,7 +20,8 @@ interface Pasos {
 // opcional: no cuenta para el progreso ni para dar la guia por terminada (quien
 // atiende solo nunca suma cajeros y la tarjeta quedaba en "2 de 3" para siempre).
 const PASOS: { id: keyof Pasos; titulo: string; detalle: string; href: string; accion: string; opcional?: boolean }[] = [
-  { id: "productos", titulo: "Cargá tus productos", detalle: "Importalos desde Excel o cargalos a mano.", href: "/stock", accion: "Ir a Stock" },
+  // ?tipicos=1 abre los productos tipicos del rubro del alta (lib/rubros-perfil.ts).
+  { id: "productos", titulo: "Cargá tus productos", detalle: "Empezá con los típicos de tu rubro, ya configurados, o importá tu lista de Excel.", href: "/stock?tipicos=1", accion: "Empezar" },
   { id: "venta", titulo: "Hacé tu primera venta", detalle: "Abrí la caja y cobrá desde el Punto de Venta.", href: "/pos", accion: "Vender" },
   { id: "cajeros", titulo: "Sumá a tus cajeros", detalle: "Crealos con su PIN y registrá la PC de la caja: ahí entran con “Soy empleado”.", href: "/usuarios", accion: "Empleados", opcional: true },
   { id: "mercadoPago", titulo: "Conectá Mercado Pago", detalle: "Cobrá con QR y lector Point (está en Facturación).", href: "/facturacion#mercado-pago", accion: "Conectar" },

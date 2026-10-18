@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
   Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, ChevronDown, Megaphone,
-  CalendarClock, ClipboardCheck,
+  CalendarClock, ClipboardCheck, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import type { MotivoMerma } from "@/lib/perdidas";
@@ -28,6 +28,7 @@ import { ImportDialog } from "@/components/stock/import-dialog";
 import { EditarProductoDialog } from "@/components/stock/editar-producto-dialog";
 import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { AumentoPreciosDialog } from "@/components/stock/aumento-precios-dialog";
+import { ProductosTipicosDialog } from "@/components/stock/productos-tipicos-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
 import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
@@ -69,6 +70,14 @@ export default function StockPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [aumentoOpen, setAumentoOpen] = useState(false);
+  const [tipicosOpen, setTipicosOpen] = useState(false);
+
+  // Primeros pasos -> "Cargar los típicos" abre /stock?tipicos=1.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tipicos") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setTipicosOpen(true);
+  }, []);
   const [cambiosPrecio, setCambiosPrecio] = useState<CambioPrecioReciente[]>([]);
   const [seleccionadosPrecio, setSeleccionadosPrecio] = useState<Set<string>>(new Set());
   const [precioAbierto, setPrecioAbierto] = useState(false);
@@ -427,6 +436,9 @@ export default function StockPage() {
         <Button variant="outline" className="rounded-2xl" asChild>
           <Link href="/stock/inventario"><ClipboardCheck className="mr-2 h-4 w-4" /> Recuento</Link>
         </Button>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setTipicosOpen(true)} title="Productos típicos de tu rubro, ya configurados">
+          <Sparkles className="mr-2 h-4 w-4" /> Típicos
+        </Button>
         <Button variant="outline" className="rounded-2xl" onClick={() => setAumentoOpen(true)}>
           <TrendingUp className="mr-2 h-4 w-4" /> Aumentar precios
         </Button>
@@ -488,6 +500,9 @@ export default function StockPage() {
               <div className="flex flex-wrap justify-center gap-2">
                 <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
                   <Upload className="mr-2 h-4 w-4" /> Importar mi lista
+                </Button>
+                <Button variant="outline" className="rounded-2xl" onClick={() => setTipicosOpen(true)}>
+                  <Sparkles className="mr-2 h-4 w-4" /> Productos típicos de mi rubro
                 </Button>
                 <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
                   <PackagePlus className="mr-2 h-4 w-4" /> Cargar uno
@@ -688,6 +703,7 @@ export default function StockPage() {
         onCreated={() => refreshAll()}
       />
       <AumentoPreciosDialog open={aumentoOpen} onOpenChange={setAumentoOpen} onAplicado={() => refreshAll()} />
+      <ProductosTipicosDialog open={tipicosOpen} onOpenChange={setTipicosOpen} onCreados={() => refreshAll()} />
       <EtiquetasPrint productos={productosEtiqueta} />
       {impresion}
     </AppShell>

@@ -70,10 +70,12 @@ export async function errorPinRepetido(comercioId: string, pin: string | null | 
 }
 
 /** Slug (el panel vive en /<slug>) y nombre del comercio (menu y panel). */
-export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string }> {
-  const { data } = await supabaseAdmin.from("comercios").select("slug, nombre, plan").eq("id", comercioId).maybeSingle();
+export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string; rubro?: string }> {
+  const { data } = await supabaseAdmin.from("comercios").select("slug, nombre, plan, config").eq("id", comercioId).maybeSingle();
   // El plan viaja al navegador para mostrar los avisos de "plan Pro" (el servidor igual lo valida).
-  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined };
+  // El rubro del alta, para sugerir productos tipicos y la unidad (lib/rubros-perfil.ts).
+  const rubro = typeof data?.config?.rubro === "string" ? data.config.rubro : undefined;
+  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined, rubro };
 }
 
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */

@@ -15,6 +15,8 @@ import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
 import { lookupNombrePorCodigoBarras } from "@/lib/barcode-lookup";
 import { createProduct, findProductByCode, type CreateProductInput } from "@/services/products-service";
 import { UNIDADES, esFraccionable, simboloUnidad, type Unidad } from "@/lib/unidades";
+import { perfilDeRubro } from "@/lib/rubros-perfil";
+import { getCurrentUser } from "@/hooks/use-auth";
 
 interface NuevoProductoDialogProps {
   open: boolean;
@@ -34,11 +36,13 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const [lote, setLote] = useState("");
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
-  const [unidad, setUnidad] = useState<Unidad>("un");
+  // El rubro del alta sugiere la unidad (pan y verdura por kg) y los rubros habituales.
+  const perfil = perfilDeRubro(getCurrentUser()?.rubro);
+  const [unidad, setUnidad] = useState<Unidad>(perfil.unidad);
   // kg, m y l: precio y stock por esa unidad, con decimales y sin "unidades por bulto".
   const porKg = esFraccionable(unidad);
   const simbolo = simboloUnidad(unidad);
-  const [stockControlado, setStockControlado] = useState(true);
+  const [stockControlado, setStockControlado] = useState(perfil.controlaStock);
   const [precioLibre, setPrecioLibre] = useState(false);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
@@ -67,8 +71,8 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setLote("");
     setFavorito(false);
     setFechaVencimiento("");
-    setUnidad("un");
-    setStockControlado(true);
+    setUnidad(perfil.unidad);
+    setStockControlado(perfil.controlaStock);
     setPrecioLibre(false);
     setIva(IVA_DEFAULT);
   }, [open]);
@@ -187,8 +191,12 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             <Label className="mb-1 block text-xs">Rubro / Subrubro</Label>
             <Input
               value={category} onChange={(e) => setCategory(e.target.value)}
-              placeholder="Ej: Almacén / Galletitas" className="rounded-xl"
+              placeholder={`Ej: ${perfil.categorias[0] ?? "Almacén / Galletitas"}`} className="rounded-xl"
+              list="rubros-sugeridos"
             />
+            <datalist id="rubros-sugeridos">
+              {perfil.categorias.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </div>
 
           {/* Va antes que precio y stock: los rotulos cambian si se vende por kg, metro o litro. */}
