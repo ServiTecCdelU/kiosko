@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { ALICUOTAS_IVA, IVA_DEFAULT } from "@/lib/iva";
 import { lookupNombrePorCodigoBarras } from "@/lib/barcode-lookup";
-import { createProduct, findProductByCode, type CreateProductInput } from "@/services/products-service";
+import { createProduct, findProductByCode, sugerenciaPorCodigo, usarFotoExterna, type CreateProductInput } from "@/services/products-service";
 import { UNIDADES, esFraccionable, simboloUnidad, type Unidad } from "@/lib/unidades";
 import { perfilDeRubro } from "@/lib/rubros-perfil";
 import { getCurrentUser } from "@/hooks/use-auth";
@@ -22,9 +22,13 @@ interface NuevoProductoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  /** Codigo leido con el lector en Stock: se precarga y se busca nombre y foto. */
+  codigoBarrasInicial?: string;
 }
 
-export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProductoDialogProps) {
+export function NuevoProductoDialog({ open, onOpenChange, onCreated, codigoBarrasInicial }: NuevoProductoDialogProps) {
+  // Foto de Open Food Facts para el codigo: se copia al producto al guardarlo.
+  const [fotoSugerida, setFotoSugerida] = useState<string | null>(null);
   const [codigo, setCodigo] = useState("");
   const [codigoBarras, setCodigoBarras] = useState("");
   const [name, setName] = useState("");
@@ -61,8 +65,9 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setYaExiste(null);
     setBuscandoNombre(false);
     setCodigoBuscado("");
+    setFotoSugerida(null);
     setCodigo("");
-    setCodigoBarras("");
+    setCodigoBarras(codigoBarrasInicial ?? "");
     setName("");
     setCategory("");
     setPrice("");
@@ -77,6 +82,8 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
     setPrecioLibre(false);
     setElaboracionPropia(false);
     setIva(IVA_DEFAULT);
+    if (codigoBarrasInicial) void buscarCodigo(codigoBarrasInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const priceNum = Number(price) || 0;
@@ -84,17 +91,20 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const margenPct = costoNum && priceNum > 0 ? ((priceNum - costoNum) / priceNum) * 100 : undefined;
   const nombreInvalido = !name.trim();
 
-  const buscarCodigo = async () => {
-    const c = codigoBarras.trim();
+  const buscarCodigo = async (codigoDirecto?: string) => {
+    const c = (codigoDirecto ?? codigoBarras).trim();
     if (!c || c === codigoBuscado) return;
     setCodigoBuscado(c);
     setYaExiste(null);
+    setFotoSugerida(null);
     const existente = await findProductByCode(c).catch(() => null);
     if (existente) {
       setYaExiste(existente.name);
       return;
     }
-    if (name.trim()) return;
+    // La foto se busca aparte (en el servidor) y no frena la sugerencia del nombre.
+    void sugerenciaPorCodigo(c).then((s) => setFotoSugerida(s?.foto ?? null)).catch(() => {});
+    if (!codigoDirecto && name.trim()) return;
     setBuscandoNombre(true);
     const sugerido = await lookupNombrePorCodigoBarras(c).finally(() => setBuscandoNombre(false));
     // Si mientras tanto escribio un nombre, no se le pisa.
@@ -126,8 +136,12 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
         // (salvo precio libre: el importe se pone al vender).
         revisar: priceNum <= 0 && !precioLibre,
       };
-      await createProduct(input);
+      const id = await createProduct(input);
       toast.success(`${input.name} guardado`);
+      if (fotoSugerida) {
+        // No frena el alta: si falla, el producto queda sin foto.
+        void usarFotoExterna(id, fotoSugerida).then(onCreated).catch(() => toast.warning("No se pudo guardar la foto: cargala desde Editar"));
+      }
       onOpenChange(false);
       onCreated();
     } catch (e) {
@@ -155,7 +169,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
               <Input
                 value={codigoBarras}
                 onChange={(e) => setCodigoBarras(e.target.value)}
-                onBlur={buscarCodigo}
+                onBlur={() => void buscarCodigo()}
                 // El lector manda Enter al final del codigo.
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -183,6 +197,14 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
               placeholder="Nombre del producto"
               className="rounded-xl"
             />
+            {fotoSugerida && !yaExiste && (
+              <div className="mt-2 flex items-center gap-2 rounded-xl bg-muted/60 p-2 text-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={fotoSugerida} alt="" className="h-10 w-10 rounded-lg border bg-white object-contain" />
+                <span className="flex-1">Encontramos una foto: se agrega al guardar.</span>
+                <button type="button" className="font-medium text-muted-foreground hover:text-foreground" onClick={() => setFotoSugerida(null)}>No usar</button>
+              </div>
+            )}
             {yaExiste && (
               <p className="mt-1 text-xs text-warning">Ya tenés un producto con ese código: “{yaExiste}”. Buscalo en la lista para editarlo.</p>
             )}

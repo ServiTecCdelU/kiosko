@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Search, AlertTriangle, ChevronLeft, ChevronRight, Tag, Upload, Pencil,
   Package, PackageX, ClipboardList, Layers, PackagePlus, Printer, X, TrendingUp, TrendingDown, Scale, Image as ImageIcon, ChevronDown, Megaphone,
-  CalendarClock, ClipboardCheck, Sparkles,
+  CalendarClock, ClipboardCheck, Sparkles, ScanBarcode, Camera, Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import type { MotivoMerma } from "@/lib/perdidas";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
-  getCambiosPrecioRecientes, getVencimientosProximos,
+  getCambiosPrecioRecientes, getVencimientosProximos, findProductByCode,
   type SetOfertaInput, type StockStats, type UpdateProductInput, type CambioPrecioReciente,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -30,6 +30,8 @@ import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
 import { AumentoPreciosDialog } from "@/components/stock/aumento-precios-dialog";
 import { QendraDialog } from "@/components/stock/qendra-dialog";
 import { FotosAutomaticasDialog } from "@/components/stock/fotos-automaticas-dialog";
+import { SumarStockDialog } from "@/components/stock/sumar-stock-dialog";
+import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
 import { ProductosTipicosDialog } from "@/components/stock/productos-tipicos-dialog";
 import { EtiquetasPrint } from "@/components/stock/etiquetas-print";
 import { conCartel, imprimirA4 } from "@/components/stock/impresion-ofertas";
@@ -74,6 +76,13 @@ export default function StockPage() {
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  // Carga con el lector: producto que existe -> sumar stock; codigo nuevo -> alta.
+  const [lectura, setLectura] = useState("");
+  const [buscandoLectura, setBuscandoLectura] = useState(false);
+  const [aSumar, setASumar] = useState<Product | null>(null);
+  const [codigoNuevo, setCodigoNuevo] = useState("");
+  const [camaraOpen, setCamaraOpen] = useState(false);
+  const lecturaRef = useRef<HTMLInputElement>(null);
   const [aumentoOpen, setAumentoOpen] = useState(false);
   const [qendraOpen, setQendraOpen] = useState(false);
   const [fotosOpen, setFotosOpen] = useState(false);
@@ -241,6 +250,30 @@ export default function StockPage() {
       toast.error(e instanceof Error ? e.message : "Error al ajustar");
     }
   };
+
+  const procesarCodigo = async (codigo: string) => {
+    const c = codigo.trim();
+    if (!c) return;
+    setBuscandoLectura(true);
+    try {
+      const p = await findProductByCode(c);
+      setLectura("");
+      if (p) {
+        setNuevoOpen(false);
+        setASumar(p);
+      } else {
+        setASumar(null);
+        setCodigoNuevo(c);
+        setNuevoOpen(true);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo buscar el código");
+    } finally {
+      setBuscandoLectura(false);
+    }
+  };
+
+  const volverAlLector = () => setTimeout(() => lecturaRef.current?.focus(), 100);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -419,6 +452,30 @@ export default function StockPage() {
         </div>
       )}
 
+      <div className="mb-4 flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/5 p-2">
+        <div className="relative flex-1">
+          {buscandoLectura ? (
+            <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+          ) : (
+            <ScanBarcode className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+          )}
+          <Input
+            ref={lecturaRef}
+            value={lectura}
+            onChange={(e) => setLectura(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); void procesarCodigo(lectura); }
+            }}
+            placeholder="Cargar mercadería: pasá el lector por el código de barras"
+            className="rounded-xl border-0 bg-card pl-10 shadow-none"
+            inputMode="numeric"
+          />
+        </div>
+        <Button variant="outline" className="rounded-xl" onClick={() => setCamaraOpen(true)} title="Leer el código con la cámara">
+          <Camera className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Cámara</span>
+        </Button>
+      </div>
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -457,7 +514,7 @@ export default function StockPage() {
             <Scale className="mr-2 h-4 w-4" /> Balanza
           </Button>
         )}
-        <Button variant="outline" className="rounded-2xl" onClick={() => setNuevoOpen(true)}>
+        <Button variant="outline" className="rounded-2xl" onClick={() => { setCodigoNuevo(""); setNuevoOpen(true); }}>
           <PackagePlus className="mr-2 h-4 w-4" /> Nuevo producto
         </Button>
         <Button className="rounded-2xl" onClick={() => setImportOpen(true)}>
@@ -721,8 +778,20 @@ export default function StockPage() {
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={refreshAll} stockVacio={stats?.total === 0} />
       <NuevoProductoDialog
         open={nuevoOpen}
-        onOpenChange={setNuevoOpen}
+        onOpenChange={(o) => { setNuevoOpen(o); if (!o && codigoNuevo) volverAlLector(); }}
         onCreated={() => refreshAll()}
+        codigoBarrasInicial={codigoNuevo || undefined}
+      />
+      <SumarStockDialog
+        producto={aSumar}
+        onOpenChange={(o) => { if (!o) { setASumar(null); volverAlLector(); } }}
+        onSumado={() => refreshAll()}
+        onOtroCodigo={(c) => { setASumar(null); void procesarCodigo(c); }}
+      />
+      <BarcodeScannerDialog
+        open={camaraOpen}
+        onOpenChange={setCamaraOpen}
+        onDetected={(c) => { setCamaraOpen(false); void procesarCodigo(c); }}
       />
       <AumentoPreciosDialog open={aumentoOpen} onOpenChange={setAumentoOpen} onAplicado={() => refreshAll()} />
       <FotosAutomaticasDialog open={fotosOpen} onOpenChange={setFotosOpen} onCambio={() => refreshAll()} />

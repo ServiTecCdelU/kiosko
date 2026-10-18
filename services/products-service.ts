@@ -443,3 +443,21 @@ export async function buscarFotosAutomaticas(desde: number): Promise<{ revisados
   if (!res.ok) throw new Error(data?.error ?? "No se pudieron buscar las fotos");
   return data;
 }
+
+/** Nombre y foto sugeridos para un codigo de barras (Open Food Facts), o null. */
+export async function sugerenciaPorCodigo(ean: string): Promise<{ nombre: string | null; foto: string | null } | null> {
+  const res = await fetch(apiUrl(`/api/productos/foto/externa?ean=${encodeURIComponent(ean)}`));
+  const data = await res.json().catch(() => null);
+  return res.ok ? data?.producto ?? null : null;
+}
+
+/** Copia una foto de Open Food Facts al producto (alta con el lector). */
+export async function usarFotoExterna(productoId: string, url: string): Promise<void> {
+  const res = await fetch(apiUrl("/api/productos/foto/externa"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productoId, url }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "No se pudo guardar la foto");
+}

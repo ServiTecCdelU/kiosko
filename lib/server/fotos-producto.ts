@@ -5,6 +5,7 @@
 // El prefijo "off-" sirve para mostrar la atribucion en la tienda (licencia CC BY-SA).
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { nombreSugerido } from "@/lib/escaneo-stock";
 
 export const BUCKET_FOTOS = "productos";
 export const MAX_BYTES_FOTO = 2 * 1024 * 1024;
@@ -111,4 +112,20 @@ export async function descargarFotoOpenFoodFacts(url: string): Promise<{ bytes: 
   if (!esTipoFotoValido(mime)) return null;
   const bytes = new Uint8Array(await res.arrayBuffer());
   return bytes.byteLength > 0 && bytes.byteLength <= MAX_BYTES_FOTO ? { bytes, mime } : null;
+}
+
+/** Nombre sugerido y foto de un codigo de barras en Open Food Facts (para el alta). */
+export async function productoOpenFoodFacts(ean: string): Promise<{ nombre: string | null; foto: string | null } | null> {
+  if (!/^\d{8,14}$/.test(ean)) return null;
+  const res = await fetch(`${OFF_API}/${ean}.json?fields=product_name,product_name_es,brands,quantity,image_front_url`, {
+    headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  const p = data?.product;
+  if (!p) return null;
+  const nombre = nombreSugerido({ product_name: p.product_name_es || p.product_name, brands: p.brands, quantity: p.quantity });
+  const foto = typeof p.image_front_url === "string" && p.image_front_url.startsWith("https://") ? p.image_front_url : null;
+  return nombre || foto ? { nombre, foto } : null;
 }
