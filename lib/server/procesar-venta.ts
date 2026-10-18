@@ -3,6 +3,8 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { precioLinea } from "@/lib/pricing";
 import { ERROR_SIN_CAJA, errorCantidad, errorDescuento, errorPrecioLibre } from "@/lib/venta-validacion";
+import { estaVigente, preciosPresupuestados, subtotalConPresupuesto } from "@/lib/presupuesto";
+import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 
 export interface ProcesarVentaInput {
   items: { productId: string; name?: string; quantity: number; price?: number }[];
@@ -22,6 +24,8 @@ export interface ProcesarVentaInput {
   recargoPct?: number | null;
   /** Mixto: monto (sin recargo) de la parte que va por Credito, para aplicarle el recargo solo a esa porcion. */
   creditoMonto?: number | null;
+  /** Venta que sale de un presupuesto: si sigue vigente se respetan sus precios. */
+  presupuestoId?: string | null;
   /** Mixto: monto (con recargo) que se paso por el posnet, debito y/o credito. Para separar tarjeta en el arqueo. */
   tarjetaMonto?: number | null;
 }
@@ -73,17 +77,32 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
       .eq("id", data.id);
     if (errorTarjeta) console.error("[ventas] tarjeta_amount:", errorTarjeta.message);
   }
+  // El presupuesto queda vendido (solo si seguia vigente: no revive uno anulado).
+  if (input.presupuestoId) {
+    const { error: errorPresu } = await supabaseAdmin
+      .from("presupuestos")
+      .update({ estado: "vendido", venta_id: data.id, updated_at: new Date().toISOString() })
+      .eq("comercio_id", input.comercioId)
+      .eq("id", input.presupuestoId)
+      .eq("estado", "vigente");
+    if (errorPresu) console.error("[ventas] presupuesto vendido:", errorPresu.message);
+  }
   return { id: data.id, saleNumber: data.sale_number, total: data.total };
 }
 
-/** Precios, totales y recargos autoritativos; tira error si la venta no es valida. */
-async function prepararVenta(input: ProcesarVentaInput) {
-  const rawItems = input.items;
+/**
+ * Lineas con precio autoritativo (de la base, ofertas, precio libre). La usan la
+ * venta y el presupuesto. Con `presupuestados` (presupuesto vigente) cada producto
+ * presupuestado se cobra al menor entre hoy y lo prometido (lib/presupuesto.ts).
+ */
+export async function calcularLineas(
+  comercioId: string,
+  rawItems: ProcesarVentaInput["items"],
+  presupuestados?: Map<string, number>,
+): Promise<{ productId: string; name: string; quantity: number; price: number; subtotal: number; unidad: string }[]> {
   if (rawItems.length === 0) {
     throw new Error("El carrito esta vacio");
   }
-
-  const comercioId = input.comercioId;
   const ids = rawItems.map((i) => String(i.productId)).filter(Boolean);
   const { data: prods, error: prodErr } = await supabaseAdmin
     .from("productos")
@@ -95,7 +114,7 @@ async function prepararVenta(input: ProcesarVentaInput) {
   if (prodErr) throw new Error(prodErr.message);
   const byId = new Map((prods ?? []).map((p: any) => [p.id, p]));
 
-  const items = rawItems.map((i) => {
+  return rawItems.map((i) => {
     const id = String(i.productId);
     const db = byId.get(id);
     if (!db) throw new Error(`${String(i.name ?? "Un producto")} ya no existe en el catalogo`);
@@ -124,11 +143,36 @@ async function prepararVenta(input: ProcesarVentaInput) {
         quantity,
       );
     }
+    if (presupuestados && db.precio_libre !== true) {
+      subtotal = subtotalConPresupuesto(subtotal, presupuestados.get(id), quantity);
+    }
     const name = db.name;
     // Precio unitario informativo (el total sale de subtotal): a centavos, sin 1349.9999.
     const price = round2(subtotal / quantity);
-    return { productId: id, name, quantity, price, subtotal };
+    return { productId: id, name, quantity, price, subtotal, unidad: String(db.unidad ?? "un") };
   });
+}
+
+/** Precios del presupuesto si es del comercio y sigue vigente; si no, undefined (precio de hoy). */
+async function preciosDelPresupuesto(comercioId: string, presupuestoId: string | null | undefined) {
+  if (!presupuestoId) return undefined;
+  const { data } = await supabaseAdmin
+    .from("presupuestos")
+    .select("estado,vence,items")
+    .eq("comercio_id", comercioId)
+    .eq("id", presupuestoId)
+    .maybeSingle();
+  if (!data || !estaVigente(data.estado, data.vence, hoyArgentinaISO())) return undefined;
+  return preciosPresupuestados(Array.isArray(data.items) ? data.items : []);
+}
+
+/** Precios, totales y recargos autoritativos; tira error si la venta no es valida. */
+async function prepararVenta(input: ProcesarVentaInput) {
+  const comercioId = input.comercioId;
+  const presupuestados = await preciosDelPresupuesto(comercioId, input.presupuestoId);
+  // La unidad no va a la venta: ventas.items queda como siempre.
+  const items = (await calcularLineas(comercioId, input.items, presupuestados))
+    .map(({ unidad: _unidad, ...linea }) => linea);
 
   const discount = Number(input.discount) || 0;
   const bruto = items.reduce((s, i) => s + i.subtotal, 0);

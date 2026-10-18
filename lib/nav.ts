@@ -1,6 +1,6 @@
 // lib/nav.ts — items de navegacion del kiosko
 import type { LucideIcon } from "lucide-react";
-import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign } from "lucide-react";
+import { Home, ShoppingCart, Wallet, Users, Package, BarChart3, RefreshCw, Receipt, UserCog, Truck, Megaphone, FileText, CircleHelp, CircleDollarSign, ClipboardList } from "lucide-react";
 import type { UserRol } from "@/lib/types";
 import { panelHref } from "@/lib/panel";
 
@@ -18,6 +18,8 @@ export const NAV_ITEMS: NavItem[] = [
   // El cajero abre y cierra su propia caja (la pantalla adapta lo que muestra por rol).
   { label: "Caja", href: "/caja", icon: Wallet, roles: ["encargado", "cajero"] },
   { label: "Ventas", href: "/ventas", icon: Receipt, roles: ["encargado"] },
+  // Presupuestos del mostrador: los arma y los pasa a venta cualquiera que atienda.
+  { label: "Presupuestos", href: "/presupuestos", icon: ClipboardList, roles: ["encargado", "cajero"] },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Stock", href: "/stock", icon: Package },
   { label: "Promociones", href: "/promociones", icon: Megaphone, roles: ["encargado"] },

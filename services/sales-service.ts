@@ -28,6 +28,8 @@ export interface CreateSaleInput {
   creditoMonto?: number;
   /** Mixto: monto (con recargo) que va por posnet, debito y/o credito. */
   tarjetaMonto?: number;
+  /** Cobro de un presupuesto: el servidor respeta sus precios si sigue vigente. */
+  presupuestoId?: string | null;
 }
 
 export interface ProcessSaleResult {

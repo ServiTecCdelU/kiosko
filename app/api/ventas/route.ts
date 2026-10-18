@@ -37,6 +37,7 @@ export async function POST(req: Request) {
       recargoPct: body?.recargoPct ?? null,
       creditoMonto: body?.creditoMonto ?? null,
       tarjetaMonto: body?.tarjetaMonto ?? null,
+      presupuestoId: body?.presupuestoId ?? null,
     });
     // Facturacion automatica (si el comercio la activo): despues de responder,
     // asi el cobro nunca espera a AFIP.

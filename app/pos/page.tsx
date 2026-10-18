@@ -15,6 +15,10 @@ import { useOfertasVigentes } from "@/hooks/use-ofertas-vigentes";
 import { useCart } from "@/hooks/useCart";
 import { searchProducts, findProductByCode, getFavoritos, createProduct } from "@/services/products-service";
 import { ImporteLibreDialog } from "@/components/pos/importe-libre-dialog";
+import { PresupuestoDialog } from "@/components/pos/presupuesto-dialog";
+import { carritoDePresupuesto, obtenerPresupuesto } from "@/services/presupuestos-service";
+import { estaVigente } from "@/lib/presupuesto";
+import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
@@ -86,6 +90,9 @@ function PosScreen() {
   const [favoritos, setFavoritos] = useState<Product[]>([]);
   const [pesoProduct, setPesoProduct] = useState<Product | null>(null);
   const [importeLibreProduct, setImporteLibreProduct] = useState<Product | null>(null);
+  const [presupuestoOpen, setPresupuestoOpen] = useState(false);
+  /** Presupuesto que se esta cobrando (Presupuestos -> "Pasar a venta"). */
+  const [presupuestoActivo, setPresupuestoActivo] = useState<{ id: string; numero: number; vence: string; vigente: boolean } | null>(null);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
   // Id de la ultima venta registrada (para facturarla). null si quedo offline.
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
@@ -267,6 +274,36 @@ function PosScreen() {
     },
     [agregarCantidad, pesoProduct],
   );
+
+  // Presupuestos -> "Pasar a venta" abre /pos?presupuesto=<id>: se arma el carrito
+  // con los productos de hoy y se cobra con presupuestoId (precios respetados).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("presupuesto");
+    if (!id) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    (async () => {
+      try {
+        const { presupuesto, productos } = await obtenerPresupuesto(id);
+        if (!presupuesto) {
+          toast.error("No se encontró el presupuesto");
+          return;
+        }
+        if (presupuesto.estado !== "vigente") {
+          toast.error(`El presupuesto N° ${presupuesto.numero} ya está ${presupuesto.estado}`);
+          return;
+        }
+        const vigente = estaVigente(presupuesto.estado, presupuesto.vence, hoyArgentinaISO());
+        const { items, faltantes } = carritoDePresupuesto(presupuesto, productos, vigente);
+        cart.replaceAll(items);
+        setPresupuestoActivo({ id: presupuesto.id, numero: presupuesto.numero, vence: presupuesto.vence, vigente });
+        if (faltantes.length > 0) toast.warning(`Ya no están en el catálogo: ${faltantes.join(", ")}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo abrir el presupuesto");
+      }
+    })();
+    // Solo al entrar al POS.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Cantidad tipeada o +/− en el carrito: no deja pasar el stock. */
   const cambiarCantidad = useCallback(
@@ -510,6 +547,7 @@ function PosScreen() {
       };
       setLastTicket(ticket);
       cart.clear();
+      setPresupuestoActivo(null);
       setQuery("");
       setResults([]);
       focusInput();
@@ -583,6 +621,7 @@ function PosScreen() {
             changeAmount: 0,
             transferAmount: cart.total,
             cajaId,
+            presupuestoId: presupuestoActivo?.id ?? null,
             userId: user?.id,
             userName: user?.nombre,
           };
@@ -616,6 +655,7 @@ function PosScreen() {
             changeAmount: 0,
             transferAmount: cart.total,
             cajaId,
+            presupuestoId: presupuestoActivo?.id ?? null,
             userId: user?.id,
             userName: user?.nombre,
           };
@@ -643,6 +683,7 @@ function PosScreen() {
         changeAmount: data.changeAmount,
         transferAmount: data.transferAmount,
         cajaId,
+        presupuestoId: presupuestoActivo?.id ?? null,
         clienteId: data.clienteId,
         userId: user?.id,
         userName: user?.nombre,
@@ -689,7 +730,7 @@ function PosScreen() {
         setProcessing(false);
       }
     },
-    [cart, cajaId, finalizarTicket, resolverDispositivoPoint],
+    [cart, cajaId, finalizarTicket, resolverDispositivoPoint, presupuestoActivo],
   );
 
   // Sin caja la venta queda con caja_id null y no entra en ningun cierre
@@ -830,6 +871,22 @@ function PosScreen() {
       <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_380px]">
         {/* Busqueda + resultados */}
         <div className="flex min-h-0 flex-col gap-3">
+          {presupuestoActivo && (
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+              <span>
+                Cobrando el <b>presupuesto N° {presupuestoActivo.numero}</b>
+                {presupuestoActivo.vigente
+                  ? <> · se respetan sus precios (vence el {presupuestoActivo.vence.split("-").reverse().join("/")})</>
+                  : <> · <span className="text-warning">vencido: va a precio de hoy</span></>}
+              </span>
+              <button
+                onClick={() => setPresupuestoActivo(null)}
+                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                Quitar
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
@@ -965,6 +1022,7 @@ function PosScreen() {
             onClear={cart.clear}
             onConfirm={handleConfirm}
             onSuspend={handleSuspender}
+            onPresupuesto={() => setPresupuestoOpen(true)}
             processing={processing}
             isOnline={isOnline}
             avisoBloqueo={avisoCaja}
@@ -973,6 +1031,13 @@ function PosScreen() {
       </div>
 
       <PesoDialog product={pesoProduct} onOpenChange={(o) => !o && setPesoProduct(null)} onConfirm={confirmarPeso} />
+      <PresupuestoDialog
+        open={presupuestoOpen}
+        onOpenChange={setPresupuestoOpen}
+        items={cart.items}
+        nombreComercio={nombreComercio.trim() || getCurrentUser()?.comercioNombre || ""}
+        onGuardado={() => { cart.clear(); setPresupuestoActivo(null); focusInput(); }}
+      />
       <ImporteLibreDialog
         product={importeLibreProduct}
         onOpenChange={(o) => !o && setImporteLibreProduct(null)}

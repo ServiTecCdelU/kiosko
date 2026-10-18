@@ -60,6 +60,8 @@ interface CartPanelProps {
   onClear: () => void;
   onConfirm: (data: ConfirmData) => void;
   onSuspend?: () => void;
+  /** Guardar el carrito como presupuesto (pide conexion). */
+  onPresupuesto?: () => void;
   processing: boolean;
   /** Los metodos de Mercado Pago necesitan conexion: se deshabilitan sin ella. */
   isOnline?: boolean;
@@ -138,7 +140,7 @@ function EmpujeComboAviso({ item, onSumar }: { item: CartItem; onSumar: (faltan:
 }
 
 export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function CartPanel(
-  { items, total: totalBruto, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, processing, isOnline = true, avisoBloqueo },
+  { items, total: totalBruto, onSetQuantity, onRemove, onClear, onConfirm, onSuspend, onPresupuesto, processing, isOnline = true, avisoBloqueo },
   ref,
 ) {
   const [method, setMethod] = useState<PaymentMethod>("efectivo");
@@ -275,6 +277,14 @@ export const CartPanel = forwardRef<CartPanelHandle, CartPanelProps>(function Ca
         </span>
         {items.length > 0 && (
           <div className="flex items-center gap-1">
+            {onPresupuesto && (
+              <Button
+                variant="ghost" size="sm" className="text-muted-foreground" onClick={onPresupuesto}
+                disabled={!isOnline} title={isOnline ? "Guardar como presupuesto" : "Sin conexión no se puede guardar un presupuesto"}
+              >
+                Presupuesto
+              </Button>
+            )}
             {onSuspend && (
               <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onSuspend}>
                 Suspender
