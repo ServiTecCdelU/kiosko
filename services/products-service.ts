@@ -130,26 +130,6 @@ export interface CambioPrecio {
   fecha: Date;
 }
 
-export async function logCambioPrecio(
-  productId: string,
-  campo: string,
-  valorAnterior: number,
-  valorNuevo: number,
-  usuarioNombre?: string,
-): Promise<void> {
-  const res = await fetch(apiUrl("/api/productos/auditoria"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      productId, campo, valorAnterior, valorNuevo, usuarioNombre,
-    }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.error ?? "No se pudo registrar el cambio de precio");
-  }
-}
-
 export async function getHistorialPrecio(productId: string, limit = 10): Promise<CambioPrecio[]> {
   const { cambios } = await consultar<{ cambios: Record<string, any>[] }>(
     "/api/consultas/productos", "historialPrecio", { productId, limit },

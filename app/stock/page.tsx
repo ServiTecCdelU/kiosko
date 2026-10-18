@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import {
   getProductsPage, setOferta, getStockStats, getCategorias, updateProduct,
-  logCambioPrecio, getCambiosPrecioRecientes, getVencimientosProximos,
+  getCambiosPrecioRecientes, getVencimientosProximos,
   type SetOfertaInput, type StockStats, type UpdateProductInput, type CambioPrecioReciente,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -200,11 +200,8 @@ export default function StockPage() {
   const handleSaveProduct = async (input: UpdateProductInput) => {
     if (!selected) return;
     try {
+      // El cambio de precio lo audita el servidor (PATCH /api/productos).
       await updateProduct(selected.id, input);
-      if (input.price !== selected.price) {
-        const user = getCurrentUser();
-        await logCambioPrecio(selected.id, "price", selected.price, input.price, user?.nombre);
-      }
       toast.success("Producto actualizado");
       await refreshAll();
     } catch (e) {

@@ -7,7 +7,8 @@
 //
 // Funcion pura (sin imports de servidor) para poder testearla.
 
-export type ReglaRuta = "publica" | "superadmin" | "sesion" | "admin";
+/** "gestion": admin o encargado (precios, ofertas y stock); el cajero no. */
+export type ReglaRuta = "publica" | "superadmin" | "sesion" | "gestion" | "admin";
 
 /**
  * Crean la sesion o las llama un tercero sin cookie (Mercado Pago). /api/registro
@@ -55,6 +56,16 @@ const METODOS_ADMIN: Record<string, string[]> = {
   "/api/mercadopago/dispositivos": ["PATCH"],
 };
 
+/**
+ * Precios, ofertas y stock: los cambia el admin o el encargado (Stock, Promociones),
+ * nunca el cajero aunque llame a la API a mano. El alta de producto (POST
+ * /api/productos) queda para todos: el POS la usa al escanear un codigo desconocido.
+ */
+const RUTAS_GESTION = ["/api/stock"];
+const METODOS_GESTION: Record<string, string[]> = {
+  "/api/productos": ["PATCH", "PUT"],
+};
+
 function bajo(ruta: string, prefijo: string): boolean {
   return ruta === prefijo || ruta.startsWith(`${prefijo}/`);
 }
@@ -64,6 +75,8 @@ export function reglaDeRuta(ruta: string, metodo: string): ReglaRuta {
   if (RUTAS_SUPERADMIN.some((p) => bajo(ruta, p))) return "superadmin";
   if (RUTAS_ADMIN.some((p) => bajo(ruta, p))) return "admin";
   if (METODOS_ADMIN[ruta]?.includes(metodo.toUpperCase())) return "admin";
+  if (RUTAS_GESTION.some((p) => bajo(ruta, p))) return "gestion";
+  if (METODOS_GESTION[ruta]?.includes(metodo.toUpperCase())) return "gestion";
   return "sesion";
 }
 
@@ -82,5 +95,6 @@ export function autorizar(regla: ReglaRuta, sesion: SesionMinima | null): null |
   if (regla === "publica" || regla === "superadmin") return null;
   if (!sesion || sesion.comercioId === COMERCIO_SUPERADMIN) return 401;
   if (regla === "admin" && sesion.rol !== "admin") return 403;
+  if (regla === "gestion" && sesion.rol !== "admin" && sesion.rol !== "encargado") return 403;
   return null;
 }

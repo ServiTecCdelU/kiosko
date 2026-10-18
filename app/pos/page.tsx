@@ -17,7 +17,8 @@ import { searchProducts, findProductByCode, getFavoritos } from "@/services/prod
 import { createSale, NetworkUnavailableError, type CreateSaleInput } from "@/services/sales-service";
 import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
-import { parseCodigoBalanza } from "@/lib/barcode-balanza";
+import { parseCodigoBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
+import { leerFormatoBalanza } from "@/lib/balanza-config";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
@@ -223,9 +224,13 @@ function PosScreen() {
   const confirmarPeso = useCallback(
     (kg: number) => {
       if (!pesoProduct) return;
-      if (kg > pesoProduct.stock) {
-        toast.error(`Stock maximo (${pesoProduct.stock}kg) para ${pesoProduct.name}`);
-        return;
+      // Sin control de stock (pan, verdura que no se cuenta) se vende sin tope.
+      if (pesoProduct.stockControlado) {
+        const enCarrito = cart.items.find((i) => i.product.id === pesoProduct.id)?.quantity ?? 0;
+        if (enCarrito + kg > pesoProduct.stock + 1e-9) {
+          toast.error(`Stock maximo (${pesoProduct.stock}kg) para ${pesoProduct.name}`);
+          return;
+        }
       }
       cart.addProduct(pesoProduct, kg);
     },
@@ -244,7 +249,7 @@ function PosScreen() {
   // embebidos, asi que el producto pesable se agrega directo sin PesoDialog.
   const procesarCodigoBalanza = useCallback(
     async (codigo: string): Promise<boolean> => {
-      const balanza = parseCodigoBalanza(codigo);
+      const balanza = parseCodigoBalanza(codigo, leerFormatoBalanza());
       if (!balanza) return false;
       for (const c of balanza.codigosBusqueda) {
         const p = await buscarPorCodigo(c);
@@ -255,12 +260,23 @@ function PosScreen() {
           addToCart(p);
           return true;
         }
-        if (p.stockControlado && balanza.pesoKg > p.stock) {
+        // Etiqueta con importe: el peso se saca del precio por kg del sistema.
+        const kg = balanza.importe !== null ? pesoDesdeImporte(balanza.importe, p.price) : balanza.pesoKg;
+        if (!kg) {
+          toast.error(`${p.name} no tiene precio por kg cargado`);
+          return true;
+        }
+        const enCarrito = cart.items.find((i) => i.product.id === p.id)?.quantity ?? 0;
+        if (p.stockControlado && enCarrito + kg > p.stock + 1e-9) {
           toast.error(`Stock maximo (${p.stock}kg) para ${p.name}`);
           return true;
         }
-        cart.addProduct(p, balanza.pesoKg);
-        toast.success(`${p.name} · ${balanza.pesoKg.toFixed(3)} kg`);
+        cart.addProduct(p, kg);
+        toast.success(
+          balanza.importe !== null
+            ? `${p.name} · $${balanza.importe} = ${kg.toFixed(3)} kg`
+            : `${p.name} · ${kg.toFixed(3)} kg`,
+        );
         return true;
       }
       toast.error(`Etiqueta de balanza sin producto: PLU ${balanza.plu}`);
@@ -671,10 +687,10 @@ function PosScreen() {
           )}
           <button
             onClick={() => setImpresoraOpen(true)}
-            title="Configurar la impresora de tickets de esta PC"
+            title="Configurar la impresora de tickets y la balanza de esta PC"
             className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <Settings2 className="h-3.5 w-3.5" /> Impresora
+            <Settings2 className="h-3.5 w-3.5" /> Impresora y balanza
           </button>
           {lastTicket && (
             <button

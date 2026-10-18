@@ -1,10 +1,12 @@
 // app/api/productos/route.ts — escrituras sobre productos (server-only, service role).
-// PATCH -> editar un producto | PUT -> activar/desactivar una oferta
+// POST -> alta (tambien el alta rapida del POS, cualquier rol)
+// PATCH -> editar un producto | PUT -> activar/desactivar una oferta (admin y encargado,
+// ver lib/permisos-api.ts). El cambio de precio queda en producto_auditoria.
 // Antes se escribia desde el navegador con el anon key: cualquiera con esa
 // clave podia cambiar los precios de todo el catalogo.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { comercioIdDeSesion } from "@/lib/server/sesion";
+import { comercioIdDeSesion, getSesion } from "@/lib/server/sesion";
 import { errorVigencia, hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import { registrarFinDeOferta } from "@/lib/server/ofertas";
 
@@ -58,6 +60,17 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Alicuota de IVA invalida" }, { status: 400 });
   }
 
+  // Precio anterior para la auditoria: se registra aca y no desde el navegador,
+  // asi un cambio de precio no puede quedar sin rastro.
+  const { data: anterior, error: errorAnterior } = await supabaseAdmin
+    .from("productos")
+    .select("price")
+    .eq("comercio_id", comercioId)
+    .eq("id", productId)
+    .maybeSingle();
+  if (errorAnterior) return NextResponse.json({ error: errorAnterior.message }, { status: 400 });
+  if (!anterior) return NextResponse.json({ error: "El producto no existe" }, { status: 404 });
+
   const { error } = await supabaseAdmin
     .from("productos")
     .update({
@@ -81,6 +94,21 @@ export async function PATCH(req: Request) {
     .eq("id", productId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  const precioAnterior = Number(anterior.price) || 0;
+  if (precioAnterior !== price) {
+    const sesion = getSesion(req);
+    const { error: errorAuditoria } = await supabaseAdmin.from("producto_auditoria").insert({
+      id: crypto.randomUUID(),
+      comercio_id: comercioId,
+      producto_id: productId,
+      campo: "price",
+      valor_anterior: String(precioAnterior),
+      valor_nuevo: String(price),
+      usuario_nombre: sesion?.nombre ?? null,
+    });
+    if (errorAuditoria) console.error("[productos] auditoria de precio:", errorAuditoria.message);
+  }
   return NextResponse.json({ ok: true });
 }
 

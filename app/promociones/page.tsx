@@ -17,7 +17,7 @@ import { useAuth, getCurrentUser } from "@/hooks/use-auth";
 import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
 import { hoyArgentinaISO } from "@/lib/oferta-vigencia";
 import {
-  getCambiosPrecioRecientes, getReposicionPredictiva, getVencimientosProximos, logCambioPrecio, setOferta, updateProduct,
+  getCambiosPrecioRecientes, getReposicionPredictiva, getVencimientosProximos, setOferta, updateProduct,
   type CambioPrecioReciente, type ReposicionItem, type SetOfertaInput, type UpdateProductInput,
 } from "@/services/products-service";
 import { ajustarStock } from "@/services/stock-service";
@@ -95,10 +95,8 @@ export default function PromocionesPage() {
   const guardarProducto = async (input: UpdateProductInput) => {
     if (!editando) return;
     try {
+      // El cambio de precio lo audita el servidor (PATCH /api/productos).
       await updateProduct(editando.id, input);
-      if (input.price !== editando.price) {
-        await logCambioPrecio(editando.id, "price", editando.price, input.price, getCurrentUser()?.nombre);
-      }
       toast.success("Producto actualizado");
       setVersion((v) => v + 1);
       await cargar();

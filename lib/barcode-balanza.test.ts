@@ -1,7 +1,7 @@
 // lib/barcode-balanza.test.ts — correr con: npm test
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { parseCodigoBalanza } from "./barcode-balanza.ts";
+import { parseCodigoBalanza, pesoDesdeImporte } from "./barcode-balanza.ts";
 
 describe("parseCodigoBalanza", () => {
   test("prefijo 20, PLU 00042, 350 gramos", () => {
@@ -36,5 +36,36 @@ describe("parseCodigoBalanza", () => {
     assert.equal(parseCodigoBalanza("12345"), null);
     assert.equal(parseCodigoBalanza("20abc42003500"), null);
     assert.equal(parseCodigoBalanza(""), null);
+  });
+
+  test("formato importe: $3.000 no se lee como 3 kg", () => {
+    const r = parseCodigoBalanza("2000042030001", "importe");
+    assert.ok(r);
+    assert.equal(r.importe, 3000);
+    assert.equal(r.pesoKg, null);
+  });
+
+  test("sin formato se asume peso (compatibilidad)", () => {
+    const r = parseCodigoBalanza("2000042030001");
+    assert.ok(r);
+    assert.equal(r.pesoKg, 3);
+    assert.equal(r.importe, null);
+  });
+});
+
+describe("pesoDesdeImporte", () => {
+  test("$3.000 de un producto a $6.000/kg son 0,5 kg", () => {
+    assert.equal(pesoDesdeImporte(3000, 6000), 0.5);
+  });
+
+  test("redondea al gramo y precio x peso vuelve al importe", () => {
+    // La balanza peso 0,355 kg a $8.450/kg = $2.999,75 -> etiqueta $3.000
+    const kg = pesoDesdeImporte(3000, 8450);
+    assert.equal(kg, 0.355);
+    assert.ok(Math.abs(kg! * 8450 - 3000) < 1);
+  });
+
+  test("sin precio devuelve null", () => {
+    assert.equal(pesoDesdeImporte(3000, 0), null);
   });
 });

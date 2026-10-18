@@ -62,6 +62,13 @@ describe("reglaDeRuta", () => {
     assert.equal(reglaDeRuta("/api/mercadopago/dispositivos", "PATCH"), "admin");
   });
 
+  test("precios, ofertas y stock son de gestion; el alta rapida del POS, de cualquier rol", () => {
+    assert.equal(reglaDeRuta("/api/productos", "PATCH"), "gestion");
+    assert.equal(reglaDeRuta("/api/productos", "PUT"), "gestion");
+    assert.equal(reglaDeRuta("/api/stock", "POST"), "gestion");
+    assert.equal(reglaDeRuta("/api/productos", "POST"), "sesion");
+  });
+
   test("un prefijo no matchea rutas que solo empiezan igual", () => {
     assert.equal(reglaDeRuta("/api/usuarios-raros", "GET"), "sesion");
   });
@@ -96,6 +103,13 @@ describe("autorizar", () => {
 
   test("admin entra a todo lo del comercio", () => {
     assert.equal(autorizar("admin", admin), null);
+    assert.equal(autorizar("gestion", admin), null);
+  });
+
+  test("gestion: el encargado cambia precios y stock, el cajero no", () => {
+    assert.equal(autorizar("gestion", { comercioId: "c1", rol: "encargado" }), null);
+    assert.equal(autorizar("gestion", cajero), 403);
+    assert.equal(autorizar("gestion", null), 401);
   });
 
   test("las rutas de superadmin se autorizan adentro (pasan siempre)", () => {

@@ -1,25 +1,36 @@
-// lib/barcode-balanza.ts — codigos EAN-13 de balanza con peso embebido.
+// lib/barcode-balanza.ts — codigos EAN-13 de balanza con peso o importe embebido.
 //
 // Las balanzas de fiambreria/verduleria (Systel, Kretz, Moretti...) imprimen
-// etiquetas EAN-13 con esta estructura (configuracion de fabrica mas comun):
+// etiquetas EAN-13 con esta estructura:
 //
-//   2P PPPPP WWWWW C
+//   2P PPPPP VVVVV C
 //   └┬┘ └─┬─┘ └─┬─┘ └─ digito verificador EAN-13
-//    │    │     └──── peso en GRAMOS (5 digitos, 00350 = 0.350 kg)
+//    │    │     └──── valor: peso en GRAMOS (00350 = 0.350 kg) o IMPORTE en pesos
+//    │    │           (03000 = $3.000), segun como este configurada la balanza
 //    │    └────────── codigo del producto en la balanza (PLU, 5 digitos)
 //    └─────────────── prefijo 20-29 (reservado para uso interno del comercio)
+//
+// El codigo no dice cual de los dos es: lo elige el comercio en el POS
+// (lib/balanza-config.ts). Leer un importe como peso cobra de mas (una etiqueta
+// de $3.000 se cobraba como 3 kg).
 //
 // El PLU se matchea contra productos.codigo (con y sin ceros a la izquierda).
 
 const PREFIJOS_BALANZA = new Set(["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"]);
+
+/** "peso": el valor son gramos. "importe": el valor son pesos enteros. */
+export type FormatoBalanza = "peso" | "importe";
 
 export interface CodigoBalanza {
   /** PLU tal como viene (5 digitos, ej "00042") */
   plu: string;
   /** Variantes para buscar en el catalogo: con y sin ceros a la izquierda */
   codigosBusqueda: string[];
-  /** Peso en kg (3 decimales) */
-  pesoKg: number;
+  formato: FormatoBalanza;
+  /** Peso en kg (3 decimales). Solo con formato "peso". */
+  pesoKg: number | null;
+  /** Importe en pesos. Solo con formato "importe". */
+  importe: number | null;
 }
 
 function checksumEAN13(codigo: string): boolean {
@@ -36,18 +47,32 @@ function checksumEAN13(codigo: string): boolean {
  * Interpreta un codigo de balanza. Devuelve null si no es un EAN-13 valido
  * con prefijo 20-29 (en ese caso se sigue el flujo normal de busqueda).
  */
-export function parseCodigoBalanza(codigo: string): CodigoBalanza | null {
+export function parseCodigoBalanza(codigo: string, formato: FormatoBalanza = "peso"): CodigoBalanza | null {
   const c = codigo.trim();
   if (!/^[0-9]{13}$/.test(c)) return null;
   if (!PREFIJOS_BALANZA.has(c.slice(0, 2))) return null;
   if (!checksumEAN13(c)) return null;
 
   const plu = c.slice(2, 7);
-  const gramos = Number(c.slice(7, 12));
-  if (!Number.isFinite(gramos) || gramos <= 0) return null;
+  const valor = Number(c.slice(7, 12));
+  if (!Number.isFinite(valor) || valor <= 0) return null;
 
   const sinCeros = String(Number(plu));
   const codigosBusqueda = plu === sinCeros ? [plu] : [plu, sinCeros];
 
-  return { plu, codigosBusqueda, pesoKg: gramos / 1000 };
+  return formato === "importe"
+    ? { plu, codigosBusqueda, formato, pesoKg: null, importe: valor }
+    : { plu, codigosBusqueda, formato, pesoKg: valor / 1000, importe: null };
+}
+
+/**
+ * Peso que pesó la balanza a partir del importe de la etiqueta y el precio por kg
+ * del sistema (redondeado al gramo, como la balanza). El servidor cobra
+ * precio × peso, asi que si los precios coinciden el total es el de la etiqueta.
+ * null si el producto no tiene precio.
+ */
+export function pesoDesdeImporte(importe: number, precioKg: number): number | null {
+  if (!(precioKg > 0) || !(importe > 0)) return null;
+  const kg = Math.round((importe / precioKg) * 1000) / 1000;
+  return kg > 0 ? kg : null;
 }

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateTime } from "@/lib/utils/format";
-import { getCliente, getMovimientos, registrarPago, canjearPuntos } from "@/services/clientes-service";
+import { getCliente, getMovimientos, registrarPago, canjearPuntos, type MedioPagoCuenta } from "@/services/clientes-service";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { CONDICIONES_RECEPTOR } from "@/lib/afip/iva";
 import type { Cliente, CuentaMov } from "@/lib/types";
@@ -33,6 +33,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
   const [movs, setMovs] = useState<CuentaMov[]>([]);
   const [loading, setLoading] = useState(true);
   const [monto, setMonto] = useState("");
+  const [medio, setMedio] = useState<MedioPagoCuenta>("efectivo");
   const [working, setWorking] = useState(false);
   const [puntosCanje, setPuntosCanje] = useState("");
   const [canjeando, setCanjeando] = useState(false);
@@ -54,6 +55,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
   useEffect(() => {
     if (open && clienteId) {
       setMonto("");
+      setMedio("efectivo");
       setPuntosCanje("");
       load();
     }
@@ -69,8 +71,9 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
     setWorking(true);
     try {
       const user = getCurrentUser();
-      const res = await registrarPago(cliente.id, n, user?.nombre);
+      const res = await registrarPago(cliente.id, n, user?.nombre, undefined, medio);
       toast.success(`Pago registrado · saldo ${formatCurrency(res.saldoNuevo)}`);
+      if (res.avisoCaja) toast.warning(res.avisoCaja);
       setMonto("");
       await load();
       onChanged();
@@ -162,6 +165,21 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange, onChanged }
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
                 <Banknote className="h-4 w-4 text-primary" /> Registrar pago
               </p>
+              <div className="mb-2 flex gap-2">
+                {(["efectivo", "transferencia"] as const).map((m) => (
+                  <Button
+                    key={m} type="button" size="sm"
+                    variant={medio === m ? "default" : "outline"}
+                    className="rounded-xl"
+                    onClick={() => setMedio(m)}
+                  >
+                    {m === "efectivo" ? "Efectivo" : "Transferencia"}
+                  </Button>
+                ))}
+              </div>
+              {medio === "efectivo" && (
+                <p className="mb-2 text-xs text-muted-foreground">Entra a la caja abierta.</p>
+              )}
               <div className="flex items-center gap-2">
                 <Input
                   type="number" inputMode="decimal" placeholder="Monto que abona"

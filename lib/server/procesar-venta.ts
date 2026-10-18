@@ -29,6 +29,8 @@ export interface ProcesarVentaResult {
   total: number;
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 /** Recalcula precios/subtotales autoritativos desde la BD e inserta la venta via RPC atomica. */
 export async function procesarVenta(input: ProcesarVentaInput): Promise<ProcesarVentaResult> {
   const rawItems = input.items;
@@ -65,14 +67,16 @@ export async function procesarVenta(input: ProcesarVentaInput): Promise<Procesar
           },
           quantity,
         )
-      : (Number(i.price) || 0) * quantity;
+      : round2((Number(i.price) || 0) * quantity);
     const name = db ? db.name : String(i.name ?? "");
     const price = quantity > 0 ? subtotal / quantity : 0;
     return { productId: id, name, quantity, price, subtotal };
   });
 
   const discount = Number(input.discount) || 0;
-  const subtotal = Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount);
+  // Redondeo a centavos: sumar subtotales ya redondeados igual deja basura de coma
+  // flotante (3 x 299.7 = 899.0999999999999), y AFIP exige 2 decimales.
+  const subtotal = round2(Math.max(0, items.reduce((s, i) => s + i.subtotal, 0) - discount));
 
   // El recargo por cuotas se calcula aca, nunca se confia en un total
   // mandado por el navegador. Solo existe para Credito (recargo sobre todo

@@ -95,7 +95,12 @@ export interface PagoResult {
   clienteId: string;
   saldoAnterior: number;
   saldoNuevo: number;
+  /** Pago registrado pero sin entrar a la caja (cargarlo como aporte a mano). */
+  avisoCaja?: string | null;
 }
+
+/** Medio del abono: el efectivo entra a la caja abierta, la transferencia no. */
+export type MedioPagoCuenta = "efectivo" | "transferencia";
 
 /** Registra un abono del cliente (reduce la deuda) via API route. */
 export async function registrarPago(
@@ -103,11 +108,12 @@ export async function registrarPago(
   monto: number,
   usuario?: string,
   referencia?: string,
+  medio: MedioPagoCuenta = "efectivo",
 ): Promise<PagoResult> {
   const res = await fetch(apiUrl("/api/clientes/pago"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clienteId, monto, usuario, referencia }),
+    body: JSON.stringify({ clienteId, monto, usuario, referencia, medio }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "No se pudo registrar el pago");

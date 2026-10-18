@@ -19,6 +19,8 @@ import { elegirImpresoraUsb, impresoraUsbGuardada, nombreDispositivo, soportaWeb
 import { estadoAgente } from "@/lib/impresora/agente";
 import { abrirCajon, imprimirTicketDePrueba } from "@/lib/impresora/imprimir";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
+import { guardarFormatoBalanza, leerFormatoBalanza } from "@/lib/balanza-config";
+import type { FormatoBalanza } from "@/lib/barcode-balanza";
 import type { TicketData } from "@/components/pos/ticket-print";
 
 interface ImpresoraDialogProps {
@@ -44,10 +46,12 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
   const [usbNombre, setUsbNombre] = useState<string | null>(null);
   const [agenteEstado, setAgenteEstado] = useState<{ ok: boolean; impresoras: string[]; error?: string } | null>(null);
   const [ocupado, setOcupado] = useState<"usb" | "agente" | "prueba" | "cajon" | null>(null);
+  const [formatoBalanza, setFormatoBalanza] = useState<FormatoBalanza>(leerFormatoBalanza);
 
   useEffect(() => {
     if (!open) return;
     setConfig(leerConfigImpresora());
+    setFormatoBalanza(leerFormatoBalanza());
     impresoraUsbGuardada().then((d) => setUsbNombre(d ? nombreDispositivo(d) : null));
     setAgenteEstado(null);
   }, [open]);
@@ -119,9 +123,9 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Printer className="h-4 w-4 text-primary" /> Impresora de tickets</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Printer className="h-4 w-4 text-primary" /> Impresora y balanza</DialogTitle>
           <DialogDescription>
-            Cómo imprime esta PC. Se guarda acá, en esta computadora: cada caja puede tener su impresora.
+            Cómo imprime esta PC y qué traen las etiquetas de su balanza. Se guarda acá, en esta computadora: cada caja puede tener las suyas.
           </DialogDescription>
         </DialogHeader>
 
@@ -256,6 +260,37 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
             </Button>
           )}
         </div>
+
+        <section className="space-y-2 border-t pt-4">
+          <p className="text-sm font-semibold">Etiquetas de la balanza</p>
+          <p className="text-xs text-muted-foreground">
+            Las etiquetas con código que empieza en 20 a 29 traen el peso o el importe. Fijate en la etiqueta
+            o en la configuración de la balanza cuál de los dos imprime.
+          </p>
+          <div className="space-y-1.5">
+            {([
+              { valor: "peso", titulo: "Traen el peso", ayuda: "Ej.: 0,350 kg. Es lo más común en verdulerías y panaderías." },
+              { valor: "importe", titulo: "Traen el importe", ayuda: "Ej.: $3.000. Común en carnicerías y fiambrerías. El peso se calcula con el precio por kg del sistema." },
+            ] as const).map((f) => (
+              <label
+                key={f.valor}
+                className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm transition-colors ${formatoBalanza === f.valor ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"}`}
+              >
+                <input
+                  type="radio"
+                  name="formato-balanza"
+                  className="mt-0.5 accent-primary"
+                  checked={formatoBalanza === f.valor}
+                  onChange={() => { setFormatoBalanza(f.valor); guardarFormatoBalanza(f.valor); }}
+                />
+                <span>
+                  <span className="font-medium">{f.titulo}</span>
+                  <span className="block text-xs text-muted-foreground">{f.ayuda}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
       </DialogContent>
     </Dialog>
   );
