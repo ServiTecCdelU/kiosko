@@ -218,11 +218,11 @@ export function EditarProductoDialog({
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">Precio de venta</Label>
+              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Precio por kg" : "Precio de venta"}</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">Costo</Label>
+              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Costo por kg" : "Costo"}</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
             </div>
             <div>
@@ -245,8 +245,8 @@ export function EditarProductoDialog({
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">Stock mínimo</Label>
-              <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
+              <Label className="mb-1 block text-xs">{unidad === "kg" ? "Stock mínimo (kg)" : "Stock mínimo"}</Label>
+              <Input type="number" inputMode={unidad === "kg" ? "decimal" : "numeric"} value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
             </div>
             <div>
               <Label className="mb-1 block text-xs">Unidades por bulto</Label>
@@ -328,9 +328,9 @@ export function EditarProductoDialog({
             </label>
             <label className="col-span-2 flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">
-                Es un servicio (sin stock)
+                No controlar stock
                 <span className="block text-xs font-normal text-muted-foreground">
-                  Ej: recarga de celular, fotocopias — se cobra pero no descuenta stock
+                  Se vende sin contar unidades. Ej: recargas, fotocopias, o el pan y la verdura si no los contás
                 </span>
               </span>
               <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />

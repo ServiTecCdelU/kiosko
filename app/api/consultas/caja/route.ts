@@ -274,7 +274,8 @@ export async function POST(req: Request) {
 
       const ahora = Date.now();
       const dias = (iso?: string) =>
-        iso ? Math.floor((ahora - new Date(iso).getTime()) / 86400000) : null;
+        // max 0: con la hora de la base unos segundos adelantada un pago recien hecho daba -1.
+        iso ? Math.max(0, Math.floor((ahora - new Date(iso).getTime()) / 86400000)) : null;
 
       const deudores = clientes
         .map((c: any) => {

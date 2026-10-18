@@ -19,6 +19,7 @@ import { getCajasAbiertas } from "@/services/caja-service";
 import { useOfflineSync } from "@/hooks/use-offline-sync";
 import { parseCodigoBalanza, pesoDesdeImporte } from "@/lib/barcode-balanza";
 import { leerFormatoBalanza } from "@/lib/balanza-config";
+import { cantidadTexto } from "@/lib/cantidad";
 import { buscarProductosOffline, buscarPorCodigoOffline, getFavoritosOffline } from "@/lib/offline/catalog";
 import { encolarVentaPendiente, descontarStockOffline } from "@/lib/offline/db";
 import { guardarCajasConocidas, leerCajasConocidas } from "@/lib/offline/caja-local";
@@ -199,7 +200,9 @@ function PosScreen() {
   const addToCart = useCallback(
     (p: Product) => {
       if (p.stockControlado && p.stock <= 0) {
-        toast.error(`Sin stock: ${p.name}`);
+        toast.error(`Sin stock: ${p.name}`, {
+          description: "Cargá stock en Stock, o marcalo como sin control de stock si no se cuenta (pan, servicios).",
+        });
         return;
       }
       if (p.unidad === "kg") {
@@ -785,7 +788,7 @@ function PosScreen() {
                             <li key={p.id}>
                               <button
                                 onClick={() => addToCart(p)}
-                                disabled={sinStock}
+                                aria-disabled={sinStock}
                                 className={cn(
                                   "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
                                   sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
@@ -819,7 +822,7 @@ function PosScreen() {
                     <li key={p.id}>
                       <button
                         onClick={() => addToCart(p)}
-                        disabled={sinStock}
+                        aria-disabled={sinStock}
                         className={cn(
                           "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
                           sinStock ? "opacity-50" : "hover:border-primary hover:bg-primary/5",
@@ -840,7 +843,7 @@ function PosScreen() {
                               sinStock ? "text-destructive" : stockBajo ? "text-warning" : "text-muted-foreground",
                             )}
                           >
-                            {!p.stockControlado ? "Servicio" : sinStock ? "Sin stock" : `Stock: ${p.stock}`}
+                            {!p.stockControlado ? "Sin control de stock" : sinStock ? "Sin stock" : `Stock: ${cantidadTexto(p.stock, p.unidad)}`}
                           </span>
                         </div>
                         <span className="shrink-0 text-right">

@@ -34,6 +34,7 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
   const [favorito, setFavorito] = useState(false);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [unidad, setUnidad] = useState<"un" | "kg">("un");
+  const porKg = unidad === "kg";
   const [stockControlado, setStockControlado] = useState(true);
   const [iva, setIva] = useState(IVA_DEFAULT);
   const [saving, setSaving] = useState(false);
@@ -96,13 +97,13 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
       const input: CreateProductInput = {
         name: name.trim(),
         price: priceNum,
-        stock: Number(stock) || 0,
+        stock: stockControlado ? Number(stock) || 0 : 0,
         codigo: codigo.trim() || undefined,
         codigoBarras: codigoBarras.trim() || undefined,
         category: category.trim() || undefined,
         costo: costoNum,
         stockMinimo: Number(stockMinimo) || 0,
-        lote: lote ? Number(lote) : undefined,
+        lote: lote && !porKg ? Number(lote) : undefined,
         unidad,
         fechaVencimiento: fechaVencimiento || undefined,
         favorito,
@@ -183,13 +184,28 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             />
           </div>
 
+          {/* Va antes que precio y stock: los rotulos cambian si se vende por kg. */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="mb-1 block text-xs">Se vende por</Label>
+              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={selectClass}>
+                <option value="un">Unidad</option>
+                <option value="kg">Peso (kg)</option>
+              </select>
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">Fecha de vencimiento</Label>
+              <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="rounded-xl" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="mb-1 block text-xs">Precio de venta</Label>
+              <Label className="mb-1 block text-xs">{porKg ? "Precio por kg" : "Precio de venta"}</Label>
               <Input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <Label className="mb-1 block text-xs">Costo</Label>
+              <Label className="mb-1 block text-xs">{porKg ? "Costo por kg" : "Costo"}</Label>
               <Input type="number" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Opcional" className="rounded-xl" />
             </div>
             <div>
@@ -214,34 +230,30 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <Label className="mb-1 block text-xs">Stock inicial</Label>
-              <Input type="number" inputMode="numeric" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" className="rounded-xl" />
+          {stockControlado && (
+            <div className={cn("grid gap-2", porKg ? "grid-cols-2" : "grid-cols-3")}>
+              <div>
+                <Label className="mb-1 block text-xs">{porKg ? "Stock inicial (kg)" : "Stock inicial"}</Label>
+                <Input
+                  type="number" inputMode={porKg ? "decimal" : "numeric"} step={porKg ? "0.001" : "1"}
+                  value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" className="rounded-xl"
+                />
+              </div>
+              <div>
+                <Label className="mb-1 block text-xs">{porKg ? "Stock mínimo (kg)" : "Stock mínimo"}</Label>
+                <Input
+                  type="number" inputMode={porKg ? "decimal" : "numeric"} step={porKg ? "0.001" : "1"}
+                  value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl"
+                />
+              </div>
+              {!porKg && (
+                <div>
+                  <Label className="mb-1 block text-xs">Unidades por bulto</Label>
+                  <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Ej: 12" className="rounded-xl" />
+                </div>
+              )}
             </div>
-            <div>
-              <Label className="mb-1 block text-xs">Stock mínimo</Label>
-              <Input type="number" inputMode="numeric" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} className="rounded-xl" />
-            </div>
-            <div>
-              <Label className="mb-1 block text-xs">Unidades por bulto</Label>
-              <Input type="number" inputMode="numeric" value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Ej: 12" className="rounded-xl" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="mb-1 block text-xs">Se vende por</Label>
-              <select value={unidad} onChange={(e) => setUnidad(e.target.value as "un" | "kg")} className={selectClass}>
-                <option value="un">Unidad</option>
-                <option value="kg">Peso (kg)</option>
-              </select>
-            </div>
-            <div>
-              <Label className="mb-1 block text-xs">Fecha de vencimiento</Label>
-              <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} className="rounded-xl" />
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 gap-2">
             <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
@@ -250,9 +262,9 @@ export function NuevoProductoDialog({ open, onOpenChange, onCreated }: NuevoProd
             </label>
             <label className="flex items-center justify-between rounded-xl border px-3 py-2.5">
               <span className="text-sm font-medium">
-                Es un servicio (sin stock)
+                No controlar stock
                 <span className="block text-xs font-normal text-muted-foreground">
-                  Ej: recarga de celular, fotocopias — se cobra pero no descuenta stock
+                  Se vende sin contar unidades. Ej: recargas, fotocopias, o el pan y la verdura si no los contás
                 </span>
               </span>
               <Switch checked={!stockControlado} onCheckedChange={(v) => setStockControlado(!v)} />

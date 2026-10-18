@@ -33,6 +33,7 @@ import { useImpresionOfertas } from "@/hooks/use-impresion-ofertas";
 import { OfertaLoteDialog } from "@/components/stock/oferta-lote-dialog";
 import { getCurrentUser } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils/format";
+import { cantidadTexto } from "@/lib/cantidad";
 import { precioFinal, tieneOferta, comboLabel, ofertaConfigurada } from "@/lib/pricing";
 import { estadoVigencia, textoVigencia } from "@/lib/oferta-vigencia";
 import { cn } from "@/lib/utils";
@@ -574,6 +575,7 @@ export default function StockPage() {
                         ) : (
                           formatCurrency(p.price)
                         )}
+                        {p.unidad === "kg" && <span className="ml-0.5 text-xs text-muted-foreground">/kg</span>}
                       </TableCell>
                       <TableCell className="cifra text-right text-xs">
                         {p.precioBase && p.price > 0 ? (
@@ -591,11 +593,11 @@ export default function StockPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {!p.stockControlado ? (
-                          <span className="text-xs text-muted-foreground">Servicio</span>
+                          <span className="text-xs text-muted-foreground">Sin control</span>
                         ) : (
                           <>
                             <span className={cn("cifra font-semibold", sinStock ? "text-destructive" : bajo ? "text-warning" : "")}>
-                              {p.stock}
+                              {cantidadTexto(p.stock, p.unidad)}
                             </span>
                             {(sinStock || bajo) && (
                               <Badge variant="outline" className="ml-2 border-warning text-warning">
