@@ -18,7 +18,7 @@ import { formatearCuit, type ComprobanteAfip } from "@/lib/afip/qr-comprobante";
 import type { Renglon } from "@/lib/afip/renglones-pdf";
 import { leerFacturaPdf, leerQrDeImagen } from "@/services/leer-factura-pdf";
 import { crearProveedor, leerFacturaAfip, type LecturaFacturaAfip, type Proveedor } from "@/services/compras-service";
-import { createProduct, searchProducts } from "@/services/products-service";
+import { createProduct, findProductByCode, searchProducts } from "@/services/products-service";
 import type { Product } from "@/lib/types";
 
 export interface ItemDeFactura {
@@ -59,6 +59,8 @@ interface FilaRenglon {
   precioVenta: string;
   /** Como se encontro: por codigo (seguro), por nombre (revisar) o nada. */
   origen: "codigo" | "nombre" | null;
+  /** Codigo de barras leido con el lector para un producto nuevo (la factura no lo traia). */
+  codigoLeido?: string;
 }
 
 const MARGEN_SUGERIDO = 1.35;
@@ -223,6 +225,20 @@ export function FacturaAfipDialog({ open, onOpenChange, proveedores, onProveedor
   const setFila = (i: number, cambios: Partial<FilaRenglon>) =>
     setFilas((prev) => prev.map((f, j) => (j === i ? { ...f, ...cambios } : f)));
 
+  // Renglon sin asociar + lector sobre la caja: el producto con ese codigo; si no existe,
+  // se crea como nuevo con ese codigo de barras.
+  const codigoEnFila = async (i: number, codigo: string) => {
+    const c = codigo.trim();
+    if (!/^\d{8,14}$/.test(c)) return;
+    const p = await findProductByCode(c).catch(() => null);
+    if (p) {
+      setFila(i, { producto: p, origen: "codigo", crear: false, candidatos: [], busqueda: "" });
+    } else {
+      setFila(i, { crear: true, codigoLeido: c, candidatos: [], busqueda: "" });
+      toast.info(`No está en tu stock: se crea con el código ${c}`);
+    }
+  };
+
   const incluidas = filas.filter((f) => f.incluir && (f.producto || f.crear));
   const listas = incluidas.every((f) => f.producto || (f.crear && Number(f.precioVenta) > 0));
   const puedeCargar = !!lectura && !!proveedorId && !lectura.duplicada && !lectura.comprobante.esNotaCredito && listas && !cargando;
@@ -240,7 +256,8 @@ export function FacturaAfipDialog({ open, onOpenChange, proveedores, onProveedor
           const esBarra = /^\d{8,14}$/.test(r.codigo);
           const id = await createProduct({
             name: r.descripcion.slice(0, 120), price: Number(f.precioVenta), stock: 0,
-            codigoBarras: esBarra ? r.codigo : undefined, codigo: !esBarra && r.codigo ? r.codigo : undefined,
+            codigoBarras: f.codigoLeido ?? (esBarra ? r.codigo : undefined),
+            codigo: !esBarra && r.codigo ? r.codigo : undefined,
             costo: r.precioUnitario, revisar: true,
           });
           items.push({ productoId: id, nombre: r.descripcion.slice(0, 120), precioVenta: Number(f.precioVenta), cantidad: r.cantidad, costoUnitario: r.precioUnitario });
@@ -382,15 +399,23 @@ export function FacturaAfipDialog({ open, onOpenChange, proveedores, onProveedor
                             </>
                           ) : f.crear ? (
                             <>
-                              <Badge variant="outline" className="gap-1 border-primary/50 text-primary"><Plus className="h-3 w-3" /> Producto nuevo</Badge>
+                              <Badge variant="outline" className="gap-1 border-primary/50 text-primary"><Plus className="h-3 w-3" /> Producto nuevo{f.codigoLeido && ` · ${f.codigoLeido}`}</Badge>
                               <Label className="text-xs">Precio de venta</Label>
                               <Input type="number" inputMode="decimal" value={f.precioVenta} onChange={(e) => setFila(i, { precioVenta: e.target.value })} className="h-8 w-28 rounded-lg text-right" />
-                              <button type="button" className="text-xs text-primary hover:underline" onClick={() => setFila(i, { crear: false })}>Buscar en stock</button>
+                              <button type="button" className="text-xs text-primary hover:underline" onClick={() => setFila(i, { crear: false, codigoLeido: undefined })}>Buscar en stock</button>
                             </>
                           ) : (
                             <div className="relative w-full sm:w-80">
                               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <Input value={f.busqueda} onChange={(e) => buscarEnFila(i, e.target.value)} placeholder="Buscar producto en tu stock…" className="h-8 rounded-lg pl-8 text-sm" />
+                              <Input
+                                value={f.busqueda}
+                                onChange={(e) => buscarEnFila(i, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); void codigoEnFila(i, f.busqueda); }
+                                }}
+                                placeholder="Pasá el lector por el producto o buscalo…"
+                                className="h-8 rounded-lg pl-8 text-sm"
+                              />
                               {(f.candidatos.length > 0 || f.busqueda) && (
                                 <div className="absolute z-10 mt-1 w-full rounded-xl border bg-card shadow-lg">
                                   {f.candidatos.map((p) => (

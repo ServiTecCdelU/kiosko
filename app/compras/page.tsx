@@ -4,7 +4,7 @@
 // Spec: docs/superpowers/specs/2026-09-18-proveedores-compras-design.md
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Truck, Search, Trash2, History, Users, Plus, Ban, Wallet, ScanLine, X } from "lucide-react";
+import { Truck, Trash2, History, Users, Plus, Ban, Wallet, ScanLine, X, ScanBarcode, Camera } from "lucide-react";
 import { FacturaAfipDialog, type ResultadoFactura } from "@/components/compras/factura-afip-dialog";
 import { formatearCuit } from "@/lib/afip/qr-comprobante";
 import { CuentaCorrienteTab } from "@/components/compras/cuenta-corriente-tab";
@@ -25,7 +25,10 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 import { totalCompra, margenPct } from "@/lib/compras";
-import { searchProducts } from "@/services/products-service";
+import { findProductByCode, searchProducts } from "@/services/products-service";
+import { BarcodeScannerDialog } from "@/components/pos/barcode-scanner-dialog";
+import { NuevoProductoDialog } from "@/components/stock/nuevo-producto-dialog";
+import { leerEntradaCantidad } from "@/lib/escaneo-stock";
 import {
   getProveedores, crearProveedor, actualizarProveedor, recibirCompra, anularCompra,
   getCompras, getCompraDetalle,
@@ -136,6 +139,13 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
   // Factura electronica leida del QR (58): la deuda queda por su total.
   const [factura, setFactura] = useState<ResultadoFactura | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lector: buscador, cantidad de cada renglon y alta de un codigo que no esta en el catalogo.
+  const buscadorRef = useRef<HTMLInputElement>(null);
+  const cantidadRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const cantidadAlEntrar = useRef("");
+  const [camaraOpen, setCamaraOpen] = useState(false);
+  const [codigoNuevo, setCodigoNuevo] = useState("");
+  const altaPendiente = useRef("");
 
   const cargarFactura = (r: ResultadoFactura) => {
     setFactura(r);
@@ -193,6 +203,53 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
         },
       ];
     });
+  };
+
+  const enfocarCantidad = (id: string) =>
+    setTimeout(() => cantidadRefs.current[id]?.select(), 50);
+
+  // Codigo leido con el lector (o con la camara): si ya esta en la lista suma uno, si esta
+  // en el catalogo se agrega y queda lista la cantidad, y si no existe se abre el alta.
+  const procesarCodigo = async (codigo: string) => {
+    const c = codigo.trim();
+    if (!c) return;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    try {
+      const p = await findProductByCode(c);
+      setQuery("");
+      setResults([]);
+      if (!p) {
+        if (/^\d{8,14}$/.test(c)) {
+          altaPendiente.current = c;
+          setCodigoNuevo(c);
+        } else {
+          toast.error(`No hay ningún producto con el código ${c}`);
+        }
+        return;
+      }
+      const ya = items.find((i) => i.productoId === p.id);
+      if (ya) {
+        const n = (Number(ya.cantidad) || 0) + 1;
+        actualizarItem(p.id, "cantidad", String(n));
+        toast.success(`${p.name}: ${n}`);
+      } else {
+        agregar(p);
+      }
+      enfocarCantidad(p.id);
+    } catch {
+      toast.error("No se pudo buscar el código");
+    }
+  };
+
+  // Enter en la cantidad: vuelve al buscador; si lo que entro es un codigo, era el lector.
+  const enterEnCantidad = (id: string, valor: string) => {
+    const entrada = leerEntradaCantidad(valor, cantidadAlEntrar.current, false);
+    if (entrada.tipo === "codigo") {
+      actualizarItem(id, "cantidad", cantidadAlEntrar.current);
+      void procesarCodigo(entrada.codigo);
+      return;
+    }
+    buscadorRef.current?.focus();
   };
 
   const actualizarItem = (id: string, campo: "cantidad" | "costoUnitario" | "fechaVencimiento", valor: string) => {
@@ -275,6 +332,28 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
     />
   );
 
+  const dialogosLector = (
+    <>
+      <BarcodeScannerDialog open={camaraOpen} onOpenChange={setCamaraOpen} onDetected={(c) => { setCamaraOpen(false); void procesarCodigo(c); }} />
+      <NuevoProductoDialog
+        open={!!codigoNuevo}
+        onOpenChange={(o) => {
+          if (o) return;
+          setCodigoNuevo("");
+          altaPendiente.current = "";
+          setTimeout(() => buscadorRef.current?.focus(), 100);
+        }}
+        onCreated={() => {
+          // Se llama otra vez si despues se guarda la foto: solo la primera lo agrega a la compra.
+          const c = altaPendiente.current;
+          altaPendiente.current = "";
+          if (c) void procesarCodigo(c);
+        }}
+        codigoBarrasInicial={codigoNuevo || undefined}
+      />
+    </>
+  );
+
   if (proveedores.length === 0 && !factura) {
     return (
       <Card className="card-premium rounded-2xl">
@@ -350,16 +429,27 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
             </div>
           )}
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative flex gap-2">
+            <ScanBarcode className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={buscadorRef}
               value={query}
               onChange={(e) => buscar(e.target.value)}
-              placeholder="Buscar producto por nombre o código…"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                // Un solo resultado por nombre: Enter lo agrega; si no, se toma como codigo.
+                if (results.length === 1 && !/^\d+$/.test(query.trim())) agregar(results[0]);
+                else void procesarCodigo(query);
+              }}
+              placeholder="Pasá el lector por el código o buscá por nombre…"
               className="rounded-xl pl-9"
             />
+            <Button variant="outline" className="rounded-xl" onClick={() => setCamaraOpen(true)} title="Leer el código con la cámara">
+              <Camera className="h-4 w-4" />
+            </Button>
             {results.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-xl border bg-card shadow-lg">
+              <div className="absolute top-full z-10 mt-1 w-full rounded-xl border bg-card shadow-lg">
                 {results.map((p) => (
                   <button
                     key={p.id}
@@ -414,9 +504,14 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
                         )}
                         <TableCell>
                           <Input
-                            type="number" inputMode="decimal"
+                            ref={(el) => { cantidadRefs.current[i.productoId] = el; }}
+                            inputMode="decimal"
                             value={i.cantidad}
                             onChange={(e) => actualizarItem(i.productoId, "cantidad", e.target.value)}
+                            onFocus={(e) => { cantidadAlEntrar.current = e.target.value; }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); enterEnCantidad(i.productoId, e.currentTarget.value); }
+                            }}
                             className="h-8 rounded-lg text-right"
                           />
                         </TableCell>
@@ -477,6 +572,7 @@ function RecepcionTab({ proveedores, onProveedoresChanged }: { proveedores: Prov
         </CardContent>
       </Card>
       {dialogoFactura}
+      {dialogosLector}
     </div>
   );
 }
