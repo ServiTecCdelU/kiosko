@@ -13,6 +13,7 @@ export const RUBROS = [
   { id: "dietetica", nombre: "Dietética" },
   { id: "ferreteria", nombre: "Ferretería" },
   { id: "libreria", nombre: "Librería" },
+  { id: "repuestos", nombre: "Repuestos / lubricentro" },
   { id: "otro", nombre: "Otro" },
 ] as const;
 

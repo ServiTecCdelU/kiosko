@@ -10,6 +10,9 @@ test("el rubro decide de entrada", () => {
   assert.equal(moduloActivo("presupuestos", "ferreteria"), true);
   assert.equal(moduloActivo("balanza", "ferreteria"), false);
   assert.equal(moduloActivo("balanza", "verduleria"), true);
+  assert.equal(moduloActivo("presupuestos", "repuestos"), true);
+  assert.equal(moduloActivo("balanza", "repuestos"), false);
+  assert.equal(moduloActivo("produccion", "repuestos"), false);
 });
 
 test("sin rubro u 'otro': todo prendido", () => {

@@ -166,6 +166,19 @@ export const PERFILES: Record<string, PerfilRubro> = {
       VARIOS,
     ],
   },
+  repuestos: {
+    unidad: "un",
+    controlaStock: true,
+    categorias: ["Filtros", "Lubricantes", "Frenos", "Encendido", "Distribución", "Suspensión", "Iluminación", "Baterías", "Accesorios"],
+    tipicos: [
+      contado("Aceite suelto 15W40", "Lubricantes", "l"),
+      contado("Aceite suelto 20W50", "Lubricantes", "l"),
+      contado("Manguera de nafta 8 mm", "Accesorios", "m"),
+      contado("Cable para batería", "Accesorios", "m"),
+      { name: "Mano de obra", category: "Servicios", unidad: "un", stockControlado: false, precioLibre: true },
+      VARIOS,
+    ],
+  },
   otro: { unidad: "un", controlaStock: true, categorias: [], tipicos: [VARIOS] },
 };
 

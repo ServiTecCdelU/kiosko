@@ -8,6 +8,7 @@ import { leerTodo } from "@/lib/server/leer-todo";
 import { hoyArgentinaISO, sumarDias } from "@/lib/oferta-vigencia";
 import { comercioIdDeSesion } from "@/lib/server/sesion";
 import { historialOfertas, ofertasConResultados, sugerenciasOfertas } from "@/lib/server/ofertas";
+import { palabrasBusqueda } from "@/lib/busqueda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,6 @@ function acotar(valor: unknown, porDefecto: number, max = LIMITE_MAX): number {
   return Math.min(Math.floor(n), max);
 }
 
-/** Quita lo que rompe el filtro .or() de PostgREST. */
 /**
  * Saca los productos sin control de stock (servicios, recargas, pan que no se cuenta):
  * no se reponen, y como tienen stock 0 aparecian primeros "por agotarse".
@@ -38,13 +38,13 @@ async function sinServicios<T extends { producto_id: string }>(comercioId: strin
   return filas.filter((f) => !servicios.has(f.producto_id));
 }
 
-function sanitizar(q: string): string {
-  return q.replace(/[,()%]/g, " ").trim();
-}
-
-function filtrosComunes(q: any, comercioId: string, s: string, categoria?: string) {
+/**
+ * Cada palabra tiene que estar en nombre, codigo, codigo de barras o descripcion,
+ * en cualquier orden y sin importar tildes (productos.busqueda, 76_busqueda_productos.sql).
+ */
+function filtrosComunes(q: any, comercioId: string, palabras: string[], categoria?: string) {
   let query = q.eq("comercio_id", comercioId).eq("disabled", false);
-  if (s) query = query.or(`name.ilike.%${s}%,codigo.ilike.%${s}%,codigo_barras.ilike.%${s}%`);
+  for (const p of palabras) query = query.ilike("busqueda", `%${p}%`);
   if (categoria) query = query.eq("category", categoria);
   return query;
 }
@@ -62,14 +62,9 @@ export async function POST(req: Request) {
 
   switch (accion) {
     case "buscar": {
-      const q = sanitizar(String(body?.query ?? ""));
-      if (!q) return NextResponse.json({ productos: [] });
-      const { data, error } = await supabaseAdmin
-        .from("productos")
-        .select("*")
-        .eq("comercio_id", comercioId)
-        .eq("disabled", false)
-        .or(`name.ilike.%${q}%,codigo.ilike.%${q}%,codigo_barras.ilike.%${q}%`)
+      const palabras = palabrasBusqueda(String(body?.query ?? ""));
+      if (palabras.length === 0) return NextResponse.json({ productos: [] });
+      const { data, error } = await filtrosComunes(supabaseAdmin.from("productos").select("*"), comercioId, palabras)
         .order("name", { ascending: true })
         .limit(acotar(body?.limit, 24, 200));
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -78,7 +73,7 @@ export async function POST(req: Request) {
 
     case "pagina": {
       const p = body?.params ?? {};
-      const s = p.search ? sanitizar(String(p.search)) : "";
+      const s = p.search ? palabrasBusqueda(String(p.search)) : [];
 
       // Stock bajo / agotados: PostgREST no compara dos columnas, se trae un
       // set amplio y se filtra despues.

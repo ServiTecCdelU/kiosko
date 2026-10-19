@@ -101,3 +101,32 @@ Especificaciones de lo grande en `docs/superpowers/specs/2026-10-18-*-design.md`
   multi-caja, reportes vedados al cajero.
 - Aislamiento entre comercios: en cada prueba nueva se verificó que otro comercio no ve
   los datos (presupuestos, producción).
+
+---
+
+## 4. Repuestos del automotor — 2026-10-19
+
+Comercio "PRUEBA Repuestos El Pistón" (`prueba-repuestos-el-piston`, plan Pro, 2 cajas), por el
+alta real contra la base de producción. 24 productos como los carga una repuestera (rubro,
+marca, código del fabricante y aplicación en el nombre), aceite suelto por litro, manguera
+por metro, cliente taller responsable inscripto con cuenta corriente y proveedor.
+
+Anduvo bien: ventas en efectivo, litros y metros, fiado al taller, crédito en 3 cuotas con
+recargo, descuento al mecánico, tope de stock, presupuesto → venta a cuenta, devolución con
+reembolso, compra a cuenta corriente, aumento de precios por rubro (+8 % en Filtros),
+pago del taller, cierre de caja con diferencia 0 y reporte con margen.
+
+Arreglado:
+- **Búsqueda por varias palabras y sin tildes.** "filtro gol", "amortiguador corsa",
+  "aceite 10w40" o "bujia" no encontraban nada (se buscaba la frase entera). Ahora cada
+  palabra tiene que estar en nombre, código, código de barras o descripción, en cualquier
+  orden (`lib/busqueda.ts`, migración 76). Vale para todos los rubros, el POS, Stock,
+  Compras y la búsqueda sin conexión.
+- **Rubro "Repuestos / lubricentro"** en el alta: rubros típicos (Filtros, Lubricantes,
+  Frenos…), aceite suelto por litro, manguera por metro, mano de obra a precio libre y
+  Presupuestos prendido (sin Producción ni Balanza, que con "Otro" aparecían).
+
+Queda como idea (no se hizo): lista de precios para talleres/mecánicos (hoy se hace con
+descuento manual), campos aparte de marca y aplicación (hoy van en el nombre y se
+encuentran con la búsqueda nueva), equivalencias entre códigos de fabricantes y el rubro en
+la landing.

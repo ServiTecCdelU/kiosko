@@ -27,7 +27,7 @@ export const MODULOS: Modulo[] = [
     id: "presupuestos",
     nombre: "Presupuestos",
     descripcion: "Armar un presupuesto en PDF desde la caja y pasarlo a venta después.",
-    rubros: ["ferreteria", "libreria", "almacen", "supermercado"],
+    rubros: ["ferreteria", "libreria", "repuestos", "almacen", "supermercado"],
   },
   {
     id: "balanza",

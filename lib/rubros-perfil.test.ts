@@ -30,6 +30,11 @@ describe("perfiles por rubro", () => {
     assert.ok(PERFILES.ferreteria.tipicos.some((t) => t.unidad === "m"));
   });
 
+  test("repuestos: aceite suelto por litro y mano de obra a precio libre", () => {
+    assert.ok(PERFILES.repuestos.tipicos.some((t) => t.unidad === "l"));
+    assert.ok(PERFILES.repuestos.tipicos.some((t) => t.name === "Mano de obra" && t.precioLibre));
+  });
+
   test("los tipicos son validos: unidad conocida, nombres unicos, Varios con su codigo", () => {
     for (const [id, p] of Object.entries(PERFILES)) {
       const nombres = new Set<string>();
