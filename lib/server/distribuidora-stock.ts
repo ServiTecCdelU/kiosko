@@ -33,7 +33,7 @@ export async function estaVinculado(comercioId: string): Promise<boolean> {
 
 /** Authorization: Bearer <DISTRIBUIDORA_STOCK_CLAVE>, comparado en tiempo constante. */
 export function claveIntegracionValida(req: Request): boolean {
-  const clave = process.env.DISTRIBUIDORA_STOCK_CLAVE;
+  const clave = process.env.DISTRIBUIDORA_STOCK_CLAVE?.trim();
   if (!clave) return false;
   const recibida = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const a = Buffer.from(recibida);
@@ -42,9 +42,10 @@ export function claveIntegracionValida(req: Request): boolean {
 }
 
 async function llamarDistribuidora<T>(body: Record<string, unknown>): Promise<T> {
-  const base = process.env.DISTRIBUIDORA_API_URL;
-  const clave = process.env.DISTRIBUIDORA_STOCK_CLAVE;
-  if (!base || !clave) throw new Error("Falta configurar DISTRIBUIDORA_API_URL o DISTRIBUIDORA_STOCK_CLAVE");
+  const base = process.env.DISTRIBUIDORA_API_URL?.trim();
+  const clave = process.env.DISTRIBUIDORA_STOCK_CLAVE?.trim();
+  const faltan = [!base && "DISTRIBUIDORA_API_URL", !clave && "DISTRIBUIDORA_STOCK_CLAVE"].filter(Boolean);
+  if (!base || !clave) throw new Error(`Falta configurar en Vercel: ${faltan.join(" y ")}`);
   let res: Response;
   try {
     res = await fetch(`${base.replace(/\/$/, "")}/api/integracion/kiosko`, {
