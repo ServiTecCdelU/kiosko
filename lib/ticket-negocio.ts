@@ -1,5 +1,5 @@
 // lib/ticket-negocio.ts — datos del negocio que van arriba del ticket (logo, nombre,
-// direccion, telefono, CUIT). Los edita el dueño en Mi comercio y se guardan en
+// direccion, CUIT). Los edita el dueño en Mi comercio y se guardan en
 // comercios.config.ticket. Puro: lo usan la API, el POS, las impresoras y los tests.
 
 /** Logo ya convertido a puntos blanco y negro para la Zebra (lib/zpl-logo.ts). */
@@ -17,7 +17,6 @@ export interface LogoTicket {
 /** Lo que el ticket muestra debajo del nombre. Lo vacio no se imprime. */
 export interface EncabezadoTicket {
   direccion?: string;
-  telefono?: string;
   cuit?: string;
   logo?: LogoTicket;
 }
@@ -25,7 +24,6 @@ export interface EncabezadoTicket {
 export interface DatosTicket {
   nombre: string;
   direccion: string;
-  telefono: string;
   cuit: string;
   logo: LogoTicket | null;
 }
@@ -57,7 +55,6 @@ export function datosTicketValidos(v: any): DatosTicket {
   return {
     nombre: texto(v?.nombre, 60),
     direccion: texto(v?.direccion, 120),
-    telefono: texto(v?.telefono, 40),
     cuit: texto(v?.cuit, 20),
     logo: logoValido(v?.logo),
   };
@@ -72,7 +69,6 @@ export function formatearCuit(cuit: string): string {
 export function encabezadoDeDatos(d: DatosTicket): EncabezadoTicket {
   return {
     direccion: d.direccion || undefined,
-    telefono: d.telefono || undefined,
     cuit: d.cuit || undefined,
     logo: d.logo ?? undefined,
   };

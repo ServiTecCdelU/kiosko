@@ -1,7 +1,7 @@
 "use client";
 
 // components/pos/datos-ticket-config.tsx — "Datos del ticket" en Mi comercio: logo,
-// nombre, direccion, telefono y CUIT que salen arriba del ticket (Zebra, termica y
+// nombre, direccion y CUIT que salen arriba del ticket (Zebra, termica y
 // navegador). El logo se pasa aca a blanco y negro (lib/zpl-logo.ts) y se guarda
 // ya listo para la impresora: no hace falta subir la imagen a ningun lado.
 import { useEffect, useRef, useState } from "react";
@@ -183,10 +183,6 @@ export function DatosTicketConfig() {
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">Dirección</span>
           <Input value={datos.direccion} onChange={(e) => cambiar({ direccion: e.target.value })} maxLength={120} placeholder="San Martín 123, Paraná" className="rounded-xl" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Teléfono</span>
-          <Input value={datos.telefono} onChange={(e) => cambiar({ telefono: e.target.value })} maxLength={40} placeholder="343 456-7890" className="rounded-xl" />
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">CUIT</span>

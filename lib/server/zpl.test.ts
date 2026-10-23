@@ -7,7 +7,7 @@ import { datosTicketValidos, formatearCuit } from "../ticket-negocio.ts";
 
 const ticketBase = () => ({
   comercio: "Almacén Doña Ñata",
-  encabezado: { direccion: "San Martín 123, Paraná", telefono: "343 456-7890", cuit: "20123456789" },
+  encabezado: { direccion: "San Martín 123, Paraná", cuit: "20123456789" },
   saleNumber: "0001-00000042",
   createdAt: new Date(2026, 9, 10, 14, 5),
   items: [
@@ -30,6 +30,8 @@ function fondoImpreso(zpl: string): number {
   let max = 0;
   for (const m of zpl.matchAll(/\^FO\d+,(\d+)\^A0N,(\d+)/g)) max = Math.max(max, Number(m[1]) + Number(m[2]));
   for (const m of zpl.matchAll(/\^FO\d+,(\d+)\^GB\d+,(\d+)/g)) max = Math.max(max, Number(m[1]) + Number(m[2]));
+  // Imagenes (^GFA,total,total,bytesPorFila): alto = total / bytesPorFila
+  for (const m of zpl.matchAll(/\^FO\d+,(\d+)\^GFA,(\d+),\d+,(\d+),/g)) max = Math.max(max, Number(m[1]) + Number(m[2]) / Number(m[3]));
   return max;
 }
 
@@ -54,7 +56,7 @@ describe("generarZPL", () => {
     const zpl = generarZPL(ticketBase());
     assert.ok(zpl.includes("^FDAlmacén Doña Ñata^FS"));
     assert.ok(zpl.includes("San Martín 123, Paraná"));
-    assert.ok(zpl.includes("Tel: 343 456-7890"));
+    assert.ok(!zpl.includes("Tel:"));
     assert.ok(zpl.includes("CUIT: 20-12345678-9"));
     assert.ok(!zpl.includes("Patricia"));
   });
@@ -75,6 +77,14 @@ describe("generarZPL", () => {
     assert.ok(zpl.includes("^FD$800^FS"));
     assert.ok(zpl.includes("¡Gracias por su compra!"));
     assert.ok(zpl.includes("Ticket no válido como factura"));
+  });
+
+  test("pie de ServiTec con logo, abajo de todo", () => {
+    const zpl = generarZPL(ticketBase());
+    const pie = zpl.indexOf("^FDServiTec^FS");
+    assert.ok(pie > zpl.indexOf("Ticket no válido como factura"));
+    assert.ok(zpl.includes("^FDSistemas de gestión^FS"));
+    assert.ok(zpl.lastIndexOf("^GFA,") > zpl.indexOf("Ticket no válido como factura"));
   });
 
   test("con oferta muestra el precio de lista y el descuento aparte", () => {

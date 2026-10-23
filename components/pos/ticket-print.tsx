@@ -8,7 +8,7 @@ import { formatearCuit, type EncabezadoTicket } from "@/lib/ticket-negocio";
 export interface TicketData {
   /** Nombre del negocio (el de los carteles, por navegador). */
   comercio?: string;
-  /** Logo, direccion, telefono y CUIT (Mi comercio → Datos del ticket). */
+  /** Logo, direccion y CUIT (Mi comercio → Datos del ticket). */
   encabezado?: EncabezadoTicket;
   saleNumber: string;
   createdAt: Date;
@@ -54,7 +54,6 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
       )}
       <p className="text-center text-sm font-bold">{ticket.comercio || NOMBRE_POR_DEFECTO}</p>
       {ticket.encabezado?.direccion && <p className="text-center">{ticket.encabezado.direccion}</p>}
-      {ticket.encabezado?.telefono && <p className="text-center">Tel: {ticket.encabezado.telefono}</p>}
       {ticket.encabezado?.cuit && <p className="text-center">CUIT: {formatearCuit(ticket.encabezado.cuit)}</p>}
       <p className="text-center">Ticket no fiscal</p>
       <p className="text-center">{formatDateTime(ticket.createdAt)}</p>
@@ -102,6 +101,7 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
       )}
       <div className="my-1 border-t border-dashed border-black" />
       <p className="text-center">¡Gracias por su compra!</p>
+      <p className="mt-1 text-center text-[9px]">ServiTec · Sistemas de gestión</p>
     </div>
   );
 }

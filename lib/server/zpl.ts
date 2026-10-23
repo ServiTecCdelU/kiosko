@@ -36,6 +36,16 @@ const LETRA_TOTAL = 44;
 const LETRA_NORMAL = 24;
 const LETRA_CHICA = 22;
 const INTERLINEA = 6;
+const LETRA_PIE_MARCA = 20;
+const LETRA_PIE = 16;
+
+/** Logo de ServiTec (public/servitec-logo.png) a 48 puntos (~6 mm), ya en ^GFA. */
+const LOGO_SERVITEC = {
+  bytesPorFila: 6,
+  alto: 46,
+  datos:
+    "L03F,L0C18,K03004,K06002,003F0C003,00E1F8001,01801C001,0300270018,0200619008,0600407C08,0400C047FF,040087EC09C,0403BC3E083,0404C0030808060480218804021F8020C8020272J0680202C42I03C03030400403C030704084022020C8CI01B6021I803C81C0210C802401A04204802401308203813C0I18402D8I011B,4064001030E,402C030020C,401CI0423C,4012J0664,6013I01F84,20118401302,1810C003202,0C107C1FE02,039037F1802,007FF301002,00101E02002,00180986004,I0800E4004,I08003C008,I08001F87,I040030FC,I06006,I0200C,I0181,J0FE,",
+};
 
 function escaparZPL(texto: string): string {
   // ^ y ~ son caracteres de control ZPL; los reemplazamos para que no rompan el comando.
@@ -142,7 +152,7 @@ export function generarZPL(ticket: TicketData): string {
     y += 2 + 12;
   }
 
-  // ---- Encabezado: logo, nombre, direccion, telefono, CUIT -------------------
+  // ---- Encabezado: logo, nombre, direccion, CUIT ------------------------------
   const enc = ticket.encabezado ?? {};
   if (enc.logo) {
     const anchoLogo = enc.logo.bytesPorFila * 8;
@@ -153,7 +163,6 @@ export function generarZPL(ticket: TicketData): string {
   }
   linea(ticket.comercio?.trim() || "Ticket", LETRA_NOMBRE, "C", true);
   if (enc.direccion) linea(enc.direccion, LETRA_CHICA, "C");
-  if (enc.telefono) linea(`Tel: ${enc.telefono}`, LETRA_CHICA, "C");
   if (enc.cuit) linea(`CUIT: ${formatearCuit(enc.cuit)}`, LETRA_CHICA, "C");
   separador();
 
@@ -206,6 +215,21 @@ export function generarZPL(ticket: TicketData): string {
   separador();
   linea("¡Gracias por su compra!", LETRA_NORMAL, "C");
   linea("Ticket no válido como factura", LETRA_CHICA, "C");
+
+  // Firma del sistema: logo chico a la izquierda y el texto al lado, centrados juntos.
+  y += 10;
+  const anchoLogoPie = LOGO_SERVITEC.bytesPorFila * 8;
+  const anchoTextoPie = Math.max(anchoTexto("ServiTec", LETRA_PIE_MARCA), anchoTexto("Sistemas de gestión", LETRA_PIE));
+  const anchoPie = anchoLogoPie + 8 + anchoTextoPie;
+  const xPie = MARGEN_IZQUIERDO + Math.max(0, Math.floor((ANCHO_UTIL - anchoPie) / 2));
+  const xTextoPie = xPie + anchoLogoPie + 8;
+  body += comandoLogo(LOGO_SERVITEC, xPie, y);
+  const yTexto = y + Math.max(0, Math.floor((LOGO_SERVITEC.alto - LETRA_PIE_MARCA - LETRA_PIE - 2) / 2));
+  body += `^FO${xTextoPie},${yTexto}^A0N,${LETRA_PIE_MARCA},${LETRA_PIE_MARCA}^FDServiTec^FS
+`;
+  body += `^FO${xTextoPie},${yTexto + LETRA_PIE_MARCA + 2}^A0N,${LETRA_PIE},${LETRA_PIE}^FDSistemas de gestión^FS
+`;
+  fondo = y + LOGO_SERVITEC.alto;
 
   const alto = fondo + MARGEN_INFERIOR;
 
