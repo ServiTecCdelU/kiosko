@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { generarZPL } from "@/lib/server/zpl";
 import { imprimirZPL } from "@/lib/server/imprimir-zpl";
 import type { TicketData } from "@/components/pos/ticket-print";
+import { datosTicketValidos, encabezadoDeDatos } from "@/lib/ticket-negocio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,15 @@ export async function POST(req: Request) {
   }
 
   const ticket: TicketData = {
+    comercio: typeof body.comercio === "string" ? body.comercio : undefined,
+    // El logo se valida igual que al guardarlo: nada que corte el ^GF.
+    encabezado: body.encabezado ? encabezadoDeDatos(datosTicketValidos(body.encabezado)) : undefined,
     saleNumber: String(body.saleNumber ?? ""),
     createdAt: new Date(body.createdAt ?? Date.now()),
     items: body.items,
     total: Number(body.total ?? 0),
+    ahorroOfertas: Number(body.ahorroOfertas ?? 0) || undefined,
+    ofertasDestacadas: Array.isArray(body.ofertasDestacadas) ? body.ofertasDestacadas.map(String) : undefined,
     paymentMethod: body.paymentMethod ?? "efectivo",
     cashAmount: Number(body.cashAmount ?? 0),
     changeAmount: Number(body.changeAmount ?? 0),

@@ -1,4 +1,4 @@
-// app/api/imprimir-ticket/prueba/route.ts — ticket fijo para calibrar ALTO_POR_LINEA a mano.
+// app/api/imprimir-ticket/prueba/route.ts — ticket fijo para probar la Zebra a mano.
 // Abrir esta URL en el navegador (GET) manda el ticket de prueba a la Zebra RAW
 // (solo funciona con la app corriendo en la misma PC que la impresora).
 import { NextResponse } from "next/server";

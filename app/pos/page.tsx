@@ -44,6 +44,8 @@ import { TicketsEsperaDialog } from "@/components/pos/tickets-espera-dialog";
 import { OfertasRapidas } from "@/components/pos/ofertas-rapidas";
 import { AvisoSoporte } from "@/components/layout/aviso-soporte";
 import { useNombreComercio } from "@/components/stock/oferta-publicada";
+import { useDatosTicket } from "@/hooks/use-datos-ticket";
+import { encabezadoDeDatos } from "@/lib/ticket-negocio";
 import {
   listarTicketsEnEspera, suspenderTicket, quitarTicketEnEspera, type TicketEnEspera,
 } from "@/lib/utils/tickets-espera";
@@ -85,6 +87,7 @@ function PosScreen() {
   const anunciarVenta = usePantallaCliente(cart.items);
   const ofertasVigentes = useOfertasVigentes();
   const [nombreComercio] = useNombreComercio();
+  const datosTicket = useDatosTicket();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
@@ -594,7 +597,9 @@ function PosScreen() {
       const ahorroOfertas = cart.items.reduce((s, i) => s + ahorroLinea(i.product, i.quantity), 0);
       anunciarVenta(total, ahorroOfertas);
       const ticket: TicketData = {
-        comercio: nombreComercio.trim() || undefined,
+        // Mi comercio → Datos del ticket; si no esta cargado, el nombre de los carteles o el del comercio.
+        comercio: datosTicket?.nombre || nombreComercio.trim() || getCurrentUser()?.comercioNombre || undefined,
+        encabezado: datosTicket ? encabezadoDeDatos(datosTicket) : undefined,
         saleNumber,
         createdAt: new Date(),
         items: cart.items.map((i) => {
@@ -605,6 +610,7 @@ function PosScreen() {
             price: i.quantity > 0 ? subtotal / i.quantity : 0,
             subtotal,
             unidad: i.product.unidad,
+            ahorro: ahorroLinea(i.product, i.quantity),
           };
         }),
         total,
@@ -631,7 +637,7 @@ function PosScreen() {
       focusInput();
       imprimirTicket(ticket);
     },
-    [cart, focusInput, imprimirTicket, anunciarVenta, ofertasVigentes, nombreComercio],
+    [cart, focusInput, imprimirTicket, anunciarVenta, ofertasVigentes, nombreComercio, datosTicket],
   );
 
   const handleAprobadoQR = useCallback(
@@ -1145,7 +1151,8 @@ function PosScreen() {
           setImpresoraOpen(o);
           if (!o) focusInput();
         }}
-        nombreComercio={nombreComercio.trim() || undefined}
+        nombreComercio={datosTicket?.nombre || nombreComercio.trim() || undefined}
+        encabezado={datosTicket ? encabezadoDeDatos(datosTicket) : undefined}
         onChanged={setConfigImpresora}
         onPruebaNavegador={handlePruebaNavegador}
         conBalanza={conBalanza}

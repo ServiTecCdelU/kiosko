@@ -1,5 +1,5 @@
-// app/api/comercio/route.ts — "Mi comercio": rubro, modulos del menu (lib/modulos.ts) y
-// tienda online (lib/tienda.ts, plan Tienda).
+// app/api/comercio/route.ts — "Mi comercio": rubro, modulos del menu (lib/modulos.ts),
+// tienda online (lib/tienda.ts, plan Tienda) y datos del ticket (lib/ticket-negocio.ts).
 // Solo el dueño (RUTAS_ADMIN en lib/permisos-api.ts). Se guardan en comercios.config,
 // sin pisar el resto de la config (origen del alta, etc.).
 import { NextResponse } from "next/server";
@@ -9,6 +9,8 @@ import { RUBROS } from "@/lib/registro";
 import { modulosValidos } from "@/lib/modulos";
 import { MENSAJE_TIENDA, planIncluyeTienda } from "@/lib/suscripcion";
 import { configTiendaValida, numeroWhatsapp } from "@/lib/tienda";
+import { datosTicketValidos } from "@/lib/ticket-negocio";
+import { leerDatosTicket } from "@/lib/server/datos-ticket";
 
 /** Config actual (la tienda no viaja en la sesion). Sin WhatsApp cargado, se sugiere el del alta. */
 export async function GET(req: Request) {
@@ -22,12 +24,19 @@ export async function GET(req: Request) {
   if (!data) return NextResponse.json({ error: "El comercio no existe" }, { status: 404 });
   const tienda = configTiendaValida(data.config?.tienda);
   if (!tienda.whatsapp && typeof data.config?.telefono === "string") tienda.whatsapp = data.config.telefono;
+  let ticket;
+  try {
+    ticket = await leerDatosTicket(comercioId);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 400 });
+  }
   return NextResponse.json({
     slug: data.slug,
     rubro: data.config?.rubro ?? null,
     modulos: modulosValidos(data.config?.modulos),
     tienda,
     tiendaEnPlan: planIncluyeTienda(data.plan),
+    ticket,
   });
 }
 
@@ -67,8 +76,22 @@ export async function PATCH(req: Request) {
     }
     config.tienda = tienda;
   }
+  if (body?.ticket !== undefined) {
+    const ticket = datosTicketValidos(body.ticket);
+    // Un logo que vino pero no paso la validacion no se descarta en silencio.
+    if (body.ticket?.logo && !ticket.logo) {
+      return NextResponse.json({ error: "El logo no es válido: volvé a elegir la imagen" }, { status: 400 });
+    }
+    config.ticket = ticket;
+  }
 
   const { error } = await supabaseAdmin.from("comercios").update({ config }).eq("id", comercioId);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true, rubro: config.rubro ?? null, modulos: config.modulos ?? {}, tienda: configTiendaValida(config.tienda) });
+  return NextResponse.json({
+    ok: true,
+    rubro: config.rubro ?? null,
+    modulos: config.modulos ?? {},
+    tienda: configTiendaValida(config.tienda),
+    ticket: config.ticket ? datosTicketValidos(config.ticket) : undefined,
+  });
 }

@@ -185,6 +185,9 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - `zebra`: ZPL a la **Zebra ZD220** (`lib/server/zpl.ts`, se arma en el navegador) por el
     agente local, a la impresora RAW `ZD220-RAW`. Sin agente cae a `/api/imprimir-ticket`,
     que solo sirve con la app corriendo en la misma PC que la impresora.
+    Papel continuo (`^MNN`), `^LL` = lo impreso + 0,5 cm. El encabezado (logo, nombre, dirección,
+    teléfono, CUIT) sale de **Mi comercio → Datos del ticket** (`comercios.config.ticket`,
+    `lib/ticket-negocio.ts`); el logo se guarda ya convertido a `^GFA` (`lib/zpl-logo.ts`).
   - Si la impresora falla, siempre se cae al ticket del navegador. Orquestador:
     `lib/impresora/imprimir.ts` (`imprimirTicket`, `abrirCajon`).
 - **Cajón de dinero**: enchufado a la impresora (RJ11). Se abre solo al cobrar en

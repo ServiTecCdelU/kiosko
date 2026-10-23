@@ -3,13 +3,17 @@ import { formatCurrency, formatDateTime } from "@/lib/utils/format";
 import { cantidadTexto } from "@/lib/cantidad";
 import type { PaymentMethod } from "@/lib/types";
 import type { Unidad } from "@/lib/unidades";
+import { formatearCuit, type EncabezadoTicket } from "@/lib/ticket-negocio";
 
 export interface TicketData {
   /** Nombre del negocio (el de los carteles, por navegador). */
   comercio?: string;
+  /** Logo, direccion, telefono y CUIT (Mi comercio → Datos del ticket). */
+  encabezado?: EncabezadoTicket;
   saleNumber: string;
   createdAt: Date;
-  items: { name: string; quantity: number; price: number; subtotal: number; unidad: Unidad }[];
+  /** ahorro: lo que la oferta le desconto a esa linea (price y subtotal ya vienen con la oferta). */
+  items: { name: string; quantity: number; price: number; subtotal: number; unidad: Unidad; ahorro?: number }[];
   total: number;
   /** Suma de lo que el cliente se ahorro con ofertas de catalogo. */
   ahorroOfertas?: number;
@@ -44,7 +48,14 @@ export function TicketPrint({ ticket }: { ticket: TicketData | null }) {
 
   return (
     <div id="ticket-print" className="bg-white p-2 font-mono text-[11px] leading-tight text-black">
+      {ticket.encabezado?.logo?.vista && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={ticket.encabezado.logo.vista} alt="" className="mx-auto mb-1 max-h-16" />
+      )}
       <p className="text-center text-sm font-bold">{ticket.comercio || NOMBRE_POR_DEFECTO}</p>
+      {ticket.encabezado?.direccion && <p className="text-center">{ticket.encabezado.direccion}</p>}
+      {ticket.encabezado?.telefono && <p className="text-center">Tel: {ticket.encabezado.telefono}</p>}
+      {ticket.encabezado?.cuit && <p className="text-center">CUIT: {formatearCuit(ticket.encabezado.cuit)}</p>}
       <p className="text-center">Ticket no fiscal</p>
       <p className="text-center">{formatDateTime(ticket.createdAt)}</p>
       <p className="text-center">#{ticket.saleNumber}</p>

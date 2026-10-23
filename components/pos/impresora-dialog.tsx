@@ -25,11 +25,14 @@ import {
 import { BalanzaSerieSection } from "@/components/pos/balanza-serie-section";
 import type { FormatoBalanza } from "@/lib/barcode-balanza";
 import type { TicketData } from "@/components/pos/ticket-print";
+import type { EncabezadoTicket } from "@/lib/ticket-negocio";
 
 interface ImpresoraDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nombreComercio?: string;
+  /** Logo, direccion, telefono y CUIT: la prueba sale igual que un ticket real. */
+  encabezado?: EncabezadoTicket;
   /** Modulo Balanza del comercio (lib/modulos.ts): sin el, solo la impresora. */
   conBalanza?: boolean;
   /** Se avisa cada vez que se guarda, para que el POS relea la configuracion. */
@@ -46,7 +49,7 @@ const MODOS: { valor: ModoImpresora; ayuda: string }[] = [
   { valor: "zebra", ayuda: "Ticket ZPL a la Zebra ZD220, con el alto justo. Va por el agente local, igual que la térmica." },
 ];
 
-export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged, onPruebaNavegador, conBalanza = true }: ImpresoraDialogProps) {
+export function ImpresoraDialog({ open, onOpenChange, nombreComercio, encabezado, onChanged, onPruebaNavegador, conBalanza = true }: ImpresoraDialogProps) {
   const [config, setConfig] = useState<ConfigImpresora>(leerConfigImpresora);
   const [usbNombre, setUsbNombre] = useState<string | null>(null);
   const [agenteEstado, setAgenteEstado] = useState<{ ok: boolean; impresoras: string[]; error?: string } | null>(null);
@@ -101,8 +104,8 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
   const probar = async () => {
     setOcupado("prueba");
     try {
-      const r = await imprimirTicketDePrueba(nombreComercio, config);
-      if (r === "navegador") onPruebaNavegador?.(ticketDePrueba(nombreComercio));
+      const r = await imprimirTicketDePrueba(nombreComercio, config, encabezado);
+      if (r === "navegador") onPruebaNavegador?.(ticketDePrueba(nombreComercio, encabezado));
       else if (r === "omitido") toast.info("Con “No imprimir ticket” no sale nada. Elegí una impresora para probar.");
       else toast.success("Ticket de prueba enviado a la impresora");
     } catch (e) {

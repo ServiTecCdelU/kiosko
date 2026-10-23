@@ -17,6 +17,7 @@ import { enviarPorUsb } from "@/lib/impresora/webusb";
 import { AgenteNoResponde, enviarAlAgente } from "@/lib/impresora/agente";
 import { generarZPL } from "@/lib/server/zpl";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
+import type { EncabezadoTicket } from "@/lib/ticket-negocio";
 
 /**
  * "impreso": ya salio. "navegador": el llamador tiene que abrir window.print().
@@ -103,6 +104,10 @@ export async function abrirCajon(config: ConfigImpresora = leerConfigImpresora()
 }
 
 /** Ticket fijo para probar papel, ancho y cajon. */
-export async function imprimirTicketDePrueba(comercio: string | undefined, config: ConfigImpresora = leerConfigImpresora()): Promise<ResultadoImpresion> {
-  return imprimirTicket(ticketDePrueba(comercio), config);
+export async function imprimirTicketDePrueba(
+  comercio: string | undefined,
+  config: ConfigImpresora = leerConfigImpresora(),
+  encabezado?: EncabezadoTicket,
+): Promise<ResultadoImpresion> {
+  return imprimirTicket(ticketDePrueba(comercio, encabezado), config);
 }

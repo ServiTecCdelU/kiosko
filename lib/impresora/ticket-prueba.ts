@@ -1,10 +1,12 @@
 // lib/impresora/ticket-prueba.ts — ticket fijo para probar la impresora
 // (boton "Imprimir ticket de prueba" y la ruta /api/imprimir-ticket/prueba).
 import type { TicketData } from "@/components/pos/ticket-print";
+import type { EncabezadoTicket } from "@/lib/ticket-negocio";
 
-export function ticketDePrueba(comercio?: string): TicketData {
+export function ticketDePrueba(comercio?: string, encabezado?: EncabezadoTicket): TicketData {
   return {
     comercio: comercio?.trim() || "Ticket de prueba",
+    encabezado,
     saleNumber: "0000-PRUEBA",
     createdAt: new Date(),
     items: [

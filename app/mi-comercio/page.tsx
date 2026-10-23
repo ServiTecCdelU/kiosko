@@ -1,6 +1,6 @@
 "use client";
 
-// app/mi-comercio/page.tsx — rubro del comercio y pantallas del menu (lib/modulos.ts).
+// app/mi-comercio/page.tsx — datos del ticket, tienda, rubro del comercio y pantallas del menu (lib/modulos.ts).
 // Solo el dueño (la API lo exige). Cada modulo arranca segun el rubro; lo que se
 // prende o apaga aca le gana al rubro.
 import { useState } from "react";
@@ -14,6 +14,7 @@ import { RUBROS } from "@/lib/registro";
 import { MODULOS, moduloActivo, moduloPorRubro, type ModuloId, type ModulosElegidos } from "@/lib/modulos";
 import { apiUrl } from "@/lib/utils/api-url";
 import { TiendaConfig } from "@/components/tienda/tienda-config";
+import { DatosTicketConfig } from "@/components/pos/datos-ticket-config";
 
 export default function MiComercioPage() {
   const { user, rol } = useAuth();
@@ -63,6 +64,8 @@ export default function MiComercioPage() {
   return (
     <AppShell title="Mi comercio">
       <div className="max-w-2xl space-y-6">
+        <DatosTicketConfig />
+
         <TiendaConfig />
 
         <section className="space-y-2 rounded-2xl border bg-card p-5">
