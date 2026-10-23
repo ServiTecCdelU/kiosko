@@ -10,9 +10,10 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { leerTodo } from "@/lib/server/leer-todo";
+import { filasDesdeDistribuidora } from "@/lib/sync-filas";
 import {
-  deltaDistribuidora, estadoTrasPaso, ladoDelPaso, siguientePaso, transferenciaDesdeFila,
-  type DireccionTransferencia, type FilaStock, type Transferencia,
+  deltaDistribuidora, estadoTrasPaso, ladoDelPaso, siguientePaso, transferenciaDesdeFila, unirStock,
+  type DireccionTransferencia, type FilaStock, type ProductoRemoto, type Transferencia,
 } from "@/lib/stock-distribuidora";
 
 /** La distribuidora contesto y no acepto el movimiento (ej. sin stock): no se movio nada alla. */
@@ -66,10 +67,44 @@ async function llamarDistribuidora<T>(body: Record<string, unknown>): Promise<T>
   throw new Error(mensaje);
 }
 
-/** Stock de la distribuidora por id de producto (los que tiene). */
-async function stockDistribuidora(): Promise<Map<string, number>> {
-  const { stock } = await llamarDistribuidora<{ stock: Record<string, number> }>({ accion: "stock" });
-  return new Map(Object.entries(stock ?? {}).map(([id, n]) => [id, Number(n) || 0]));
+/** Catalogo habilitado de la distribuidora con su stock. */
+async function catalogoDistribuidora(): Promise<ProductoRemoto[]> {
+  const { productos } = await llamarDistribuidora<{ productos: ProductoRemoto[] }>({ accion: "stock" });
+  return Array.isArray(productos) ? productos : [];
+}
+
+/**
+ * Id del producto del comercio para ese producto de la distribuidora. Si el comercio
+ * todavia no lo tiene y va a recibir stock, se da de alta igual que en la
+ * sincronizacion del catalogo (lib/sync-filas.ts), con stock 0.
+ */
+async function asegurarProducto(
+  comercioId: string,
+  distId: string,
+  crear: boolean,
+  catalogo: () => Promise<ProductoRemoto[]>,
+): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("productos")
+    .select("id")
+    .eq("comercio_id", comercioId)
+    .eq("dist_id", distId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (data) return data.id;
+  if (!crear) throw new Error("El super no tiene ese producto");
+
+  const remoto = (await catalogo()).find((p) => p.id === distId);
+  if (!remoto) throw new Error("La distribuidora no tiene ese producto");
+  const [fila] = filasDesdeDistribuidora([{ ...remoto, codigo: remoto.codigo ?? undefined }], comercioId, new Date().toISOString());
+  // Por (comercio_id, dist_id), como la sincronizacion: nunca toca otro comercio.
+  const { data: alta, error: errorAlta } = await supabaseAdmin
+    .from("productos")
+    .upsert(fila, { onConflict: "comercio_id,dist_id" })
+    .select("id")
+    .single();
+  if (errorAlta) throw new Error(errorAlta.message);
+  return alta.id;
 }
 
 async function leerTransferencia(comercioId: string, id: string): Promise<Transferencia> {
@@ -140,27 +175,34 @@ async function avanzar(comercioId: string, t: Transferencia): Promise<Transferen
   return t;
 }
 
+export interface PedidoTransferencia {
+  /** Id del producto en la distribuidora (lo identifica en los dos sistemas). */
+  distId: string;
+  cantidad: number;
+  direccion: DireccionTransferencia;
+  usuario: string | null;
+  pedidaEn: "comercio" | "distribuidora";
+}
+
+/** El catalogo remoto se pide una sola vez por pedido, y solo si hace falta dar un alta. */
+function catalogoUnaVez(): () => Promise<ProductoRemoto[]> {
+  let p: Promise<ProductoRemoto[]> | null = null;
+  return () => (p ??= catalogoDistribuidora());
+}
+
 export async function transferir(
   comercioId: string,
-  datos: { productoId: string; cantidad: number; direccion: DireccionTransferencia; usuario: string | null; pedidaEn: "comercio" | "distribuidora" },
+  datos: PedidoTransferencia,
+  catalogo: () => Promise<ProductoRemoto[]> = catalogoUnaVez(),
 ): Promise<Transferencia> {
-  // El producto tiene que ser de este comercio y venir de la distribuidora.
-  const { data: producto, error } = await supabaseAdmin
-    .from("productos")
-    .select("id, dist_id")
-    .eq("id", datos.productoId)
-    .eq("comercio_id", comercioId)
-    .not("dist_id", "is", null)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!producto) throw new Error("Ese producto no es de la distribuidora");
+  const productoId = await asegurarProducto(comercioId, datos.distId, datos.direccion === "a_comercio", catalogo);
 
   const id = `tdist_${randomUUID()}`;
   const { error: errorAlta } = await supabaseAdmin.from("transferencias_distribuidora").insert({
     id,
     comercio_id: comercioId,
-    producto_id: producto.id,
-    dist_id: producto.dist_id,
+    producto_id: productoId,
+    dist_id: datos.distId,
     cantidad: datos.cantidad,
     direccion: datos.direccion,
     pedida_en: datos.pedidaEn,
@@ -168,6 +210,24 @@ export async function transferir(
   });
   if (errorAlta) throw new Error(errorAlta.message);
   return avanzar(comercioId, await leerTransferencia(comercioId, id));
+}
+
+/** Varios de una ("pasar 10 de cada uno" o "todo"). Uno que falla no frena al resto. */
+export async function transferirVarios(
+  comercioId: string,
+  items: { distId: string; cantidad: number }[],
+  comun: Omit<PedidoTransferencia, "distId" | "cantidad">,
+): Promise<{ distId: string; transferencia?: Transferencia; error?: string }[]> {
+  const catalogo = catalogoUnaVez();
+  const resultado: { distId: string; transferencia?: Transferencia; error?: string }[] = [];
+  for (const item of items) {
+    try {
+      resultado.push({ distId: item.distId, transferencia: await transferir(comercioId, { ...comun, ...item }, catalogo) });
+    } catch (e) {
+      resultado.push({ distId: item.distId, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return resultado;
 }
 
 /** Reintenta las que quedaron a medio camino. */
@@ -185,7 +245,7 @@ export async function reintentarAbiertas(comercioId: string): Promise<Transferen
   return resultado;
 }
 
-/** Productos de la distribuidora con el stock de los dos lados, y las ultimas transferencias. */
+/** Catalogo de la distribuidora con el stock de los dos lados, y las ultimas transferencias. */
 export async function verStock(comercioId: string): Promise<{ productos: FilaStock[]; transferencias: Transferencia[]; errorDistribuidora?: string }> {
   const [locales, remoto, transferencias] = await Promise.all([
     leerTodo<{ id: string; dist_id: string; name: string; codigo: string | null; stock: number }>((desde, hasta) =>
@@ -198,9 +258,9 @@ export async function verStock(comercioId: string): Promise<{ productos: FilaSto
         .order("name", { ascending: true })
         .range(desde, hasta),
     ),
-    stockDistribuidora().then(
-      (m) => ({ m, error: undefined as string | undefined }),
-      (e) => ({ m: null, error: e instanceof Error ? e.message : String(e) }),
+    catalogoDistribuidora().then(
+      (lista) => ({ lista, error: undefined as string | undefined }),
+      (e) => ({ lista: null, error: e instanceof Error ? e.message : String(e) }),
     ),
     supabaseAdmin
       .from("transferencias_distribuidora")
@@ -212,14 +272,10 @@ export async function verStock(comercioId: string): Promise<{ productos: FilaSto
   if (transferencias.error) throw new Error(transferencias.error.message);
 
   return {
-    productos: locales.map((p) => ({
-      productoId: p.id,
-      distId: p.dist_id,
-      nombre: p.name,
-      codigo: p.codigo,
-      stockComercio: Number(p.stock) || 0,
-      stockDistribuidora: remoto.m ? remoto.m.get(p.dist_id) ?? null : null,
-    })),
+    productos: unirStock(
+      remoto.lista,
+      locales.map((p) => ({ id: p.id, distId: p.dist_id, nombre: p.name, codigo: p.codigo, stock: Number(p.stock) || 0 })),
+    ),
     transferencias: (transferencias.data ?? []).map(transferenciaDesdeFila),
     errorDistribuidora: remoto.error,
   };

@@ -2,14 +2,17 @@
 // distribuidora (su pantalla "Stock Super"). Sin sesion: Authorization Bearer con
 // DISTRIBUIDORA_STOCK_CLAVE. El comercio NO viaja en el body: es el unico vinculado
 // (distribuidora_vinculo), asi la distribuidora no puede tocar a ningun otro.
-//   stock · transferir { productoId, cantidad, direccion, usuario? } · reintentar
+//   stock · transferir { distId, cantidad, direccion, usuario? }
+//   transferir_varios { items: [{ distId, cantidad }], direccion, usuario? } · reintentar
 import { NextResponse } from "next/server";
 import { accesoDeComercio, mensajeSoloLectura } from "@/lib/server/acceso";
-import { claveIntegracionValida, comercioVinculado, reintentarAbiertas, transferir, verStock } from "@/lib/server/distribuidora-stock";
-import { cantidadTransferible, esDireccion } from "@/lib/stock-distribuidora";
+import { claveIntegracionValida, comercioVinculado, reintentarAbiertas, transferir, transferirVarios, verStock } from "@/lib/server/distribuidora-stock";
+import { esDireccion, leerItems } from "@/lib/stock-distribuidora";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Pasar muchos productos de una son dos llamadas por producto (una por base).
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   if (!claveIntegracionValida(req)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -27,19 +30,15 @@ export async function POST(req: Request) {
     if (body?.accion === "reintentar") {
       return NextResponse.json({ transferencias: await reintentarAbiertas(comercioId) });
     }
-    if (body?.accion === "transferir") {
-      const cantidad = cantidadTransferible(body.cantidad);
-      if (!cantidad) return NextResponse.json({ error: "La cantidad tiene que ser un número entero mayor a 0" }, { status: 400 });
+    if (body?.accion === "transferir" || body?.accion === "transferir_varios") {
       if (!esDireccion(body.direccion)) return NextResponse.json({ error: "Dirección inválida" }, { status: 400 });
-      if (typeof body.productoId !== "string" || !body.productoId) return NextResponse.json({ error: "Falta el producto" }, { status: 400 });
-      const transferencia = await transferir(comercioId, {
-        productoId: body.productoId,
-        cantidad,
-        direccion: body.direccion,
-        usuario: typeof body.usuario === "string" ? body.usuario.slice(0, 80) : null,
-        pedidaEn: "distribuidora",
-      });
-      return NextResponse.json({ transferencia });
+      const items = leerItems(body);
+      if (typeof items === "string") return NextResponse.json({ error: items }, { status: 400 });
+      const comun = { direccion: body.direccion, usuario: typeof body.usuario === "string" ? body.usuario.slice(0, 80) : null, pedidaEn: "distribuidora" as const };
+      if (body.accion === "transferir") {
+        return NextResponse.json({ transferencia: await transferir(comercioId, { ...comun, ...items[0] }) });
+      }
+      return NextResponse.json({ resultados: await transferirVarios(comercioId, items, comun) });
     }
     return NextResponse.json({ error: "Accion desconocida" }, { status: 400 });
   } catch (e) {

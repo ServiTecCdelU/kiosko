@@ -28,13 +28,36 @@ export interface Transferencia {
 }
 
 export interface FilaStock {
-  productoId: string;
+  /** null: el comercio todavia no lo tiene (se da de alta al pasarle stock). */
+  productoId: string | null;
+  /** Id del producto en la distribuidora: identifica la fila en los dos sistemas. */
   distId: string;
   nombre: string;
   codigo: string | null;
   stockComercio: number;
   /** null: la distribuidora no lo tiene (o no respondio). */
   stockDistribuidora: number | null;
+}
+
+/** Producto de la distribuidora con su stock (accion "stock" de su integracion). */
+export interface ProductoRemoto {
+  id: string;
+  name: string;
+  codigo: string | null;
+  stock: number;
+  price?: number;
+  category?: string;
+  imageUrl?: string;
+  description?: string;
+}
+
+/** Producto del comercio que vino de la distribuidora. */
+export interface ProductoLocal {
+  id: string;
+  distId: string;
+  nombre: string;
+  codigo: string | null;
+  stock: number;
 }
 
 /** Tope por movimiento: evita un cero de mas tipeado sin querer. */
@@ -108,4 +131,78 @@ export function filtrarFilas(filas: FilaStock[], texto: string): FilaStock[] {
     const donde = norm(`${f.nombre} ${f.codigo ?? ""}`);
     return palabras.every((p) => donde.includes(p));
   });
+}
+
+/**
+ * Una fila por producto de la distribuidora (lo tenga o no el comercio), mas los del
+ * comercio que la distribuidora ya no tiene (sin stock alla). Por nombre.
+ */
+export function unirStock(remotos: ProductoRemoto[] | null, locales: ProductoLocal[]): FilaStock[] {
+  const porDist = new Map(locales.map((l) => [l.distId, l]));
+  const filas: FilaStock[] = [];
+  const vistos = new Set<string>();
+  for (const r of remotos ?? []) {
+    const l = porDist.get(r.id);
+    vistos.add(r.id);
+    filas.push({
+      productoId: l?.id ?? null,
+      distId: r.id,
+      nombre: l?.nombre || r.name || r.id,
+      codigo: l?.codigo ?? r.codigo ?? null,
+      stockComercio: l?.stock ?? 0,
+      stockDistribuidora: Number(r.stock) || 0,
+    });
+  }
+  for (const l of locales) {
+    if (vistos.has(l.distId)) continue;
+    filas.push({ productoId: l.id, distId: l.distId, nombre: l.nombre, codigo: l.codigo, stockComercio: l.stock, stockDistribuidora: null });
+  }
+  return filas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+/** Lo que tiene stock en algun lado (lo que se ve de entrada). */
+export function conStock(filas: FilaStock[]): FilaStock[] {
+  return filas.filter((f) => f.stockComercio > 0 || (f.stockDistribuidora ?? 0) > 0);
+}
+
+/** Cuanto se puede mover de una fila hacia ese lado (todo lo que hay en el origen, entero). */
+export function disponibleParaMover(f: FilaStock, direccion: DireccionTransferencia): number {
+  const n = direccion === "a_comercio" ? f.stockDistribuidora ?? 0 : f.stockComercio;
+  return Math.max(0, Math.floor(n));
+}
+
+/** Movimientos de una pasada: la cantidad pedida o todo; se saltean los que no tienen. */
+export function armarLote(
+  filas: FilaStock[],
+  direccion: DireccionTransferencia,
+  cantidad: number | "todo",
+): { distId: string; cantidad: number }[] {
+  const lote: { distId: string; cantidad: number }[] = [];
+  for (const f of filas) {
+    const hay = disponibleParaMover(f, direccion);
+    const n = cantidad === "todo" ? hay : Math.min(cantidad, hay);
+    if (n > 0) lote.push({ distId: f.distId, cantidad: n });
+  }
+  return lote;
+}
+
+/** Tope de productos por pasada (cada uno son dos llamadas, una por base). */
+export const MAX_POR_LOTE = 300;
+
+/**
+ * Body de "transferir" ({ distId, cantidad }) o "transferir_varios" ({ items }) ya
+ * validado; un string es el mensaje de error.
+ */
+export function leerItems(body: any): { distId: string; cantidad: number }[] | string {
+  const crudos: unknown[] = body?.accion === "transferir_varios" ? (Array.isArray(body.items) ? body.items : []) : [body];
+  if (crudos.length === 0) return "No hay productos para mover";
+  if (crudos.length > MAX_POR_LOTE) return `Como máximo ${MAX_POR_LOTE} productos por vez`;
+  const items: { distId: string; cantidad: number }[] = [];
+  for (const c of crudos as any[]) {
+    if (typeof c?.distId !== "string" || !c.distId) return "Falta el producto";
+    const cantidad = cantidadTransferible(c.cantidad);
+    if (!cantidad) return "La cantidad tiene que ser un número entero mayor a 0";
+    items.push({ distId: c.distId, cantidad });
+  }
+  return items;
 }

@@ -26,9 +26,20 @@ async function enviar<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-export async function transferirStock(productoId: string, cantidad: number, direccion: DireccionTransferencia): Promise<Transferencia> {
-  const { transferencia } = await enviar<{ transferencia: Transferencia }>({ accion: "transferir", productoId, cantidad, direccion });
+export async function transferirStock(distId: string, cantidad: number, direccion: DireccionTransferencia): Promise<Transferencia> {
+  const { transferencia } = await enviar<{ transferencia: Transferencia }>({ accion: "transferir", distId, cantidad, direccion });
   return transferencia;
+}
+
+export interface ResultadoLote {
+  distId: string;
+  transferencia?: Transferencia;
+  error?: string;
+}
+
+export async function transferirVarios(items: { distId: string; cantidad: number }[], direccion: DireccionTransferencia): Promise<ResultadoLote[]> {
+  const { resultados } = await enviar<{ resultados: ResultadoLote[] }>({ accion: "transferir_varios", items, direccion });
+  return resultados;
 }
 
 export async function reintentarTransferencias(): Promise<Transferencia[]> {
