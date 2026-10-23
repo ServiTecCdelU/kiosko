@@ -33,6 +33,7 @@ export async function GET(req: Request) {
       comercioNombre: comercio.nombre,
       comercioSlug: comercio.slug,
       plan: comercio.plan,
+      conDistribuidora: (await datosDeComercio(comercio.id)).conDistribuidora,
     });
   }
 

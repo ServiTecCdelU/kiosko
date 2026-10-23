@@ -71,14 +71,18 @@ export async function errorPinRepetido(comercioId: string, pin: string | null | 
 }
 
 /** Slug (el panel vive en /<slug>) y nombre del comercio (menu y panel). */
-export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string; rubro?: string; modulos?: ModulosElegidos }> {
-  const { data } = await supabaseAdmin.from("comercios").select("slug, nombre, plan, config").eq("id", comercioId).maybeSingle();
+export async function datosDeComercio(comercioId: string): Promise<{ comercioSlug?: string; comercioNombre?: string; plan?: string; rubro?: string; modulos?: ModulosElegidos; conDistribuidora?: boolean }> {
+  const [{ data }, { data: vinculo }] = await Promise.all([
+    supabaseAdmin.from("comercios").select("slug, nombre, plan, config").eq("id", comercioId).maybeSingle(),
+    // Stock compartido con la distribuidora: solo el comercio vinculado ve esa pantalla.
+    supabaseAdmin.from("distribuidora_vinculo").select("comercio_id").eq("comercio_id", comercioId).eq("activo", true).maybeSingle(),
+  ]);
   // El plan viaja al navegador para mostrar los avisos de "plan Pro" (el servidor igual lo valida).
   // El rubro del alta, para sugerir productos tipicos y la unidad (lib/rubros-perfil.ts).
   const rubro = typeof data?.config?.rubro === "string" ? data.config.rubro : undefined;
   // Modulos prendidos o apagados por el dueño (lib/modulos.ts): ordenan el menu.
   const modulos = modulosValidos(data?.config?.modulos);
-  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined, rubro, modulos };
+  return { comercioSlug: data?.slug ?? undefined, comercioNombre: data?.nombre ?? undefined, plan: data?.plan ?? undefined, rubro, modulos, conDistribuidora: !!vinculo || undefined };
 }
 
 /** Respuesta de login por PIN: datos del usuario + cookie de sesion firmada. */

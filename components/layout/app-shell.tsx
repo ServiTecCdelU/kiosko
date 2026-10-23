@@ -28,7 +28,7 @@ export function AppShell({ title, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, rol, logout } = useAuth();
-  const items = visibleNavItems(rol, user?.rubro, user?.modulos, user?.plan);
+  const items = visibleNavItems(rol, user?.rubro, user?.modulos, user?.plan, user?.conDistribuidora);
   const [colapsado, setColapsado] = useState(false);
   // Pedidos nuevos de la tienda online: numero en el menu, se consulta cada minuto.
   const conPedidos = items.some((i) => i.href === "/pedidos");

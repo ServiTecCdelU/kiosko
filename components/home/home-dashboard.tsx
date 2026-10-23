@@ -91,7 +91,7 @@ export function HomeDashboard() {
 
 function HomeContent() {
   const { user, rol } = useAuth();
-  const items = visibleNavItems(rol, user?.rubro, user?.modulos, user?.plan).filter((i) => i.href !== "/");
+  const items = visibleNavItems(rol, user?.rubro, user?.modulos, user?.plan, user?.conDistribuidora).filter((i) => i.href !== "/");
   const pos = items.find((i) => i.href === "/pos");
   const rest = items.filter((i) => i.href !== "/pos");
 

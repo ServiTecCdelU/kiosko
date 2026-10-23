@@ -223,6 +223,8 @@ export interface Usuario {
   rubro?: string;
   /** Modulos que el dueño prendio o apago en "Mi comercio" (lib/modulos.ts): le ganan al rubro. */
   modulos?: Partial<Record<"produccion" | "presupuestos" | "balanza", boolean>>;
+  /** Comercio vinculado a la distribuidora (distribuidora_vinculo): ve la pantalla de stock compartido. */
+  conDistribuidora?: boolean;
   /** Entro con el PIN viejo de 4: tiene que elegir uno de 6 antes de seguir. */
   debeCambiarPin?: boolean;
   /** Caja (puesto) de la PC registrada donde entro por PIN. */

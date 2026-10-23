@@ -15,8 +15,10 @@ export type ReglaRuta = "publica" | "superadmin" | "sesion" | "gestion" | "admin
  * crea el comercio de alguien que todavia no tiene sesion: la protege la cookie
  * firmada de registro (lib/server/sesion.ts), que solo emite el login con Google.
  * /api/publico: lo que ve cualquiera sin sesion (tienda online, solo lectura).
+ * /api/integracion: otros sistemas de servidor a servidor; cada handler exige su clave
+ * (ej. la distribuidora con DISTRIBUIDORA_STOCK_CLAVE).
  */
-const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook", "/api/billing/webhook", "/api/registro", "/api/dispositivo", "/api/publico"];
+const RUTAS_PUBLICAS = ["/api/auth", "/api/mercadopago/webhook", "/api/billing/webhook", "/api/registro", "/api/dispositivo", "/api/publico", "/api/integracion"];
 
 /** Validan la cookie de superadmin adentro de cada handler. */
 const RUTAS_SUPERADMIN = ["/api/superadmin"];
@@ -63,7 +65,11 @@ const METODOS_ADMIN: Record<string, string[]> = {
  * nunca el cajero aunque llame a la API a mano. El alta de producto (POST
  * /api/productos) queda para todos: el POS la usa al escanear un codigo desconocido.
  */
-const RUTAS_GESTION = ["/api/stock", "/api/productos/aumento", "/api/productos/foto", "/api/productos/fotos-automaticas"];
+// Stock compartido con la distribuidora (pantalla /distribuidora): como Stock, sin el cajero.
+const RUTAS_GESTION = [
+  "/api/stock", "/api/productos/aumento", "/api/productos/foto", "/api/productos/fotos-automaticas",
+  "/api/distribuidora", "/api/consultas/distribuidora",
+];
 const METODOS_GESTION: Record<string, string[]> = {
   "/api/productos": ["PATCH", "PUT"],
 };
