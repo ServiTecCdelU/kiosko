@@ -5,7 +5,7 @@
 //   navegador → el llamador abre window.print() (el ticket HTML ya esta en pantalla)
 //   webusb    → bytes ESC/POS directo a la impresora USB
 //   agente    → bytes ESC/POS al agente local, que escribe en la impresora de Windows o de red
-//   zebra     → ZPL por /api/imprimir-ticket (solo tiene sentido con la app en esta misma PC)
+//   zebra     → ZPL al agente local; sin agente, por /api/imprimir-ticket (app en esta misma PC)
 import { apiUrl } from "@/lib/utils/api-url";
 import type { TicketData } from "@/components/pos/ticket-print";
 import type { PaymentMethod } from "@/lib/types";
@@ -14,7 +14,8 @@ import { generarComprobanteEscPos } from "@/lib/escpos-comprobante";
 import type { Comprobante } from "@/services/facturacion-service";
 import { leerConfigImpresora, modoPuedeAbrirCajon, type ConfigImpresora } from "@/lib/impresora/config";
 import { enviarPorUsb } from "@/lib/impresora/webusb";
-import { enviarAlAgente } from "@/lib/impresora/agente";
+import { AgenteNoResponde, enviarAlAgente } from "@/lib/impresora/agente";
+import { generarZPL } from "@/lib/server/zpl";
 import { ticketDePrueba } from "@/lib/impresora/ticket-prueba";
 
 /**
@@ -37,7 +38,23 @@ async function enviarBytes(config: ConfigImpresora, datos: Uint8Array): Promise<
   throw new Error("Este modo de impresión no habla directo con la impresora.");
 }
 
-async function imprimirZebra(ticket: TicketData): Promise<void> {
+/**
+ * La app esta en internet y no llega a la Zebra del local: el ZPL se arma aca y lo
+ * escribe el agente. Sin agente queda la instalacion vieja, con la app corriendo en
+ * la misma PC que la impresora (el servidor le escribe a la impresora compartida).
+ */
+async function imprimirZebra(ticket: TicketData, config: ConfigImpresora): Promise<void> {
+  try {
+    await enviarAlAgente(config.agenteUrl, config.zebraImpresora, new TextEncoder().encode(generarZPL(ticket)));
+  } catch (e) {
+    if (!(e instanceof AgenteNoResponde)) throw e;
+    await imprimirZebraPorServidor(ticket).catch(() => {
+      throw e;
+    });
+  }
+}
+
+async function imprimirZebraPorServidor(ticket: TicketData): Promise<void> {
   const res = await fetch(apiUrl("/api/imprimir-ticket"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,7 +75,7 @@ export async function imprimirTicket(ticket: TicketData, config: ConfigImpresora
   if (config.modo === "ninguno") return "omitido";
   if (config.modo === "navegador") return "navegador";
   if (config.modo === "zebra") {
-    await imprimirZebra(ticket);
+    await imprimirZebra(ticket, config);
     return "impreso";
   }
   const abrirCajon = config.cajonAlCobrar && cobroConEfectivo(ticket.paymentMethod);

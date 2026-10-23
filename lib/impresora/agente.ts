@@ -20,8 +20,11 @@ function normalizarUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
+/** El agente no contesto (cerrado o en otra PC): distinto de un error de la impresora. */
+export class AgenteNoResponde extends Error {}
+
 function errorConexion(url: string): Error {
-  return new Error(`No responde el agente de impresión en ${url}. ¿Está abierto en esta PC?`);
+  return new AgenteNoResponde(`No responde el agente de impresión en ${url}. ¿Está abierto en esta PC?`);
 }
 
 export async function estadoAgente(url: string): Promise<EstadoAgente> {

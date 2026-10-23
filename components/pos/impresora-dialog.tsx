@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
-  AGENTE_URL_DEFAULT, MODO_LABEL, guardarConfigImpresora, leerConfigImpresora, modoPuedeAbrirCajon,
+  AGENTE_URL_DEFAULT, MODO_LABEL, ZEBRA_IMPRESORA_DEFAULT, guardarConfigImpresora, leerConfigImpresora, modoPuedeAbrirCajon,
   type ConfigImpresora, type ModoImpresora,
 } from "@/lib/impresora/config";
 import { elegirImpresoraUsb, impresoraUsbGuardada, nombreDispositivo, soportaWebUsb } from "@/lib/impresora/webusb";
@@ -43,7 +43,7 @@ const MODOS: { valor: ModoImpresora; ayuda: string }[] = [
   { valor: "navegador", ayuda: "Se abre la ventana de imprimir en cada venta. Sirve con cualquier impresora instalada en Windows, pero no abre el cajón." },
   { valor: "webusb", ayuda: "Chrome o Edge le mandan el ticket directo a la impresora térmica (Epson, Xprinter, 3nStar…). Silencioso, con corte y cajón." },
   { valor: "agente", ayuda: "Un programita en esta PC recibe el ticket y lo manda a la impresora de Windows o de red. Sirve cuando el USB directo no funciona." },
-  { valor: "zebra", ayuda: "Ticket ZPL a una Zebra ZD220 compartida en la PC donde corre la app. Solo para instalaciones locales." },
+  { valor: "zebra", ayuda: "Ticket ZPL a la Zebra ZD220, con el alto justo. Va por el agente local, igual que la térmica." },
 ];
 
 export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged, onPruebaNavegador, conBalanza = true }: ImpresoraDialogProps) {
@@ -90,7 +90,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
     try {
       const estado = await estadoAgente(config.agenteUrl);
       setAgenteEstado({ ok: estado.ok, impresoras: estado.impresoras });
-      if (!config.agenteImpresora && estado.impresoras.length === 1) guardar({ agenteImpresora: estado.impresoras[0] });
+      if (config.modo === "agente" && !config.agenteImpresora && estado.impresoras.length === 1) guardar({ agenteImpresora: estado.impresoras[0] });
     } catch (e) {
       setAgenteEstado({ ok: false, impresoras: [], error: e instanceof Error ? e.message : "No responde" });
     } finally {
@@ -125,6 +125,10 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
   };
 
   const directa = modoPuedeAbrirCajon(config.modo);
+  // El agente sirve a la termica y a la Zebra: cada una guarda su propia impresora.
+  const nombreImpresora = config.modo === "zebra" ? config.zebraImpresora : config.agenteImpresora;
+  const guardarNombreImpresora = (nombre: string) =>
+    guardar(config.modo === "zebra" ? { zebraImpresora: nombre } : { agenteImpresora: nombre });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,7 +186,7 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
           </section>
         )}
 
-        {config.modo === "agente" && (
+        {(config.modo === "agente" || config.modo === "zebra") && (
           <section className="space-y-2 rounded-xl border p-3">
             <p className="text-sm font-semibold">Agente local</p>
             <p className="text-xs text-muted-foreground">
@@ -206,10 +210,16 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
                 ? <Badge variant="outline" className="border-primary text-primary">Agente conectado · {agenteEstado.impresoras.length} impresora(s)</Badge>
                 : <p className="text-sm text-destructive">{agenteEstado.error}</p>
             )}
+            {config.modo === "zebra" && (
+              <p className="text-xs text-muted-foreground">
+                La Zebra va instalada en Windows como impresora <b>Generic / Text Only</b> en el mismo puerto USB que la ZDesigner,
+                con el nombre <code>{ZEBRA_IMPRESORA_DEFAULT}</code> (o el que elijas abajo).
+              </p>
+            )}
             {!!agenteEstado?.impresoras.length && (
               <select
-                value={agenteEstado.impresoras.includes(config.agenteImpresora) ? config.agenteImpresora : ""}
-                onChange={(e) => e.target.value && guardar({ agenteImpresora: e.target.value })}
+                value={agenteEstado.impresoras.includes(nombreImpresora) ? nombreImpresora : ""}
+                onChange={(e) => e.target.value && guardarNombreImpresora(e.target.value)}
                 className="h-9 w-full rounded-xl border bg-transparent px-2 text-sm"
                 aria-label="Impresora de Windows"
               >
@@ -218,9 +228,10 @@ export function ImpresoraDialog({ open, onOpenChange, nombreComercio, onChanged,
               </select>
             )}
             <Input
-              value={config.agenteImpresora}
-              onChange={(e) => guardar({ agenteImpresora: e.target.value })}
-              placeholder="Nombre en Windows (ej. POS-80) o impresora de red (ej. 192.168.1.50:9100)"
+              value={nombreImpresora}
+              onChange={(e) => guardarNombreImpresora(e.target.value)}
+              onBlur={() => config.modo === "zebra" && !config.zebraImpresora.trim() && guardar({ zebraImpresora: ZEBRA_IMPRESORA_DEFAULT })}
+              placeholder={config.modo === "zebra" ? ZEBRA_IMPRESORA_DEFAULT : "Nombre en Windows (ej. POS-80) o impresora de red (ej. 192.168.1.50:9100)"}
               className="h-9 rounded-xl text-sm"
             />
           </section>

@@ -182,8 +182,9 @@ Leer en este orden: `CLAUDE.md` (reglas) → este archivo → el spec puntual de
   - `agente`: los mismos bytes al **agente local** (`herramientas/agente-impresora/`,
     Node sin dependencias en `127.0.0.1:9123`) que escribe en la impresora de Windows
     por `winspool` (PowerShell) o en una de red (`host:9100`). README en la carpeta.
-  - `zebra`: ZPL a la **Zebra ZD220** por `/api/imprimir-ticket` (`lib/server/zpl.ts`);
-    solo sirve con la app corriendo en la misma PC que la impresora.
+  - `zebra`: ZPL a la **Zebra ZD220** (`lib/server/zpl.ts`, se arma en el navegador) por el
+    agente local, a la impresora RAW `ZD220-RAW`. Sin agente cae a `/api/imprimir-ticket`,
+    que solo sirve con la app corriendo en la misma PC que la impresora.
   - Si la impresora falla, siempre se cae al ticket del navegador. Orquestador:
     `lib/impresora/imprimir.ts` (`imprimirTicket`, `abrirCajon`).
 - **Cajón de dinero**: enchufado a la impresora (RJ11). Se abre solo al cobrar en

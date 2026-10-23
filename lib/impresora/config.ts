@@ -18,9 +18,12 @@ export interface ConfigImpresora {
   agenteUrl: string;
   /** Nombre de la impresora de Windows o host:puerto de una impresora de red (modo agente). */
   agenteImpresora: string;
+  /** Impresora RAW de la Zebra en Windows (modo zebra, va por el mismo agente). */
+  zebraImpresora: string;
 }
 
 export const AGENTE_URL_DEFAULT = "http://127.0.0.1:9123";
+export const ZEBRA_IMPRESORA_DEFAULT = "ZD220-RAW";
 
 export const CONFIG_IMPRESORA_DEFAULT: ConfigImpresora = {
   modo: "navegador",
@@ -28,6 +31,7 @@ export const CONFIG_IMPRESORA_DEFAULT: ConfigImpresora = {
   cajonAlCobrar: true,
   agenteUrl: AGENTE_URL_DEFAULT,
   agenteImpresora: "",
+  zebraImpresora: ZEBRA_IMPRESORA_DEFAULT,
 };
 
 const CLAVE = "kiosko:impresora";
@@ -37,7 +41,7 @@ export const MODO_LABEL: Record<ModoImpresora, string> = {
   navegador: "Diálogo de impresión del navegador",
   webusb: "Impresora térmica por USB (sin instalar nada)",
   agente: "Impresora térmica por el agente local",
-  zebra: "Zebra ZD220 (ZPL, app en esta misma PC)",
+  zebra: "Zebra ZD220 (ZPL por el agente local)",
 };
 
 export function leerConfigImpresora(): ConfigImpresora {
@@ -53,6 +57,7 @@ export function leerConfigImpresora(): ConfigImpresora {
       cajonAlCobrar: parsed.cajonAlCobrar ?? CONFIG_IMPRESORA_DEFAULT.cajonAlCobrar,
       agenteUrl: (parsed.agenteUrl ?? "").trim() || AGENTE_URL_DEFAULT,
       agenteImpresora: (parsed.agenteImpresora ?? "").trim(),
+      zebraImpresora: (parsed.zebraImpresora ?? "").trim() || ZEBRA_IMPRESORA_DEFAULT,
     };
   } catch {
     return CONFIG_IMPRESORA_DEFAULT;

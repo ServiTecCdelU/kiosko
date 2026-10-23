@@ -30,6 +30,20 @@ directo*, y mover ese acceso directo a la carpeta de Inicio (`Win + R`, escribir
 - **De red (Ethernet o Wi-Fi)**: en vez del nombre se escribe `IP:9100`, por ejemplo
   `192.168.1.50:9100`. No hace falta instalarla en Windows.
 
+### Zebra ZD220 (tickets en ZPL)
+
+El agente también le pasa los tickets a la Zebra. Además del driver ZDesigner hay que
+agregar la misma impresora una segunda vez, sin interpretar nada:
+
+1. Ver el puerto de la ZDesigner: botón derecho → *Propiedades de impresora* → *Puertos*
+   (ej. `USB001`).
+2. *Agregar impresora* → "La impresora que quiero no está en la lista" → *Agregar una
+   impresora local o de red con configuración manual* → *Usar un puerto existente*: el
+   mismo del paso 1.
+3. Driver: *Generic* → *Generic / Text Only*. Nombre: `ZD220-RAW`. Sin página de prueba.
+4. En el sistema: **Punto de venta → Impresora → "Zebra ZD220"**, con el agente abierto, y
+   **Imprimir ticket de prueba**.
+
 El cajón de dinero va enchufado al conector RJ11 de la impresora; el ticket ya lleva
 la orden de abrirlo cuando se cobra en efectivo, y en el sistema hay un botón
 "Abrir cajón" para abrirlo sin vender.
