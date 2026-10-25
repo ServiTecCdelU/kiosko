@@ -2,7 +2,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 // Import estático: Next le agrega el basePath (/comercio) a la URL del logo.
-import logoServitec from '@/public/servitec-logo.png'
+// Versión de 64 px (4 KB): el PNG original pesa 40 KB y se muestra a 32 px.
+import logoServitec from '@/public/servitec-logo-64.webp'
 
 export function WhatsAppIcon({ className }: { className?: string }) {
   return (
