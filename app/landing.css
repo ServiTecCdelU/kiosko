@@ -1,0 +1,15 @@
+/*
+ * CSS de la landing pública (app/page.tsx). Va aparte de globals.css porque el
+ * Tailwind de todo el sistema (~140 KB) bloqueaba el primer pintado en el
+ * celular (PageSpeed). source(none) + @source: solo genera las clases que usa
+ * la landing.
+ */
+@import 'tailwindcss' source(none);
+@import './theme.css';
+@import './landing-theme.css';
+
+@source "./page.tsx";
+@source "./layout.tsx";
+@source "../components/landing";
+@source "../components/analytics/whatsapp-link.tsx";
+@source "../lib/marketing";

@@ -1,8 +1,8 @@
 import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
-import { Toaster } from "sonner";
-import "@/app/globals.css";
+// Sin CSS acá: el sistema importa globals.css desde app/(sistema)/layout.tsx y la
+// landing (app/page.tsx) importa el suyo, app/landing.css.
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { GoogleTag } from "@/components/analytics/google-tag";
 import { IMAGEN_OG, OG_BASE, conBase, siteOrigin } from "@/lib/site";
@@ -77,7 +77,6 @@ export default function RootLayout({
     >
       <body className={`font-sans antialiased`} suppressHydrationWarning>
         {children}
-        <Toaster richColors position="top-center" />
         <ServiceWorkerRegister />
         <GoogleTag />
       </body>

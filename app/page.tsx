@@ -1,3 +1,4 @@
+import "@/app/landing.css";
 import { Landing } from "@/components/landing/landing";
 import { IMAGEN_OG, conBase, siteOrigin } from "@/lib/site";
 import { jsonLdLanding } from "@/lib/marketing/seo";
